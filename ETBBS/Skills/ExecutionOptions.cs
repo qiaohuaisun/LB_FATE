@@ -11,4 +11,4 @@ public sealed record ExecutionOptions(
     ConflictHandling ConflictHandling = ConflictHandling.WarnOnly,
     bool EmitPerActionEventsInTransactional = true
 );
- 
+

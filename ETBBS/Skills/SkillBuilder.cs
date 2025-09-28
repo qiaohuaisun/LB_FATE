@@ -1,5 +1,3 @@
-using System.Linq;
-
 namespace ETBBS;
 
 public record SkillMetadata(string Name, int MpCost, int Range);
@@ -326,6 +324,6 @@ public sealed class SkillScript
     public SkillScript ForEachEnemiesInRangeParallel(string casterId, IReadOnlyDictionary<string, string> teamMap, int range, Action<SkillScript, string> body, DistanceMetric metric = DistanceMetric.Manhattan, string posKey = Keys.Pos)
         => ForEachParallel(Selection.EnemiesWithinRange(casterId, teamMap, range, metric, posKey), body);
 }
- 
+
 
 

@@ -1,7 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Collections.Immutable;
-using System.Linq;
 using ETBBS;
 
 namespace LB_FATE;
@@ -25,7 +21,7 @@ partial class Game
         [ClassType.Assassin] = new ClassDef(28, 3, 6, 4, 1, 4),
     };
 
-    private readonly char[] symbols = new[] { '1','2','3','4','5','6','7' };
+    private readonly char[] symbols = new[] { '1', '2', '3', '4', '5', '6', '7' };
     private readonly string[] playerIds;
     private readonly Dictionary<string, IPlayerEndpoint> endpoints = new();
 

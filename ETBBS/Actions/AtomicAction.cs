@@ -33,4 +33,4 @@ internal static class SetExtensions
     public static bool IsDisjoint<T>(this ImmutableHashSet<T> a, ImmutableHashSet<T> b)
         => a.Count == 0 || b.Count == 0 || a.Intersect(b).IsEmpty;
 }
- 
+

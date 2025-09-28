@@ -1,8 +1,8 @@
+using ETBBS;
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.IO;
-using ETBBS;
 using Xunit;
 
 public class RoleAndReplayTests
@@ -43,7 +43,7 @@ role "Test Role" id "test_role" {
         // Execute the compiled S1 to ensure it runs and sets global var
         var s = EmptyWorld();
         s = WorldStateOps.WithGlobal(s, g => g with { Vars = g.Vars.SetItem(DslRuntime.CasterKey, "U") });
-        s = WorldStateOps.WithUnit(s, "U", _ => new UnitState(ImmutableDictionary<string, object>.Empty.Add(Keys.Pos, new Coord(0,0)), ImmutableHashSet<string>.Empty));
+        s = WorldStateOps.WithUnit(s, "U", _ => new UnitState(ImmutableDictionary<string, object>.Empty.Add(Keys.Pos, new Coord(0, 0)), ImmutableHashSet<string>.Empty));
         var se = new SkillExecutor();
         (s, _) = se.ExecutePlan(s, role.Skills[0].Compiled.BuildPlan(new Context(s)), validator: null);
         Assert.Equal(1, (int)Convert.ToInt32(s.Global.Vars["s1"]));

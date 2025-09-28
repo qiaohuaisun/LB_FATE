@@ -1,5 +1,3 @@
-using System.Collections.Immutable;
-
 namespace ETBBS;
 
 public sealed class SkillRegistry
@@ -14,4 +12,4 @@ public sealed class SkillRegistry
 
     public IEnumerable<SkillMetadata> All() => _skills.Values.Select(s => s.Metadata);
 }
- 
+

@@ -573,7 +573,8 @@ public static partial class TextDsl
 
         private bool Match(string text)
         {
-            var save = _pos; if (TryConsume(text)) { _pos = save; return true; } return false;
+            var save = _pos; if (TryConsume(text)) { _pos = save; return true; }
+            return false;
         }
 
         private bool TryConsume(string text)

@@ -75,6 +75,11 @@ public sealed record Damage(string TargetId, int Amount) : AtomicAction
     public override Effect Compile() => state =>
         WorldStateOps.WithUnit(state, TargetId, u =>
         {
+            // Guaranteed evasion also blocks generic damage once
+            if (u.Vars.TryGetValue(Keys.EvadeCharges, out var ec) && ec is int ecc && ecc > 0)
+            {
+                return u with { Vars = u.Vars.SetItem(Keys.EvadeCharges, ecc - 1).SetItem(Keys.NextAttackMultiplier, 2.0) };
+            }
             var hp = 0;
             if (u.Vars.TryGetValue(Keys.Hp, out var v))
             {
@@ -154,60 +159,120 @@ public sealed record Heal(string TargetId, int Amount) : AtomicAction
 public sealed record PhysicalDamage(string AttackerId, string TargetId, int Power, double IgnoreDefenseRatio = 0.0) : AtomicAction
 {
     public override Effect Compile() => state =>
-        WorldStateOps.WithUnit(state, TargetId, t =>
+    {
+        // Read attacker/target
+        state.Units.TryGetValue(AttackerId, out var au);
+        state.Units.TryGetValue(TargetId, out var tu);
+        if (tu is null) return state;
+
+        // Guaranteed evasion charge: consume and grant next-attack multiplier to defender
+        if (tu.Vars.TryGetValue(Keys.EvadeCharges, out var ec) && ec is int ecc && ecc > 0)
         {
-            var atk = 0; var def = 0; var hp = 0;
-            if (state.Units.TryGetValue(AttackerId, out var au) && au.Vars.TryGetValue(Keys.Atk, out var av))
-                atk = av switch { int i => i, long l => (int)l, double d => (int)Math.Round(d), _ => 0 };
-            if (t.Vars.TryGetValue(Keys.Def, out var dv))
-                def = dv switch { int i => i, long l => (int)l, double d => (int)Math.Round(d), _ => 0 };
-            if (t.Vars.TryGetValue(Keys.Hp, out var hv))
-                hp = hv switch { int i => i, long l => (int)l, double d => (int)Math.Round(d), _ => 0 };
-            var effDef = (int)Math.Round(def * Math.Max(0.0, 1.0 - IgnoreDefenseRatio));
-            var raw = Math.Max(0, Power + atk - effDef);
-            // apply physical resistance if present
-            if (t.Vars.TryGetValue(Keys.ResistPhysical, out var rp) && rp is double rpd)
-            {
-                var factor = 1.0 - Math.Clamp(rpd, 0.0, 1.0);
-                raw = (int)Math.Max(0, Math.Round(raw * factor));
-            }
-            // Duel mode: if both sides have duel tag, increase damage 3x (approx 'attack +200%')
-            var attackerHasDuel = state.Units.TryGetValue(AttackerId, out var au2) && au2.Tags.Contains(Tags.Duel);
-            var targetHasDuel = t.Tags.Contains(Tags.Duel);
-            if (attackerHasDuel && targetHasDuel)
-                raw = (int)Math.Round(raw * 3.0);
-            // consume shield
+            var afterCharges = ecc - 1;
+            var s1 = WorldStateOps.WithUnit(state, TargetId, u => u with { Vars = u.Vars.SetItem(Keys.EvadeCharges, afterCharges) });
+            s1 = WorldStateOps.WithUnit(s1, TargetId, u => u with { Vars = u.Vars.SetItem(Keys.NextAttackMultiplier, 2.0) });
+            return s1;
+        }
+
+        // RNG for evasion
+        System.Random rng = null!;
+        if (state.Global.Vars.TryGetValue(DslRuntime.RngKey, out var rv) && rv is System.Random r) rng = r; else rng = new System.Random(unchecked(Environment.TickCount * 31 + AttackerId.GetHashCode() + TargetId.GetHashCode()));
+
+        // Compute evasion chance
+        double evasion = tu.Vars.TryGetValue(Keys.Evasion, out var evv) ? Convert.ToDouble(evv) : 0.0;
+        // Phase-based bonus (phase 1 & 5)
+        if (state.Global.Vars.TryGetValue(DslRuntime.PhaseKey, out var pv) && pv is int ph && (ph == 1 || ph == 5))
+        {
+            if (tu.Vars.TryGetValue(Keys.NightOrDawnEvasionBonus, out var nb)) evasion += Convert.ToDouble(nb);
+        }
+        // Temporary bonus with duration
+        if (tu.Vars.TryGetValue(Keys.TempEvasionBonusTurns, out var tbt) && tbt is int tbtn && tbtn > 0)
+        {
+            if (tu.Vars.TryGetValue(Keys.TempEvasionBonus, out var tb)) evasion += Convert.ToDouble(tb);
+        }
+        evasion = Math.Clamp(evasion, 0.0, 0.95);
+        if (rng.NextDouble() < evasion)
+        {
+            return state; // evaded
+        }
+
+        // Next attack multiplier from attacker
+        double atkMult = 1.0;
+        if (au is not null && au.Vars.TryGetValue(Keys.NextAttackMultiplier, out var nm))
+        {
+            atkMult = Math.Max(1.0, Convert.ToDouble(nm));
+            state = WorldStateOps.WithUnit(state, AttackerId, u => u with { Vars = u.Vars.Remove(Keys.NextAttackMultiplier) });
+            state.Units.TryGetValue(TargetId, out tu); // refresh
+        }
+
+        // Stats
+        int atk = 0, def = 0, hp = 0;
+        if (au is not null && au.Vars.TryGetValue(Keys.Atk, out var av)) atk = av switch { int i => i, long l => (int)l, double d => (int)Math.Round(d), _ => 0 };
+        if (tu.Vars.TryGetValue(Keys.Def, out var dv)) def = dv switch { int i => i, long l => (int)l, double d => (int)Math.Round(d), _ => 0 };
+        if (tu.Vars.TryGetValue(Keys.Hp, out var hv)) hp = hv switch { int i => i, long l => (int)l, double d => (int)Math.Round(d), _ => 0 };
+
+        // Low HP ignore defense (attacker passive)
+        double ignoreBelow = 0.0;
+        if (au is not null && au.Vars.TryGetValue(Keys.LowHpIgnoreDefRatio, out var th)) ignoreBelow = Math.Clamp(Convert.ToDouble(th), 0.0, 1.0);
+        int maxHp = tu.Vars.TryGetValue(Keys.MaxHp, out var mhv) ? (mhv is int mi ? mi : (mhv is long ml ? (int)ml : (mhv is double md ? (int)Math.Round(md) : 0))) : 0;
+        bool ignoreAllDef = false;
+        // Force ignore defense during turns
+        if (au is not null && au.Vars.TryGetValue(Keys.ForceIgnoreDefTurns, out var fid) && fid is int fidt && fidt > 0)
+            ignoreAllDef = true;
+        if (maxHp > 0 && ignoreBelow > 0.0 && hp <= (int)Math.Round(maxHp * ignoreBelow)) ignoreAllDef = true;
+
+        var effDef = ignoreAllDef ? 0 : (int)Math.Round(def * Math.Max(0.0, 1.0 - IgnoreDefenseRatio));
+        var raw = Math.Max(0, Power + atk - effDef);
+        // apply physical resistance if present
+        if (tu.Vars.TryGetValue(Keys.ResistPhysical, out var rp) && rp is double rpd)
+        {
+            var factor = 1.0 - Math.Clamp(rpd, 0.0, 1.0);
+            raw = (int)Math.Max(0, Math.Round(raw * factor));
+        }
+        // Next attack multiplier
+        raw = (int)Math.Max(0, Math.Round(raw * atkMult));
+        // Duel mode
+        var attackerHasDuel = (au is not null) && au.Tags.Contains(Tags.Duel);
+        var targetHasDuel = tu.Tags.Contains(Tags.Duel);
+        if (attackerHasDuel && targetHasDuel)
+            raw = (int)Math.Round(raw * 3.0);
+
+        // Apply shield and hp
+        return WorldStateOps.WithUnit(state, TargetId, t =>
+        {
+            int thp = hp;
+            int traw = raw;
             if (t.Vars.TryGetValue(Keys.ShieldValue, out var sv))
             {
                 double shield = sv is double dd ? dd : (sv is int ii ? ii : 0);
-                var after = shield - raw;
+                var after = shield - traw;
                 if (after >= 0)
                 {
                     return t with { Vars = t.Vars.SetItem(Keys.ShieldValue, after) };
                 }
                 else
                 {
-                    raw = (int)Math.Max(0, Math.Round(-after));
+                    traw = (int)Math.Max(0, Math.Round(-after));
                     t = t with { Vars = t.Vars.SetItem(Keys.ShieldValue, 0) };
                 }
             }
-            var nhp = Math.Max(0, hp - raw);
-            // auto-heal below half
-            int maxHp = t.Vars.TryGetValue(Keys.MaxHp, out var mhv) ? (mhv is int mi ? mi : (mhv is long ml ? (int)ml : (mhv is double md ? (int)Math.Round(md) : 0))) : 0;
+            var nhp2 = Math.Max(0, thp - traw);
+            int maxHp2 = t.Vars.TryGetValue(Keys.MaxHp, out var mhv2) ? (mhv2 is int mi2 ? mi2 : (mhv2 is long ml2 ? (int)ml2 : (mhv2 is double md2 ? (int)Math.Round(md2) : 0))) : 0;
             if (t.Vars.TryGetValue(Keys.AutoHealBelowHalf, out var ahv)
                 && (t.Vars.TryGetValue(Keys.AutoHealBelowHalfUsed, out var used) ? !(used is bool ub && ub) : true)
-                && maxHp > 0 && hp > maxHp / 2 && nhp <= maxHp / 2)
+                && maxHp2 > 0 && thp > maxHp2 / 2 && nhp2 <= maxHp2 / 2)
             {
                 int heal = ahv is int ai ? ai : (ahv is long al ? (int)al : (ahv is double ad ? (int)Math.Round(ad) : 0));
-                nhp = Math.Min(maxHp, nhp + Math.Max(0, heal));
+                nhp2 = Math.Min(maxHp2, nhp2 + Math.Max(0, heal));
                 t = t with { Vars = t.Vars.SetItem(Keys.AutoHealBelowHalfUsed, true) };
             }
             if (t.Vars.TryGetValue(Keys.UndyingTurns, out var ud) && ud is int turns && turns > 0)
             {
-                if (nhp <= 0) nhp = 1;
+                if (nhp2 <= 0) nhp2 = 1;
             }
-            return t with { Vars = t.Vars.SetItem(Keys.Hp, nhp) };
+            return t with { Vars = t.Vars.SetItem(Keys.Hp, nhp2) };
         });
+    };
 
     public override ImmutableHashSet<string> ReadVars => ImmutableHashSet<string>.Empty
         .Add(UnitVarKey(AttackerId, Keys.Atk))
@@ -220,57 +285,92 @@ public sealed record PhysicalDamage(string AttackerId, string TargetId, int Powe
 public sealed record MagicDamage(string AttackerId, string TargetId, int Power, double IgnoreResistRatio = 0.0) : AtomicAction
 {
     public override Effect Compile() => state =>
-        WorldStateOps.WithUnit(state, TargetId, t =>
+    {
+        state.Units.TryGetValue(AttackerId, out var au);
+        state.Units.TryGetValue(TargetId, out var tu);
+        if (tu is null) return state;
+
+        // Guaranteed evade
+        if (tu.Vars.TryGetValue(Keys.EvadeCharges, out var ec) && ec is int ecc && ecc > 0)
         {
-            var matk = 0; var mdef = 0; var hp = 0;
-            if (state.Units.TryGetValue(AttackerId, out var au) && au.Vars.TryGetValue(Keys.MAtk, out var av))
-                matk = av switch { int i => i, long l => (int)l, double d => (int)Math.Round(d), _ => 0 };
-            else if (state.Units.TryGetValue(AttackerId, out var au2) && au2.Vars.TryGetValue(Keys.Atk, out var av2))
-                matk = av2 switch { int i => i, long l => (int)l, double d => (int)Math.Round(d), _ => 0 };
-            if (t.Vars.TryGetValue(Keys.MDef, out var dv))
-                mdef = dv switch { int i => i, long l => (int)l, double d => (int)Math.Round(d), _ => 0 };
-            if (t.Vars.TryGetValue(Keys.Hp, out var hv))
-                hp = hv switch { int i => i, long l => (int)l, double d => (int)Math.Round(d), _ => 0 };
-            var effRes = (int)Math.Round(mdef * Math.Max(0.0, 1.0 - IgnoreResistRatio));
-            var raw = Math.Max(0, Power + matk - effRes);
-            // apply magic resistance if present
-            if (t.Vars.TryGetValue(Keys.ResistMagic, out var rm) && rm is double rmd)
-            {
-                var factor = 1.0 - Math.Clamp(rmd, 0.0, 1.0);
-                raw = (int)Math.Max(0, Math.Round(raw * factor));
-            }
-            // consume shield
+            var s1 = WorldStateOps.WithUnit(state, TargetId, u => u with { Vars = u.Vars.SetItem(Keys.EvadeCharges, ecc - 1) });
+            s1 = WorldStateOps.WithUnit(s1, TargetId, u => u with { Vars = u.Vars.SetItem(Keys.NextAttackMultiplier, 2.0) });
+            return s1;
+        }
+
+        System.Random rng = null!;
+        if (state.Global.Vars.TryGetValue(DslRuntime.RngKey, out var rv) && rv is System.Random r) rng = r; else rng = new System.Random(unchecked(Environment.TickCount * 31 + AttackerId.GetHashCode() + TargetId.GetHashCode()));
+        double evasion = tu.Vars.TryGetValue(Keys.Evasion, out var evv) ? Convert.ToDouble(evv) : 0.0;
+        if (state.Global.Vars.TryGetValue(DslRuntime.PhaseKey, out var pv) && pv is int ph && (ph == 1 || ph == 5))
+        {
+            if (tu.Vars.TryGetValue(Keys.NightOrDawnEvasionBonus, out var nb)) evasion += Convert.ToDouble(nb);
+        }
+        if (tu.Vars.TryGetValue(Keys.TempEvasionBonusTurns, out var tbt) && tbt is int tbtn && tbtn > 0)
+        {
+            if (tu.Vars.TryGetValue(Keys.TempEvasionBonus, out var tb)) evasion += Convert.ToDouble(tb);
+        }
+        evasion = Math.Clamp(evasion, 0.0, 0.95);
+        if (rng.NextDouble() < evasion) return state;
+
+        double atkMult = 1.0;
+        if (au is not null && au.Vars.TryGetValue(Keys.NextAttackMultiplier, out var nm))
+        {
+            atkMult = Math.Max(1.0, Convert.ToDouble(nm));
+            state = WorldStateOps.WithUnit(state, AttackerId, u => u with { Vars = u.Vars.Remove(Keys.NextAttackMultiplier) });
+            state.Units.TryGetValue(TargetId, out tu);
+        }
+
+        int matk = 0, mdef = 0, hp = 0;
+        if (au is not null && au.Vars.TryGetValue(Keys.MAtk, out var av))
+            matk = av switch { int i => i, long l => (int)l, double d => (int)Math.Round(d), _ => 0 };
+        else if (au is not null && au.Vars.TryGetValue(Keys.Atk, out var av2))
+            matk = av2 switch { int i => i, long l => (int)l, double d => (int)Math.Round(d), _ => 0 };
+        if (tu.Vars.TryGetValue(Keys.MDef, out var dv)) mdef = dv switch { int i => i, long l => (int)l, double d => (int)Math.Round(d), _ => 0 };
+        if (tu.Vars.TryGetValue(Keys.Hp, out var hv)) hp = hv switch { int i => i, long l => (int)l, double d => (int)Math.Round(d), _ => 0 };
+        var effRes = (int)Math.Round(mdef * Math.Max(0.0, 1.0 - IgnoreResistRatio));
+        var raw = Math.Max(0, Power + matk - effRes);
+        if (tu.Vars.TryGetValue(Keys.ResistMagic, out var rm) && rm is double rmd)
+        {
+            var factor = 1.0 - Math.Clamp(rmd, 0.0, 1.0);
+            raw = (int)Math.Max(0, Math.Round(raw * factor));
+        }
+        raw = (int)Math.Max(0, Math.Round(raw * atkMult));
+
+        return WorldStateOps.WithUnit(state, TargetId, t =>
+        {
+            int thp = hp;
+            int traw = raw;
             if (t.Vars.TryGetValue(Keys.ShieldValue, out var sv))
             {
                 double shield = sv is double dd ? dd : (sv is int ii ? ii : 0);
-                var after = shield - raw;
+                var after = shield - traw;
                 if (after >= 0)
                 {
                     return t with { Vars = t.Vars.SetItem(Keys.ShieldValue, after) };
                 }
                 else
                 {
-                    raw = (int)Math.Max(0, Math.Round(-after));
+                    traw = (int)Math.Max(0, Math.Round(-after));
                     t = t with { Vars = t.Vars.SetItem(Keys.ShieldValue, 0) };
                 }
             }
-            var nhp = Math.Max(0, hp - raw);
-            // auto-heal below half
-            int maxHp = t.Vars.TryGetValue(Keys.MaxHp, out var mhv) ? (mhv is int mi ? mi : (mhv is long ml ? (int)ml : (mhv is double md ? (int)Math.Round(md) : 0))) : 0;
+            var nhp2 = Math.Max(0, thp - traw);
+            int maxHp2 = t.Vars.TryGetValue(Keys.MaxHp, out var mhv2) ? (mhv2 is int mi2 ? mi2 : (mhv2 is long ml2 ? (int)ml2 : (mhv2 is double md2 ? (int)Math.Round(md2) : 0))) : 0;
             if (t.Vars.TryGetValue(Keys.AutoHealBelowHalf, out var ahv)
                 && (t.Vars.TryGetValue(Keys.AutoHealBelowHalfUsed, out var used) ? !(used is bool ub && ub) : true)
-                && maxHp > 0 && hp > maxHp / 2 && nhp <= maxHp / 2)
+                && maxHp2 > 0 && thp > maxHp2 / 2 && nhp2 <= maxHp2 / 2)
             {
                 int heal = ahv is int ai ? ai : (ahv is long al ? (int)al : (ahv is double ad ? (int)Math.Round(ad) : 0));
-                nhp = Math.Min(maxHp, nhp + Math.Max(0, heal));
+                nhp2 = Math.Min(maxHp2, nhp2 + Math.Max(0, heal));
                 t = t with { Vars = t.Vars.SetItem(Keys.AutoHealBelowHalfUsed, true) };
             }
             if (t.Vars.TryGetValue(Keys.UndyingTurns, out var ud) && ud is int turns && turns > 0)
             {
-                if (nhp <= 0) nhp = 1;
+                if (nhp2 <= 0) nhp2 = 1;
             }
-            return t with { Vars = t.Vars.SetItem(Keys.Hp, nhp) };
+            return t with { Vars = t.Vars.SetItem(Keys.Hp, nhp2) };
         });
+    };
 
     public override ImmutableHashSet<string> ReadVars => ImmutableHashSet<string>.Empty
         .Add(UnitVarKey(AttackerId, Keys.MAtk))
@@ -346,36 +446,36 @@ public sealed record LineAoeDamage(string AttackerId, string TargetId, int Power
                     curState = new Damage(id, Power).Compile()(curState);
                     break;
                 case DamageFlavor.Physical:
-                {
-                    int atk = au.Vars.TryGetValue(Keys.Atk, out var av) ? (av is int ai ? ai : (av is long al ? (int)al : (av is double ad ? (int)Math.Round(ad) : 0))) : 0;
-                    int def = u.Vars.TryGetValue(Keys.Def, out var dv) ? (dv is int di ? di : (dv is long dl ? (int)dl : (dv is double dd ? (int)Math.Round(dd) : 0))) : 0;
-                    int effDef = (int)Math.Round(def * Math.Max(0.0, 1.0 - IgnoreRatio));
-                    int raw = Math.Max(0, Power + atk - effDef);
-                    // resist_physical
-                    if (u.Vars.TryGetValue(Keys.ResistPhysical, out var rp) && rp is double rpd)
                     {
-                        var factor = 1.0 - Math.Clamp(rpd, 0.0, 1.0);
-                        raw = (int)Math.Max(0, Math.Round(raw * factor));
+                        int atk = au.Vars.TryGetValue(Keys.Atk, out var av) ? (av is int ai ? ai : (av is long al ? (int)al : (av is double ad ? (int)Math.Round(ad) : 0))) : 0;
+                        int def = u.Vars.TryGetValue(Keys.Def, out var dv) ? (dv is int di ? di : (dv is long dl ? (int)dl : (dv is double dd ? (int)Math.Round(dd) : 0))) : 0;
+                        int effDef = (int)Math.Round(def * Math.Max(0.0, 1.0 - IgnoreRatio));
+                        int raw = Math.Max(0, Power + atk - effDef);
+                        // resist_physical
+                        if (u.Vars.TryGetValue(Keys.ResistPhysical, out var rp) && rp is double rpd)
+                        {
+                            var factor = 1.0 - Math.Clamp(rpd, 0.0, 1.0);
+                            raw = (int)Math.Max(0, Math.Round(raw * factor));
+                        }
+                        curState = new Damage(id, raw).Compile()(curState);
+                        break;
                     }
-                    curState = new Damage(id, raw).Compile()(curState);
-                    break;
-                }
                 case DamageFlavor.Magic:
-                {
-                    int matk = au.Vars.TryGetValue(Keys.MAtk, out var av) ? (av is int ai ? ai : (av is long al ? (int)al : (av is double ad ? (int)Math.Round(ad) : 0)))
-                              : (au.Vars.TryGetValue(Keys.Atk, out var av2) ? (av2 is int ai2 ? ai2 : (av2 is long al2 ? (int)al2 : (av2 is double ad2 ? (int)Math.Round(ad2) : 0))) : 0);
-                    int mdef = u.Vars.TryGetValue(Keys.MDef, out var dv) ? (dv is int di ? di : (dv is long dl ? (int)dl : (dv is double dd ? (int)Math.Round(dd) : 0))) : 0;
-                    int effRes = (int)Math.Round(mdef * Math.Max(0.0, 1.0 - IgnoreRatio));
-                    int raw = Math.Max(0, Power + matk - effRes);
-                    // resist_magic
-                    if (u.Vars.TryGetValue(Keys.ResistMagic, out var rm) && rm is double rmd)
                     {
-                        var factor = 1.0 - Math.Clamp(rmd, 0.0, 1.0);
-                        raw = (int)Math.Max(0, Math.Round(raw * factor));
+                        int matk = au.Vars.TryGetValue(Keys.MAtk, out var av) ? (av is int ai ? ai : (av is long al ? (int)al : (av is double ad ? (int)Math.Round(ad) : 0)))
+                                  : (au.Vars.TryGetValue(Keys.Atk, out var av2) ? (av2 is int ai2 ? ai2 : (av2 is long al2 ? (int)al2 : (av2 is double ad2 ? (int)Math.Round(ad2) : 0))) : 0);
+                        int mdef = u.Vars.TryGetValue(Keys.MDef, out var dv) ? (dv is int di ? di : (dv is long dl ? (int)dl : (dv is double dd ? (int)Math.Round(dd) : 0))) : 0;
+                        int effRes = (int)Math.Round(mdef * Math.Max(0.0, 1.0 - IgnoreRatio));
+                        int raw = Math.Max(0, Power + matk - effRes);
+                        // resist_magic
+                        if (u.Vars.TryGetValue(Keys.ResistMagic, out var rm) && rm is double rmd)
+                        {
+                            var factor = 1.0 - Math.Clamp(rmd, 0.0, 1.0);
+                            raw = (int)Math.Max(0, Math.Round(raw * factor));
+                        }
+                        curState = new Damage(id, raw).Compile()(curState);
+                        break;
                     }
-                    curState = new Damage(id, raw).Compile()(curState);
-                    break;
-                }
             }
         }
         return curState;
@@ -488,7 +588,7 @@ public sealed record RemoveGlobalVar(string Key) : AtomicAction
     public override ImmutableHashSet<string> ReadVars => ImmutableHashSet<string>.Empty;
     public override ImmutableHashSet<string> WriteVars => ImmutableHashSet<string>.Empty.Add(GlobalVarKey(Key));
 }
- 
+
 
 
 

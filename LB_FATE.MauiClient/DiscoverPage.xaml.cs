@@ -1,7 +1,6 @@
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
-using System.Linq;
 
 namespace LB_FATE.MauiClient;
 

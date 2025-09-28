@@ -1,7 +1,6 @@
+using ETBBS;
 using System;
 using System.Collections.Generic;
-using System.Collections.Immutable;
-using ETBBS;
 using Xunit;
 
 public class GlobalTileEventsTests

@@ -1,5 +1,3 @@
-using System.Linq;
-
 namespace ETBBS;
 
 public static class Selection
@@ -83,6 +81,6 @@ public static class Selection
         return !pos.Equals(default(Coord));
     }
 }
- 
+
 
 

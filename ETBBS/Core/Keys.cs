@@ -49,6 +49,14 @@ public static class Keys
     // Generic mechanics helpers
     public const string ExtraStrikesRange = "extra_strikes_range"; // int (Manhattan distance threshold)
     public const string ExtraStrikesCount = "extra_strikes_count"; // int (>=2)
+    // Generic combat helper variables (for extensible talents/passives)
+    public const string NightOrDawnEvasionBonus = "night_or_dawn_evasion_bonus"; // double in [0,1]
+    public const string EvadeCharges = "evade_charges"; // int (guaranteed evasion charges)
+    public const string NextAttackMultiplier = "next_attack_multiplier"; // double (applies to next outgoing attack then clears)
+    public const string LowHpIgnoreDefRatio = "low_hp_ignore_def_ratio"; // double in (0,1], if target hp/max_hp <= ratio, ignore defense
+    public const string TempEvasionBonus = "temp_evasion_bonus"; // double in [0,1]
+    public const string TempEvasionBonusTurns = "temp_evasion_bonus_turns"; // int
+    public const string ForceIgnoreDefTurns = "force_ignore_def_turns"; // int
     public const string Level = "level";                // int
     public const string Exp = "exp";                    // int
 }
@@ -73,4 +81,4 @@ public static class Tags
     public const string Bleeding = "bleeding";
     public const string Shielded = "shielded";
 }
- 
+

@@ -39,4 +39,4 @@ public sealed record UnitMovedEvent(string UnitId, Coord Before, Coord After);
 public sealed record UnitTagEvent(string UnitId, string Tag, bool Added);
 public sealed record TileTagEvent(Coord Pos, string Tag, bool Added);
 public sealed record VarChangedEvent(string Scope, string Key, object? Before, object? After, string? UnitId = null, Coord? Pos = null);
- 
+

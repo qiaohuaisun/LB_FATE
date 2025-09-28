@@ -1,0 +1,52 @@
+role "凯特神父" id "caster_kate" {
+  description "\n阶职 Caster。\n技能一『鉴识眼A+』：获得一个目标的三种信息（HP / MP / 位置）。(消耗 3, 冷却 0)\n技能二『号召』：指定一名从者进行行动（消耗 5, 冷却 2）。\n宝具『烧掉他们』：在自身前方 3×3 范围内对所有敌人造成 8 点真实伤害，并施加持续 2 回合的 2 点魔法 DoT。\n天赋『转化』：随意将自身魔力与 HP 互换（任意时刻均可使用）。\n";
+
+  vars {
+    "hp" = 28; "max_hp" = 28; "mp" = 8.0;
+    "atk" = 5; "def" = 3; "mdef" = 4; "matk" = 7; "range" = 2; "speed" = 3;
+  }
+
+  tags { "caster" }
+
+  skills {
+    skill "Basic Attack" {
+      range 2; targeting enemies;
+      deal magic 5 damage to target from caster;
+    }
+
+    # 鉴识眼A+：记录目标信息到全局，服务端回合逻辑会读取这些值并输出
+    skill "鉴识眼A+" {
+      range 2; targeting any; cost mp 3; cooldown 0;
+      set global var "inspect_hp" = var "hp" of target;
+      set global var "inspect_mp" = var "mp" of target;
+      set global var "inspect_pos" = var "pos" of target;
+    }
+
+    # 号召：设置强制行动触发标记，由服务端在同一阶段调用该目标执行一次 Turn
+    skill "号召" {
+      range 2; targeting any; cost mp 5; cooldown 2;
+      set global var "force_act_now" = true;
+    }
+
+    # 宝具：利用 $point（由服务端设为“前方”）在 3×3（切比雪夫 1）范围处理敌人
+    skill "烧掉他们" {
+      range 0; targeting self; cost mp 3; cooldown 5; sealed_until 3;
+      for each enemies of point in range 1 of point in parallel do {
+        deal 8 damage to it; # 真实伤害
+        set unit(it) var "burn_turns" = 2;
+        set unit(it) var "burn_per_turn" = 2;
+      }
+    }
+
+    # 天赋：随意将 MP 与 HP 互换
+    skill "转化" {
+      range 0; targeting self; cooldown 0;
+      # 使用单位内部临时变量进行交换
+      set unit(caster) var "_tmp_val" = var "hp" of caster;
+      set unit(caster) var "hp" = var "mp" of caster;
+      set unit(caster) var "mp" = var "_tmp_val" of caster;
+      # 可选：清理临时变量（不影响逻辑）
+      remove unit var "_tmp_val" from caster;
+    }
+  }
+}

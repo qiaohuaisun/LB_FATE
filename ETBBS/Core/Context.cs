@@ -1,5 +1,3 @@
-using System.Collections.Immutable;
-
 namespace ETBBS;
 
 // Note: using readonly struct for broad compatibility. Can change to ref struct if needed.
@@ -80,4 +78,4 @@ public readonly struct Context
     public bool TryGetUnitPos(string id, out Coord pos) => TryGetUnitVar(id, Keys.Pos, out pos);
     public Coord GetUnitPosOrDefault(string id, Coord defaultPos = default) => GetUnitVar(id, Keys.Pos, defaultPos);
 }
- 
+

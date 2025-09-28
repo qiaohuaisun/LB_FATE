@@ -1,7 +1,7 @@
+using ETBBS;
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
-using ETBBS;
 using Xunit;
 
 public class ValidationAndDslTests
@@ -19,7 +19,7 @@ public class ValidationAndDslTests
     public void Validator_MpCost_And_ConsumeMp()
     {
         var s = EmptyWorld();
-        s = WithUnit(s, "C", new Dictionary<string, object> { [Keys.Mp] = 1.0, [Keys.Pos] = new Coord(1,1) });
+        s = WithUnit(s, "C", new Dictionary<string, object> { [Keys.Mp] = 1.0, [Keys.Pos] = new Coord(1, 1) });
         s = WorldStateOps.WithGlobal(s, g => g with { Vars = g.Vars.SetItem(DslRuntime.CasterKey, "C") });
 
         var script = "cost mp 2; targeting self; set global var \"ok\" = 1; consume mp = 2";
@@ -54,8 +54,8 @@ public class ValidationAndDslTests
     public void Validator_Targeting_SelfOnly()
     {
         var s = EmptyWorld();
-        s = WithUnit(s, "C", new Dictionary<string, object> { [Keys.Pos] = new Coord(2,2) });
-        s = WithUnit(s, "X", new Dictionary<string, object> { [Keys.Pos] = new Coord(2,2) });
+        s = WithUnit(s, "C", new Dictionary<string, object> { [Keys.Pos] = new Coord(2, 2) });
+        s = WithUnit(s, "X", new Dictionary<string, object> { [Keys.Pos] = new Coord(2, 2) });
         s = WorldStateOps.WithGlobal(s, g => g with { Vars = g.Vars.SetItem(DslRuntime.CasterKey, "C") });
 
         var script = "targeting self; range 0; set global var \"ok\" = 1";
@@ -63,14 +63,14 @@ public class ValidationAndDslTests
         var se = new SkillExecutor();
 
         // Correct: target self
-        var cfgOk = new ActionValidationConfig(CasterId: "C", TargetUnitId: "C", TeamOfUnit: new Dictionary<string,string>{{"C","T"}}, CurrentTurn: 0);
+        var cfgOk = new ActionValidationConfig(CasterId: "C", TargetUnitId: "C", TeamOfUnit: new Dictionary<string, string> { { "C", "T" } }, CurrentTurn: 0);
         var valOk = ActionValidators.ForSkillWithExtras(skill, cfgOk, null);
         (s, _) = se.ExecutePlan(s, skill.BuildPlan(new Context(s)), validator: valOk);
         Assert.Equal(1, (int)Convert.ToInt32(s.Global.Vars["ok"]));
 
         // Wrong: target other unit -> blocked
         s = WorldStateOps.WithGlobal(s, g => g with { Vars = g.Vars.Remove("ok") });
-        var cfgBad = new ActionValidationConfig(CasterId: "C", TargetUnitId: "X", TeamOfUnit: new Dictionary<string,string>{{"C","T"},{"X","T2"}}, CurrentTurn: 0);
+        var cfgBad = new ActionValidationConfig(CasterId: "C", TargetUnitId: "X", TeamOfUnit: new Dictionary<string, string> { { "C", "T" }, { "X", "T2" } }, CurrentTurn: 0);
         var valBad = ActionValidators.ForSkillWithExtras(skill, cfgBad, null);
         (s, _) = se.ExecutePlan(s, skill.BuildPlan(new Context(s)), validator: valBad);
         Assert.False(s.Global.Vars.ContainsKey("ok"));
@@ -80,9 +80,9 @@ public class ValidationAndDslTests
     public void Validator_Targeting_Allies_And_Enemies()
     {
         var s = EmptyWorld();
-        s = WithUnit(s, "C", new Dictionary<string, object> { [Keys.Pos] = new Coord(2,2) });
-        s = WithUnit(s, "A", new Dictionary<string, object> { [Keys.Pos] = new Coord(3,2) });
-        s = WithUnit(s, "E", new Dictionary<string, object> { [Keys.Pos] = new Coord(4,2) });
+        s = WithUnit(s, "C", new Dictionary<string, object> { [Keys.Pos] = new Coord(2, 2) });
+        s = WithUnit(s, "A", new Dictionary<string, object> { [Keys.Pos] = new Coord(3, 2) });
+        s = WithUnit(s, "E", new Dictionary<string, object> { [Keys.Pos] = new Coord(4, 2) });
         var teams = new Dictionary<string, string> { ["C"] = "T1", ["A"] = "T1", ["E"] = "T2" };
         s = WorldStateOps.WithGlobal(s, g => g with { Vars = g.Vars.SetItem(DslRuntime.CasterKey, "C").SetItem(DslRuntime.TargetKey, "A").SetItem(DslRuntime.TeamsKey, teams) });
 
@@ -127,7 +127,7 @@ public class ValidationAndDslTests
     public void Validator_MinRange_With_TileTarget()
     {
         var s = EmptyWorld();
-        s = WithUnit(s, "C", new Dictionary<string, object> { [Keys.Pos] = new Coord(2,2) });
+        s = WithUnit(s, "C", new Dictionary<string, object> { [Keys.Pos] = new Coord(2, 2) });
         s = WorldStateOps.WithGlobal(s, g => g with { Vars = g.Vars.SetItem(DslRuntime.CasterKey, "C") });
 
         var script = "range 3; min_range 2; targeting tile; set global var \"ok\" = 1";
@@ -135,7 +135,7 @@ public class ValidationAndDslTests
         var se = new SkillExecutor();
 
         // Too close: distance 1 -> blocked
-        var cfgClose = new ActionValidationConfig(CasterId: "C", TargetPos: new Coord(3,2));
+        var cfgClose = new ActionValidationConfig(CasterId: "C", TargetPos: new Coord(3, 2));
         var valClose = ActionValidators.ForSkillWithExtras(skill, cfgClose, null);
         {
             var ctx = new Context(s);
@@ -144,7 +144,7 @@ public class ValidationAndDslTests
         }
 
         // Within allowed: distance 2 -> pass
-        var cfgOk = cfgClose with { TargetPos = new Coord(4,2) };
+        var cfgOk = cfgClose with { TargetPos = new Coord(4, 2) };
         var valOk = ActionValidators.ForSkillWithExtras(skill, cfgOk, null);
         {
             var ctx = new Context(s);
@@ -158,7 +158,7 @@ public class ValidationAndDslTests
     public void Dsl_Arithmetic_VarRefs_Add_Sub_IntDouble()
     {
         var s = EmptyWorld();
-        s = WithUnit(s, "C", new Dictionary<string, object> { [Keys.Atk] = 5, [Keys.Pos] = new Coord(0,0) });
+        s = WithUnit(s, "C", new Dictionary<string, object> { [Keys.Atk] = 5, [Keys.Pos] = new Coord(0, 0) });
         s = WorldStateOps.WithGlobal(s, g => g with { Vars = g.Vars.SetItem(DslRuntime.CasterKey, "C") });
 
         var script = "set global var \"sum\" = var \"atk\" of caster + 2; set global var \"dif\" = var \"atk\" of caster - 1; set global var \"mix\" = var \"atk\" of caster + 1.5";

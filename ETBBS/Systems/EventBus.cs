@@ -8,7 +8,7 @@ public sealed class EventBus
     {
         if (!_handlers.TryGetValue(topic, out var list))
         {
-            list = new List<Action<object?>>() ;
+            list = new List<Action<object?>>();
             _handlers[topic] = list;
         }
         list.Add(handler);
@@ -33,4 +33,4 @@ public sealed class EventBus
         public void Dispose() => _list.Remove(_handler);
     }
 }
- 
+

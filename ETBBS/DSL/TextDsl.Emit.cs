@@ -1,5 +1,3 @@
-using System.Text;
-
 namespace ETBBS;
 
 public static partial class TextDsl

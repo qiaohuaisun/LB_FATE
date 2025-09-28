@@ -1,5 +1,3 @@
-using System.Collections.Immutable;
-
 namespace ETBBS;
 
 public delegate bool ActionValidator(Context ctx, AtomicAction[] actions, out string? reason);
@@ -332,26 +330,26 @@ public sealed class SkillExecutor
     {
         if (events is null) return;
 
-            switch (action)
-            {
+        switch (action)
+        {
             case Damage(var targetId, var amount):
-            {
-                var beforeHp = 0;
-                if (before.Units.TryGetValue(targetId, out var bu) && bu.Vars.TryGetValue(Keys.Hp, out var hv)) beforeHp = hv switch { int i => i, long l => (int)l, double d => (int)Math.Round(d), _ => 0 };
-                var afterHp = 0;
-                if (after.Units.TryGetValue(targetId, out var au) && au.Vars.TryGetValue(Keys.Hp, out var hv2)) afterHp = hv2 switch { int i => i, long l => (int)l, double d => (int)Math.Round(d), _ => 0 };
-                events.Publish(EventTopics.UnitDamaged, new UnitDamagedEvent(targetId, beforeHp, afterHp, Math.Max(0, beforeHp - afterHp)));
-                break;
-            }
+                {
+                    var beforeHp = 0;
+                    if (before.Units.TryGetValue(targetId, out var bu) && bu.Vars.TryGetValue(Keys.Hp, out var hv)) beforeHp = hv switch { int i => i, long l => (int)l, double d => (int)Math.Round(d), _ => 0 };
+                    var afterHp = 0;
+                    if (after.Units.TryGetValue(targetId, out var au) && au.Vars.TryGetValue(Keys.Hp, out var hv2)) afterHp = hv2 switch { int i => i, long l => (int)l, double d => (int)Math.Round(d), _ => 0 };
+                    events.Publish(EventTopics.UnitDamaged, new UnitDamagedEvent(targetId, beforeHp, afterHp, Math.Max(0, beforeHp - afterHp)));
+                    break;
+                }
             case Move(var id, var to):
-            {
-                var beforePos = default(Coord);
-                if (before.Units.TryGetValue(id, out var bu) && bu.Vars.TryGetValue(Keys.Pos, out var pv) && pv is Coord bp) beforePos = bp;
-                var afterPos = default(Coord);
-                if (after.Units.TryGetValue(id, out var au) && au.Vars.TryGetValue(Keys.Pos, out var pv2) && pv2 is Coord ap) afterPos = ap;
-                events.Publish(EventTopics.UnitMoved, new UnitMovedEvent(id, beforePos, afterPos));
-                break;
-            }
+                {
+                    var beforePos = default(Coord);
+                    if (before.Units.TryGetValue(id, out var bu) && bu.Vars.TryGetValue(Keys.Pos, out var pv) && pv is Coord bp) beforePos = bp;
+                    var afterPos = default(Coord);
+                    if (after.Units.TryGetValue(id, out var au) && au.Vars.TryGetValue(Keys.Pos, out var pv2) && pv2 is Coord ap) afterPos = ap;
+                    events.Publish(EventTopics.UnitMoved, new UnitMovedEvent(id, beforePos, afterPos));
+                    break;
+                }
             case AddUnitTag(var id, var tag):
                 events.Publish(EventTopics.UnitTagAdded, new UnitTagEvent(id, tag, true));
                 break;
@@ -365,56 +363,56 @@ public sealed class SkillExecutor
                 events.Publish(EventTopics.TileTagRemoved, new TileTagEvent(pos, tag, false));
                 break;
             case SetUnitVar(var id, var key, var value):
-            {
-                object? beforeVal = null;
-                if (before.Units.TryGetValue(id, out var bu) && bu.Vars.TryGetValue(key, out var v)) beforeVal = v;
-                events.Publish(EventTopics.UnitVarChanged, new VarChangedEvent("unit", key, beforeVal, value, UnitId: id));
-                break;
-            }
+                {
+                    object? beforeVal = null;
+                    if (before.Units.TryGetValue(id, out var bu) && bu.Vars.TryGetValue(key, out var v)) beforeVal = v;
+                    events.Publish(EventTopics.UnitVarChanged, new VarChangedEvent("unit", key, beforeVal, value, UnitId: id));
+                    break;
+                }
             case ModifyUnitVar(var id, var key, _):
-            {
-                object? beforeVal = null; object? afterVal = null;
-                if (before.Units.TryGetValue(id, out var bu) && bu.Vars.TryGetValue(key, out var v)) beforeVal = v;
-                if (after.Units.TryGetValue(id, out var au) && au.Vars.TryGetValue(key, out var v2)) afterVal = v2;
-                events.Publish(EventTopics.UnitVarChanged, new VarChangedEvent("unit", key, beforeVal, afterVal, UnitId: id));
-                break;
-            }
+                {
+                    object? beforeVal = null; object? afterVal = null;
+                    if (before.Units.TryGetValue(id, out var bu) && bu.Vars.TryGetValue(key, out var v)) beforeVal = v;
+                    if (after.Units.TryGetValue(id, out var au) && au.Vars.TryGetValue(key, out var v2)) afterVal = v2;
+                    events.Publish(EventTopics.UnitVarChanged, new VarChangedEvent("unit", key, beforeVal, afterVal, UnitId: id));
+                    break;
+                }
             case SetTileVar(var pos, var key, var value):
-            {
-                object? beforeVal = null;
-                var (x, y) = (pos.X, pos.Y);
-                if (x >= 0 && x < before.Tiles.GetLength(0) && y >= 0 && y < before.Tiles.GetLength(1))
                 {
-                    var t = before.Tiles[x, y];
-                    if (t.Vars.TryGetValue(key, out var v)) beforeVal = v;
+                    object? beforeVal = null;
+                    var (x, y) = (pos.X, pos.Y);
+                    if (x >= 0 && x < before.Tiles.GetLength(0) && y >= 0 && y < before.Tiles.GetLength(1))
+                    {
+                        var t = before.Tiles[x, y];
+                        if (t.Vars.TryGetValue(key, out var v)) beforeVal = v;
+                    }
+                    events.Publish(EventTopics.TileVarChanged, new VarChangedEvent("tile", key, beforeVal, value, Pos: pos));
+                    break;
                 }
-                events.Publish(EventTopics.TileVarChanged, new VarChangedEvent("tile", key, beforeVal, value, Pos: pos));
-                break;
-            }
             case ModifyTileVar(var pos, var key, _):
-            {
-                object? beforeVal = null; object? afterVal = null;
-                var (x, y) = (pos.X, pos.Y);
-                if (x >= 0 && x < before.Tiles.GetLength(0) && y >= 0 && y < before.Tiles.GetLength(1))
                 {
-                    var t = before.Tiles[x, y];
-                    if (t.Vars.TryGetValue(key, out var v)) beforeVal = v;
+                    object? beforeVal = null; object? afterVal = null;
+                    var (x, y) = (pos.X, pos.Y);
+                    if (x >= 0 && x < before.Tiles.GetLength(0) && y >= 0 && y < before.Tiles.GetLength(1))
+                    {
+                        var t = before.Tiles[x, y];
+                        if (t.Vars.TryGetValue(key, out var v)) beforeVal = v;
+                    }
+                    if (x >= 0 && x < after.Tiles.GetLength(0) && y >= 0 && y < after.Tiles.GetLength(1))
+                    {
+                        var t = after.Tiles[x, y];
+                        if (t.Vars.TryGetValue(key, out var v2)) afterVal = v2;
+                    }
+                    events.Publish(EventTopics.TileVarChanged, new VarChangedEvent("tile", key, beforeVal, afterVal, Pos: pos));
+                    break;
                 }
-                if (x >= 0 && x < after.Tiles.GetLength(0) && y >= 0 && y < after.Tiles.GetLength(1))
-                {
-                    var t = after.Tiles[x, y];
-                    if (t.Vars.TryGetValue(key, out var v2)) afterVal = v2;
-                }
-                events.Publish(EventTopics.TileVarChanged, new VarChangedEvent("tile", key, beforeVal, afterVal, Pos: pos));
-                break;
-            }
             case SetGlobalVar(var key, var value):
-            {
-                object? beforeVal = null;
-                if (before.Global.Vars.TryGetValue(key, out var v)) beforeVal = v;
-                events.Publish(EventTopics.GlobalVarChanged, new VarChangedEvent("global", key, beforeVal, value));
-                break;
-            }
+                {
+                    object? beforeVal = null;
+                    if (before.Global.Vars.TryGetValue(key, out var v)) beforeVal = v;
+                    events.Publish(EventTopics.GlobalVarChanged, new VarChangedEvent("global", key, beforeVal, value));
+                    break;
+                }
             case AddGlobalTag(var tag):
                 events.Publish(EventTopics.GlobalTagAdded, tag);
                 break;
@@ -424,5 +422,5 @@ public sealed class SkillExecutor
         }
     }
 }
- 
+
 

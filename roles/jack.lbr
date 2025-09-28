@@ -1,0 +1,45 @@
+role "杰克" id "assassin_jack" {
+  description "\n天赋一：在夜晚/凌晨获得 25% 闪避（）。\n天赋二：攻击低血量目标无视防御（默认：目标 ≤ 30% HP）。\n一技能：下次必定闪避一次；触发后使自己的下一次攻击伤害翻倍。\n二技能：攻击变为三连击，移距 +2。\n宝具：天赋一效果翻倍（50%）；天赋二无条件触发（忽视防御）。\n";
+
+  vars {
+    "hp" = 30; "max_hp" = 30; "mp" = 6.0;
+    "atk" = 7; "def" = 3; "range" = 1; "speed" = 4;
+    # 被动参数：夜晚/凌晨闪避奖励，低血量无视防御阈值
+    "night_or_dawn_evasion_bonus" = 0.25;  # 夜晚/凌晨时额外闪避 25%
+    "low_hp_ignore_def_ratio" = 0.30;     # 目标 HP/MaxHP ≤ 30% 时无视防御
+  }
+
+  tags { "assassin" }
+
+  skills {
+    # 普通攻击由系统统一处理（支持低血量无视防御、三连击被动）
+    skill "Basic Attack" {
+      range 1; targeting enemies;
+      deal physical 6 damage to target from caster;
+    }
+
+    # 一技能：一次必闪；触发后下一次攻击伤害翻倍（由系统处理 next_attack_multiplier）
+    skill "完美回避" {
+      range 0; targeting self; cooldown 3;
+      set unit(caster) var "evade_charges" = 1;
+    }
+
+    # 二技能：攻击变为三连击（全图范围触发），移距 +2（直接提升当前速度）
+    skill "三连突袭" {
+      range 0; targeting self; cooldown 3;
+      set unit(caster) var "extra_strikes_count" = 3;
+      set unit(caster) var "extra_strikes_range" = 999; # 视为全图触发
+      set unit(caster) var "speed" = var "speed" of caster + 2;
+    }
+
+    # 宝具：天赋一翻倍（变成 50%），天赋二无条件触发（低血量阈值 = 100%）
+    skill "解体圣母" {
+      range 0; targeting self; cooldown 5; sealed_until 3;
+      set unit(caster) var "night_or_dawn_evasion_bonus" = 0.5;
+      set unit(caster) var "low_hp_ignore_def_ratio" = 1.0;
+      consume mp = 2.0;
+    }
+  }
+}
+
+

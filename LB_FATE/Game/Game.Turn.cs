@@ -1,6 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using ETBBS;
 
 namespace LB_FATE;
@@ -9,6 +6,8 @@ partial class Game
 {
     private void Turn(string pid, int phase, int day)
     {
+        // Expose current phase to core engine for phase-dependent talents
+        state = WorldStateOps.WithGlobal(state, g => g with { Vars = g.Vars.SetItem(DslRuntime.PhaseKey, phase) });
         Context ctx;
         // speed/range/rooted/silenced will be recomputed dynamically each loop
         IPlayerEndpoint? ep = endpoints.TryGetValue(pid, out var ept) ? ept : null;
@@ -162,11 +161,34 @@ partial class Game
                     if (tid != null && (!state.Units.ContainsKey(tid) || GetInt(tid, Keys.Hp, 0) <= 0))
                     { WriteLineTo(pid, "Invalid target."); continue; }
                     var skill = role.Skills[idx];
-                    state = WorldStateOps.WithGlobal(state, g => g with { Vars = g.Vars
+                    // derive $point and optional $dir from arguments: [P#|x y|up|down|left|right]
+                    var casterPos = ctx.GetUnitVar<Coord>(pid, Keys.Pos, default);
+                    Coord point = new Coord(Math.Clamp(casterPos.X, 0, width - 1), Math.Max(0, casterPos.Y - 1));
+                    string dir = string.Empty;
+                    if (parts.Length >= 4 && int.TryParse(parts[2], out var px) && int.TryParse(parts[3], out var py))
+                    {
+                        point = new Coord(Math.Clamp(px, 0, width - 1), Math.Clamp(py, 0, height - 1));
+                    }
+                    else if (parts.Length >= 3 && string.IsNullOrWhiteSpace(tid))
+                    {
+                        var d = parts[2].ToLowerInvariant();
+                        int steps = 1;
+                        if (parts.Length >= 4 && int.TryParse(parts[3], out var st) && st > 0) steps = st;
+                        steps = Math.Max(1, Math.Min(Math.Max(width, height), steps));
+                        if (d == "up") { dir = "up"; point = new Coord(casterPos.X, Math.Max(0, casterPos.Y - steps)); }
+                        else if (d == "down") { dir = "down"; point = new Coord(casterPos.X, Math.Min(height - 1, casterPos.Y + steps)); }
+                        else if (d == "left") { dir = "left"; point = new Coord(Math.Max(0, casterPos.X - steps), casterPos.Y); }
+                        else if (d == "right") { dir = "right"; point = new Coord(Math.Min(width - 1, casterPos.X + steps), casterPos.Y); }
+                    }
+                    state = WorldStateOps.WithGlobal(state, g => g with
+                    {
+                        Vars = g.Vars
                         .SetItem(DslRuntime.CasterKey, pid)
                         .SetItem(DslRuntime.TargetKey, tid ?? "")
                         .SetItem(DslRuntime.RngKey, rng)
                         .SetItem(DslRuntime.TeamsKey, teamOf)
+                        .SetItem(DslRuntime.TargetPointKey, point)
+                        .SetItem(DslRuntime.DirKey, dir)
                     });
                     var cfg = new ActionValidationConfig(
                         CasterId: pid,
@@ -182,6 +204,19 @@ partial class Game
                     BroadcastBoard(day, phase);
                     cooldowns.SetLastUseTurn(pid, skill.Name, state.Global.Turn);
                     highlightCells = null;
+                    // If inspection outputs exist, log and clear them
+                    object? ihp = null, imp = null, ipos = null;
+                    bool gotHp = state.Global.Vars.TryGetValue("inspect_hp", out ihp);
+                    bool gotMp = state.Global.Vars.TryGetValue("inspect_mp", out imp);
+                    bool gotPos = state.Global.Vars.TryGetValue("inspect_pos", out ipos);
+                    if (gotHp || gotMp || gotPos)
+                    {
+                        int hpV = ihp is int hpi ? hpi : (ihp is long hpl ? (int)hpl : (ihp is double hpd ? (int)Math.Round(hpd) : 0));
+                        double mpV = imp is double dmp ? dmp : (imp is int impi ? impi : 0);
+                        string posV = ipos is Coord pc ? pc.ToString() : "(?,?)";
+                        WriteLineTo(pid, $"Inspect: HP={hpV}, MP={mpV:0.##}, Pos={posV}");
+                        state = WorldStateOps.WithGlobal(state, g => g with { Vars = g.Vars.Remove("inspect_hp").Remove("inspect_mp").Remove("inspect_pos") });
+                    }
                     continue;
                 }
                 if (cmd is "attack" or "a")
@@ -202,7 +237,9 @@ partial class Game
                     if (state.Units[pid].Vars.TryGetValue(Keys.ExtraStrikesCount, out var xc) && xc is int cc && cc > 1) extraStrikes = Math.Max(1, cc);
                     if (basic is not null)
                     {
-                        state = WorldStateOps.WithGlobal(state, g => g with { Vars = g.Vars
+                        state = WorldStateOps.WithGlobal(state, g => g with
+                        {
+                            Vars = g.Vars
                             .SetItem(DslRuntime.CasterKey, pid)
                             .SetItem(DslRuntime.TargetKey, tid)
                             .SetItem(DslRuntime.RngKey, rng)
@@ -286,15 +323,15 @@ partial class Game
         var visited = new HashSet<Coord>();
         q.Enqueue((src, 0));
         visited.Add(src);
-        int[,] dirs = new int[4,2] { {1,0},{-1,0},{0,1},{0,-1} };
+        int[,] dirs = new int[4, 2] { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } };
         while (q.Count > 0)
         {
             var (cur, d) = q.Dequeue();
             if (d == speed) continue;
             for (int i = 0; i < 4; i++)
             {
-                var nx = cur.X + dirs[i,0];
-                var ny = cur.Y + dirs[i,1];
+                var nx = cur.X + dirs[i, 0];
+                var ny = cur.Y + dirs[i, 1];
                 var np = new Coord(nx, ny);
                 if (nx < 0 || nx >= width || ny < 0 || ny >= height) continue;
                 if (visited.Contains(np)) continue;

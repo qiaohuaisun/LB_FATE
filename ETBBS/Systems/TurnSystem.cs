@@ -58,6 +58,19 @@ public sealed class TurnSystem
                 cur = WorldStateOps.WithUnit(cur, id, u => u with { Vars = u.Vars.SetItem(Keys.StatusImmuneTurns, ns) });
             }
 
+            // Timed evasion bonus tick
+            if (unit.Vars.TryGetValue(Keys.TempEvasionBonusTurns, out var ebv) && ebv is int ebt && ebt > 0)
+            {
+                var ns = ebt - 1;
+                cur = WorldStateOps.WithUnit(cur, id, u => u with { Vars = u.Vars.SetItem(Keys.TempEvasionBonusTurns, ns) });
+            }
+            // Force ignore defense tick
+            if (unit.Vars.TryGetValue(Keys.ForceIgnoreDefTurns, out var fiv) && fiv is int fit && fit > 0)
+            {
+                var ns = fit - 1;
+                cur = WorldStateOps.WithUnit(cur, id, u => u with { Vars = u.Vars.SetItem(Keys.ForceIgnoreDefTurns, ns) });
+            }
+
             // mp regen
             if (unit.Vars.TryGetValue(Keys.MpRegenPerTurn, out var rv))
             {
@@ -209,5 +222,5 @@ public sealed class TurnSystem
         return (cur, log);
     }
 }
- 
+
 

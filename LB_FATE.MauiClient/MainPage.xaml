@@ -92,7 +92,7 @@
                         <DataTemplate>
                             <Grid Padding="6" ColumnDefinitions="Auto,*" ColumnSpacing="8">
                                 <Frame WidthRequest="6" HeightRequest="6" Padding="0" CornerRadius="3" BackgroundColor="#9CA3AF" VerticalOptions="Center" />
-                                <Label Grid.Column="1" Text="{Binding}" FontFamily="Courier New" />
+                                <Label Grid.Column="1" Text="{Binding Display}" FontFamily="Courier New" />
                             </Grid>
                         </DataTemplate>
                     </CollectionView.ItemTemplate>
@@ -117,6 +117,15 @@
                     <Button Text="ha" Style="{StaticResource ChipButton}" Clicked="OnQuickCmdClicked" CommandParameter="ha" />
                     <Button Text="pass" Style="{StaticResource ChipButton}" Clicked="OnQuickCmdClicked" CommandParameter="pass" />
                     <Button Text="Clear" Style="{StaticResource ChipButton}" Clicked="OnClearLogsClicked" />
+                    <Button Text="Copy" Style="{StaticResource ChipButton}" Clicked="OnCopyLogsClicked" />
+                    <HorizontalStackLayout Spacing="6" VerticalOptions="Center">
+                        <Label Text="AutoScroll" VerticalTextAlignment="Center" FontSize="12" />
+                        <Switch x:Name="AutoScrollSwitch" IsToggled="True" Toggled="OnAutoScrollToggled" />
+                    </HorizontalStackLayout>
+                    <HorizontalStackLayout Spacing="6" VerticalOptions="Center">
+                        <Label Text="Errors Only" VerticalTextAlignment="Center" FontSize="12" />
+                        <Switch x:Name="ErrorsOnlySwitch" IsToggled="False" Toggled="OnErrorsOnlyToggled" />
+                    </HorizontalStackLayout>
                 </HorizontalStackLayout>
             </ScrollView>
             <!-- Command entry + send -->

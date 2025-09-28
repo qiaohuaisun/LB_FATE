@@ -1,6 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using ETBBS;
 
 namespace LB_FATE;
@@ -56,7 +53,7 @@ partial class Game
             lines.Add($" {symbolOf[pid]}: {pid} {classOf[pid],-10} HP[{Bar(hp, maxHp, 10)}]({hp}/{maxHp}) MP={mpStr} Pos={pos}");
         }
         lines.Add("");
-        lines.Add("Commands: move x y | attack P# | skills | use <n> P# | info | hint move|attack | pass | help | quit");
+        lines.Add("Commands: move x y | attack P# | skills | use <n> [P#|x y|up|down|left|right] | info | hint move|attack | pass | help | quit");
         lines.Add("Costs   : Move 0.5 MP; Attack 0.5 MP");
         lines.Add("Phases 1 & 5: all commands; Phases 2-4: move/pass only.");
         if (recentLog.Count > 0)

@@ -1,5 +1,3 @@
-using Microsoft.Maui.Storage;
-
 namespace LB_FATE.MauiClient;
 
 public static class AppSettings

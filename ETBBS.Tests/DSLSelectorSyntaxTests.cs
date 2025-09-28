@@ -1,7 +1,7 @@
+using ETBBS;
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
-using ETBBS;
 using Xunit;
 
 public class DSLSelectorSyntaxTests
@@ -19,12 +19,14 @@ public class DSLSelectorSyntaxTests
     public void Nearest_Enemies_Of_Caster_Limit2()
     {
         var s = EmptyWorld();
-        s = WithUnit(s, "C", new Dictionary<string, object> { [Keys.Pos] = new Coord(1,1) });
-        s = WithUnit(s, "E1", new Dictionary<string, object> { [Keys.Pos] = new Coord(2,1) }); // d=1
-        s = WithUnit(s, "E2", new Dictionary<string, object> { [Keys.Pos] = new Coord(3,1) }); // d=2
-        s = WithUnit(s, "E3", new Dictionary<string, object> { [Keys.Pos] = new Coord(4,1) }); // d=3
+        s = WithUnit(s, "C", new Dictionary<string, object> { [Keys.Pos] = new Coord(1, 1) });
+        s = WithUnit(s, "E1", new Dictionary<string, object> { [Keys.Pos] = new Coord(2, 1) }); // d=1
+        s = WithUnit(s, "E2", new Dictionary<string, object> { [Keys.Pos] = new Coord(3, 1) }); // d=2
+        s = WithUnit(s, "E3", new Dictionary<string, object> { [Keys.Pos] = new Coord(4, 1) }); // d=3
         var teams = new Dictionary<string, string> { ["C"] = "T1", ["E1"] = "T2", ["E2"] = "T2", ["E3"] = "T2" };
-        s = WorldStateOps.WithGlobal(s, g => g with { Vars = g.Vars
+        s = WorldStateOps.WithGlobal(s, g => g with
+        {
+            Vars = g.Vars
             .SetItem(DslRuntime.CasterKey, "C")
             .SetItem(DslRuntime.TeamsKey, teams)
         });
@@ -43,15 +45,17 @@ public class DSLSelectorSyntaxTests
     public void Farthest_1_Allies_Of_Point()
     {
         var s = EmptyWorld();
-        s = WithUnit(s, "C", new Dictionary<string, object> { [Keys.Pos] = new Coord(1,1) });
-        s = WithUnit(s, "A1", new Dictionary<string, object> { [Keys.Pos] = new Coord(2,1) }); // d=1 from point
-        s = WithUnit(s, "A2", new Dictionary<string, object> { [Keys.Pos] = new Coord(3,1) }); // d=2
-        s = WithUnit(s, "A3", new Dictionary<string, object> { [Keys.Pos] = new Coord(4,1) }); // d=3
+        s = WithUnit(s, "C", new Dictionary<string, object> { [Keys.Pos] = new Coord(1, 1) });
+        s = WithUnit(s, "A1", new Dictionary<string, object> { [Keys.Pos] = new Coord(2, 1) }); // d=1 from point
+        s = WithUnit(s, "A2", new Dictionary<string, object> { [Keys.Pos] = new Coord(3, 1) }); // d=2
+        s = WithUnit(s, "A3", new Dictionary<string, object> { [Keys.Pos] = new Coord(4, 1) }); // d=3
         var teams = new Dictionary<string, string> { ["C"] = "T", ["A1"] = "T", ["A2"] = "T", ["A3"] = "T" };
-        s = WorldStateOps.WithGlobal(s, g => g with { Vars = g.Vars
+        s = WorldStateOps.WithGlobal(s, g => g with
+        {
+            Vars = g.Vars
             .SetItem(DslRuntime.CasterKey, "C")
             .SetItem(DslRuntime.TeamsKey, teams)
-            .SetItem(DslRuntime.TargetPointKey, new Coord(1,1))
+            .SetItem(DslRuntime.TargetPointKey, new Coord(1, 1))
         });
 
         var script = "for each farthest 1 allies of point do { set unit(it) var \"far\" = 1 }";

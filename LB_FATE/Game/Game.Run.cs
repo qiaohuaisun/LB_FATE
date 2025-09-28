@@ -1,6 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using ETBBS;
 
 namespace LB_FATE;
@@ -32,6 +29,17 @@ partial class Game
                 foreach (var pid in order)
                 {
                     Turn(pid, phase, day);
+                    // Process force-act request once per loop (if any)
+                    if (state.Global.Vars.TryGetValue("force_act_now", out var fan) && fan is bool fb && fb)
+                    {
+                        var tgtId = state.Global.Vars.TryGetValue(DslRuntime.TargetKey, out var tv) ? tv as string : null;
+                        // Clear the trigger to avoid loops
+                        state = WorldStateOps.WithGlobal(state, g => g with { Vars = g.Vars.Remove("force_act_now") });
+                        if (!string.IsNullOrWhiteSpace(tgtId) && state.Units.ContainsKey(tgtId!) && GetInt(tgtId!, Keys.Hp, 0) > 0)
+                        {
+                            Turn(tgtId!, phase, day);
+                        }
+                    }
                     if (Alive().Count <= 1) break;
                 }
                 if (Alive().Count <= 1) break;

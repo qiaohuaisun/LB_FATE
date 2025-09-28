@@ -1,6 +1,3 @@
-using Microsoft.Maui;
-using Microsoft.Maui.Controls;
-
 namespace LB_FATE.MauiClient;
 
 public partial class App : Application

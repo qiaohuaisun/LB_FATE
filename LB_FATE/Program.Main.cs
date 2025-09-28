@@ -1,5 +1,3 @@
-using System;
-using System.Linq;
 using LB_FATE;
 
 class Program
@@ -19,10 +17,10 @@ class Program
             {
                 case "--roles": if (i + 1 < args.Length) { rolesDir = args[++i]; } break;
                 case "--host": host = true; break;
-                case "--client": client = true; if (i + 1 < args.Length && !args[i+1].StartsWith("--")) { var addr = args[++i]; var parts = addr.Split(':'); hostName = parts[0]; if (parts.Length > 1 && int.TryParse(parts[1], out var pp)) port = pp; } break;
+                case "--client": client = true; if (i + 1 < args.Length && !args[i + 1].StartsWith("--")) { var addr = args[++i]; var parts = addr.Split(':'); hostName = parts[0]; if (parts.Length > 1 && int.TryParse(parts[1], out var pp)) port = pp; } break;
                 case "--hostaddr": if (i + 1 < args.Length) hostName = args[++i]; break;
-                case "--port": if (i + 1 < args.Length && int.TryParse(args[i+1], out var p)) { port = p; i++; } break;
-                case "--players": if (i + 1 < args.Length && int.TryParse(args[i+1], out var n)) { players = Math.Max(1, Math.Min(7, n)); i++; } break;
+                case "--port": if (i + 1 < args.Length && int.TryParse(args[i + 1], out var p)) { port = p; i++; } break;
+                case "--players": if (i + 1 < args.Length && int.TryParse(args[i + 1], out var n)) { players = Math.Max(1, Math.Min(7, n)); i++; } break;
                 case "--size":
                     if (i + 1 < args.Length)
                     {
@@ -32,8 +30,8 @@ class Program
                         { mapW = Math.Max(5, w); mapH = Math.Max(5, h); }
                     }
                     break;
-                case "--width": if (i + 1 < args.Length && int.TryParse(args[i+1], out var w0)) { mapW = Math.Max(5, w0); i++; } break;
-                case "--height": if (i + 1 < args.Length && int.TryParse(args[i+1], out var h0)) { mapH = Math.Max(5, h0); i++; } break;
+                case "--width": if (i + 1 < args.Length && int.TryParse(args[i + 1], out var w0)) { mapW = Math.Max(5, w0); i++; } break;
+                case "--height": if (i + 1 < args.Length && int.TryParse(args[i + 1], out var h0)) { mapH = Math.Max(5, h0); i++; } break;
             }
         }
 

@@ -1,8 +1,8 @@
+using ETBBS;
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
-using ETBBS;
 using Xunit;
 
 public class CombatTests
@@ -25,11 +25,11 @@ public class CombatTests
         var teams = new Dictionary<string, string> { ["A"] = "T1", ["X"] = "T1", ["E"] = "T2" };
         s = WorldStateOps.WithGlobal(s, g => g with { Vars = g.Vars.SetItem(DslRuntime.TeamsKey, teams) });
 
-        s = WithUnit(s, "A", new Dictionary<string, object> { [Keys.Pos] = new Coord(0,0), [Keys.Atk] = 5 });
-        s = WithUnit(s, "X", new Dictionary<string, object> { [Keys.Pos] = new Coord(0,1), [Keys.Hp] = 30, [Keys.Def] = 0 });
-        s = WithUnit(s, "E", new Dictionary<string, object> { [Keys.Pos] = new Coord(0,3), [Keys.Hp] = 30, [Keys.Def] = 0 });
+        s = WithUnit(s, "A", new Dictionary<string, object> { [Keys.Pos] = new Coord(0, 0), [Keys.Atk] = 5 });
+        s = WithUnit(s, "X", new Dictionary<string, object> { [Keys.Pos] = new Coord(0, 1), [Keys.Hp] = 30, [Keys.Def] = 0 });
+        s = WithUnit(s, "E", new Dictionary<string, object> { [Keys.Pos] = new Coord(0, 3), [Keys.Hp] = 30, [Keys.Def] = 0 });
         // aim towards a target behind the enemy so the path includes E's cell
-        s = WithUnit(s, "T", new Dictionary<string, object> { [Keys.Pos] = new Coord(0,4), [Keys.Hp] = 1 });
+        s = WithUnit(s, "T", new Dictionary<string, object> { [Keys.Pos] = new Coord(0, 4), [Keys.Hp] = 1 });
 
         var eff = new LineAoeDamage("A", TargetId: "T", Power: 5, Length: 3, Radius: 0, Flavor: DamageFlavor.Physical, IgnoreRatio: 0.0).Compile();
         s = eff(s);
@@ -80,39 +80,39 @@ public class CombatTests
         var cfg1 = new ActionValidationConfig(CasterId: "A", CurrentTurn: 2);
         var val1 = ActionValidators.ForSkillWithExtras(skill, cfg1, store);
         (s, _) = se.ExecutePlan(s, skill.BuildPlan(new Context(s)), validator: val1);
-        Assert.Equal(0, (int)Convert.ToInt32(s.Units["A"].Vars["count"])) ;
+        Assert.Equal(0, (int)Convert.ToInt32(s.Units["A"].Vars["count"]));
 
         // At turn 3 => allowed
         var cfg2 = cfg1 with { CurrentTurn = 3 };
         var val2 = ActionValidators.ForSkillWithExtras(skill, cfg2, store);
         (s, _) = se.ExecutePlan(s, skill.BuildPlan(new Context(s)), validator: val2);
-        Assert.Equal(1, (int)Convert.ToInt32(s.Units["A"].Vars["count"])) ;
+        Assert.Equal(1, (int)Convert.ToInt32(s.Units["A"].Vars["count"]));
 
         // Simulate store record and retry same turn => blocked by cooldown
         store.SetLastUseTurn("A", skill.Metadata.Name, 3);
         var val3 = ActionValidators.ForSkillWithExtras(skill, cfg2, store);
         (s, _) = se.ExecutePlan(s, skill.BuildPlan(new Context(s)), validator: val3);
-        Assert.Equal(1, (int)Convert.ToInt32(s.Units["A"].Vars["count"])) ;
+        Assert.Equal(1, (int)Convert.ToInt32(s.Units["A"].Vars["count"]));
     }
 
     [Fact]
     public void Validator_Range_Targeting_Tile_With_TargetPoint()
     {
         var s = EmptyWorld();
-        s = WithUnit(s, "C", new Dictionary<string, object> { [Keys.Pos] = new Coord(1,1) });
+        s = WithUnit(s, "C", new Dictionary<string, object> { [Keys.Pos] = new Coord(1, 1) });
         var script = "range 2; targeting tile; set global var \"hit\" = 1";
         var skill = TextDsl.FromTextUsingGlobals("TileSkill", script);
         var se = new SkillExecutor();
 
         // within range: (3,1) is distance 2 from (1,1)
-        var cfgIn = new ActionValidationConfig(CasterId: "C", TargetPos: new Coord(3,1));
+        var cfgIn = new ActionValidationConfig(CasterId: "C", TargetPos: new Coord(3, 1));
         var valIn = ActionValidators.ForSkillWithExtras(skill, cfgIn, cooldownStore: null);
         (s, _) = se.ExecutePlan(s, skill.BuildPlan(new Context(s)), validator: valIn);
         Assert.Equal(1, (int)Convert.ToInt32(s.Global.Vars.GetValueOrDefault("hit", 0)));
 
         // beyond range: (4,1) is distance 3
         s = WorldStateOps.WithGlobal(s, g => g with { Vars = g.Vars.Remove("hit") });
-        var cfgOut = cfgIn with { TargetPos = new Coord(4,1) };
+        var cfgOut = cfgIn with { TargetPos = new Coord(4, 1) };
         var valOut = ActionValidators.ForSkillWithExtras(skill, cfgOut, cooldownStore: null);
         (s, _) = se.ExecutePlan(s, skill.BuildPlan(new Context(s)), validator: valOut);
         Assert.False(s.Global.Vars.ContainsKey("hit"));
@@ -122,12 +122,12 @@ public class CombatTests
     public void Events_Publish_UnitDamaged_And_Moved()
     {
         var s = EmptyWorld();
-        s = WithUnit(s, "U", new Dictionary<string, object> { [Keys.Hp] = 10, [Keys.Pos] = new Coord(0,0) });
+        s = WithUnit(s, "U", new Dictionary<string, object> { [Keys.Hp] = 10, [Keys.Pos] = new Coord(0, 0) });
         var bus = new EventBus(); int dmg = 0; int moved = 0;
         using var d1 = bus.Subscribe(EventTopics.UnitDamaged, _ => dmg++);
         using var d2 = bus.Subscribe(EventTopics.UnitMoved, _ => moved++);
         var se = new SkillExecutor();
-        (s, _) = se.Execute(s, new AtomicAction[] { new Damage("U", 3), new Move("U", new Coord(1,0)) }, events: bus);
+        (s, _) = se.Execute(s, new AtomicAction[] { new Damage("U", 3), new Move("U", new Coord(1, 0)) }, events: bus);
         Assert.Equal(1, dmg);
         Assert.Equal(1, moved);
     }
@@ -140,17 +140,19 @@ public class CombatTests
         var skill = TextDsl.FromTextUsingGlobals("Par", script);
         var se = new SkillExecutor();
         (s, _) = se.ExecutePlan(s, skill.BuildPlan(new Context(s)), validator: null);
-        Assert.Equal(1, (int)Convert.ToInt32(s.Global.Vars["a"])) ;
-        Assert.Equal(2, (int)Convert.ToInt32(s.Global.Vars["b"])) ;
+        Assert.Equal(1, (int)Convert.ToInt32(s.Global.Vars["a"]));
+        Assert.Equal(2, (int)Convert.ToInt32(s.Global.Vars["b"]));
     }
 
     [Fact]
     public void DSL_Repeat_AccumulatesDamage()
     {
         var s = EmptyWorld();
-        s = WithUnit(s, "A", new Dictionary<string, object> { [Keys.Atk] = 0, [Keys.Pos] = new Coord(0,0) });
-        s = WithUnit(s, "B", new Dictionary<string, object> { [Keys.Hp] = 10, [Keys.Def] = 0, [Keys.Pos] = new Coord(0,1) });
-        s = WorldStateOps.WithGlobal(s, g => g with { Vars = g.Vars
+        s = WithUnit(s, "A", new Dictionary<string, object> { [Keys.Atk] = 0, [Keys.Pos] = new Coord(0, 0) });
+        s = WithUnit(s, "B", new Dictionary<string, object> { [Keys.Hp] = 10, [Keys.Def] = 0, [Keys.Pos] = new Coord(0, 1) });
+        s = WorldStateOps.WithGlobal(s, g => g with
+        {
+            Vars = g.Vars
             .SetItem(DslRuntime.CasterKey, "A")
             .SetItem(DslRuntime.TargetKey, "B")
         });
@@ -178,12 +180,14 @@ public class CombatTests
     public void DSL_ForEach_InParallel_WithRange_MarksTargets()
     {
         var s = EmptyWorld();
-        s = WithUnit(s, "C", new Dictionary<string, object> { [Keys.Pos] = new Coord(1,1) });
-        s = WithUnit(s, "E1", new Dictionary<string, object> { [Keys.Pos] = new Coord(2,1) }); // d=1
-        s = WithUnit(s, "E2", new Dictionary<string, object> { [Keys.Pos] = new Coord(3,1) }); // d=2
-        s = WithUnit(s, "E3", new Dictionary<string, object> { [Keys.Pos] = new Coord(5,1) }); // d=4
+        s = WithUnit(s, "C", new Dictionary<string, object> { [Keys.Pos] = new Coord(1, 1) });
+        s = WithUnit(s, "E1", new Dictionary<string, object> { [Keys.Pos] = new Coord(2, 1) }); // d=1
+        s = WithUnit(s, "E2", new Dictionary<string, object> { [Keys.Pos] = new Coord(3, 1) }); // d=2
+        s = WithUnit(s, "E3", new Dictionary<string, object> { [Keys.Pos] = new Coord(5, 1) }); // d=4
         var teams = new Dictionary<string, string> { ["C"] = "T1", ["E1"] = "T2", ["E2"] = "T2", ["E3"] = "T2" };
-        s = WorldStateOps.WithGlobal(s, g => g with { Vars = g.Vars
+        s = WorldStateOps.WithGlobal(s, g => g with
+        {
+            Vars = g.Vars
             .SetItem(DslRuntime.CasterKey, "C")
             .SetItem(DslRuntime.TeamsKey, teams)
         });
@@ -191,8 +195,8 @@ public class CombatTests
         var skill = TextDsl.FromTextUsingGlobals("FEParRange", script);
         var se = new SkillExecutor();
         (s, _) = se.ExecutePlan(s, skill.BuildPlan(new Context(s)), validator: null);
-        Assert.Equal(1, (int)Convert.ToInt32(s.Units["E1"].Vars["mark"])) ;
-        Assert.Equal(1, (int)Convert.ToInt32(s.Units["E2"].Vars["mark"])) ;
+        Assert.Equal(1, (int)Convert.ToInt32(s.Units["E1"].Vars["mark"]));
+        Assert.Equal(1, (int)Convert.ToInt32(s.Units["E2"].Vars["mark"]));
         Assert.False(s.Units["E3"].Vars.ContainsKey("mark"));
     }
     [Fact]
@@ -211,9 +215,9 @@ public class CombatTests
         var s = EmptyWorld();
         var teams = new Dictionary<string, string> { ["A"] = "T1", ["E"] = "T2" };
         s = WorldStateOps.WithGlobal(s, g => g with { Vars = g.Vars.SetItem(DslRuntime.TeamsKey, teams) });
-        s = WithUnit(s, "A", new Dictionary<string, object> { [Keys.Pos] = new Coord(0,0), [Keys.MAtk] = 10 });
-        s = WithUnit(s, "E", new Dictionary<string, object> { [Keys.Pos] = new Coord(0,3), [Keys.Hp] = 30, [Keys.MDef] = 10, [Keys.ResistMagic] = 0.2 });
-        s = WithUnit(s, "T", new Dictionary<string, object> { [Keys.Pos] = new Coord(0,4), [Keys.Hp] = 1 });
+        s = WithUnit(s, "A", new Dictionary<string, object> { [Keys.Pos] = new Coord(0, 0), [Keys.MAtk] = 10 });
+        s = WithUnit(s, "E", new Dictionary<string, object> { [Keys.Pos] = new Coord(0, 3), [Keys.Hp] = 30, [Keys.MDef] = 10, [Keys.ResistMagic] = 0.2 });
+        s = WithUnit(s, "T", new Dictionary<string, object> { [Keys.Pos] = new Coord(0, 4), [Keys.Hp] = 1 });
         // effRes = mdef*(1-0.5)=5; raw0=5+10-5=10; resistMagic 20% => 8
         s = new LineAoeDamage("A", TargetId: "T", Power: 5, Length: 3, Radius: 0, Flavor: DamageFlavor.Magic, IgnoreRatio: 0.5).Compile()(s);
         Assert.Equal(22, (int)s.Units["E"].Vars[Keys.Hp]);
@@ -225,9 +229,9 @@ public class CombatTests
         var s = EmptyWorld();
         var teams = new Dictionary<string, string> { ["A"] = "T1", ["E"] = "T2" };
         s = WorldStateOps.WithGlobal(s, g => g with { Vars = g.Vars.SetItem(DslRuntime.TeamsKey, teams) });
-        s = WithUnit(s, "A", new Dictionary<string, object> { [Keys.Pos] = new Coord(0,0), [Keys.Atk] = 999 });
-        s = WithUnit(s, "E", new Dictionary<string, object> { [Keys.Pos] = new Coord(0,3), [Keys.Hp] = 30, [Keys.Def] = 1000, [Keys.ResistPhysical] = 0.9, [Keys.ResistMagic] = 0.9 });
-        s = WithUnit(s, "T", new Dictionary<string, object> { [Keys.Pos] = new Coord(0,4), [Keys.Hp] = 1 });
+        s = WithUnit(s, "A", new Dictionary<string, object> { [Keys.Pos] = new Coord(0, 0), [Keys.Atk] = 999 });
+        s = WithUnit(s, "E", new Dictionary<string, object> { [Keys.Pos] = new Coord(0, 3), [Keys.Hp] = 30, [Keys.Def] = 1000, [Keys.ResistPhysical] = 0.9, [Keys.ResistMagic] = 0.9 });
+        s = WithUnit(s, "T", new Dictionary<string, object> { [Keys.Pos] = new Coord(0, 4), [Keys.Hp] = 1 });
         // True damage deals Power directly (7)
         s = new LineAoeDamage("A", TargetId: "T", Power: 7, Length: 3, Radius: 0, Flavor: DamageFlavor.True).Compile()(s);
         Assert.Equal(23, (int)s.Units["E"].Vars[Keys.Hp]);
@@ -265,13 +269,13 @@ public class CombatTests
     public void DashTowards_BlockedByOccupiedTile()
     {
         var s = EmptyWorld();
-        s = WithUnit(s, "A", new Dictionary<string, object> { [Keys.Pos] = new Coord(0,0), [Keys.Hp] = 10 });
-        s = WithUnit(s, "B", new Dictionary<string, object> { [Keys.Pos] = new Coord(0,2), [Keys.Hp] = 10 }); // blocker alive
-        s = WithUnit(s, "T", new Dictionary<string, object> { [Keys.Pos] = new Coord(0,3), [Keys.Hp] = 10 });
+        s = WithUnit(s, "A", new Dictionary<string, object> { [Keys.Pos] = new Coord(0, 0), [Keys.Hp] = 10 });
+        s = WithUnit(s, "B", new Dictionary<string, object> { [Keys.Pos] = new Coord(0, 2), [Keys.Hp] = 10 }); // blocker alive
+        s = WithUnit(s, "T", new Dictionary<string, object> { [Keys.Pos] = new Coord(0, 3), [Keys.Hp] = 10 });
 
         s = new DashTowards("A", "T", MaxSteps: 3).Compile()(s);
         var pos = (Coord)s.Units["A"].Vars[Keys.Pos];
-        Assert.Equal(new Coord(0,1), pos);
+        Assert.Equal(new Coord(0, 1), pos);
     }
 
     [Fact]
@@ -377,13 +381,13 @@ public class CombatTests
         var s = EmptyWorld();
         var teams = new Dictionary<string, string> { ["A"] = "T1", ["E1"] = "T2", ["E2"] = "T2", ["F"] = "T1" };
         s = WorldStateOps.WithGlobal(s, g => g with { Vars = g.Vars.SetItem(DslRuntime.TeamsKey, teams) });
-        s = WithUnit(s, "A", new Dictionary<string, object> { [Keys.Pos] = new Coord(0,0), [Keys.Atk] = 0 });
+        s = WithUnit(s, "A", new Dictionary<string, object> { [Keys.Pos] = new Coord(0, 0), [Keys.Atk] = 0 });
         // Place enemies: one on path (0,2), one adjacent to path (1,2) within radius 1
-        s = WithUnit(s, "E1", new Dictionary<string, object> { [Keys.Pos] = new Coord(0,2), [Keys.Hp] = 20, [Keys.Def] = 0 });
-        s = WithUnit(s, "E2", new Dictionary<string, object> { [Keys.Pos] = new Coord(1,2), [Keys.Hp] = 20, [Keys.Def] = 0 });
+        s = WithUnit(s, "E1", new Dictionary<string, object> { [Keys.Pos] = new Coord(0, 2), [Keys.Hp] = 20, [Keys.Def] = 0 });
+        s = WithUnit(s, "E2", new Dictionary<string, object> { [Keys.Pos] = new Coord(1, 2), [Keys.Hp] = 20, [Keys.Def] = 0 });
         // Friendly near path should not be hit
-        s = WithUnit(s, "F", new Dictionary<string, object> { [Keys.Pos] = new Coord(1,1), [Keys.Hp] = 20, [Keys.Def] = 0 });
-        s = WithUnit(s, "T", new Dictionary<string, object> { [Keys.Pos] = new Coord(0,4), [Keys.Hp] = 1 });
+        s = WithUnit(s, "F", new Dictionary<string, object> { [Keys.Pos] = new Coord(1, 1), [Keys.Hp] = 20, [Keys.Def] = 0 });
+        s = WithUnit(s, "T", new Dictionary<string, object> { [Keys.Pos] = new Coord(0, 4), [Keys.Hp] = 1 });
 
         s = new LineAoeDamage("A", TargetId: "T", Power: 5, Length: 4, Radius: 1, Flavor: DamageFlavor.Physical, IgnoreRatio: 0.0).Compile()(s);
         Assert.Equal(15, (int)s.Units["E1"].Vars[Keys.Hp]);
@@ -395,11 +399,11 @@ public class CombatTests
     public void Script_Nearest_And_Farthest_Selection_Order()
     {
         var s = EmptyWorld();
-        s = WithUnit(s, "C", new Dictionary<string, object> { [Keys.Pos] = new Coord(1,1) });
+        s = WithUnit(s, "C", new Dictionary<string, object> { [Keys.Pos] = new Coord(1, 1) });
         // Enemies at various distances
-        s = WithUnit(s, "E1", new Dictionary<string, object> { [Keys.Pos] = new Coord(2,1) }); // d=1
-        s = WithUnit(s, "E2", new Dictionary<string, object> { [Keys.Pos] = new Coord(3,1) }); // d=2
-        s = WithUnit(s, "E3", new Dictionary<string, object> { [Keys.Pos] = new Coord(4,1) }); // d=3
+        s = WithUnit(s, "E1", new Dictionary<string, object> { [Keys.Pos] = new Coord(2, 1) }); // d=1
+        s = WithUnit(s, "E2", new Dictionary<string, object> { [Keys.Pos] = new Coord(3, 1) }); // d=2
+        s = WithUnit(s, "E3", new Dictionary<string, object> { [Keys.Pos] = new Coord(4, 1) }); // d=3
         var teams = new Dictionary<string, string> { ["C"] = "T1", ["E1"] = "T2", ["E2"] = "T2", ["E3"] = "T2" };
         // Nearest 2 via SkillScript and Selection.SortByNearestTo
         Func<Context, IEnumerable<string>> nearest2Enemies = ctx =>
@@ -427,7 +431,7 @@ public class CombatTests
         Func<Context, IEnumerable<string>> farthest1Enemy = ctx => Selection
             .SortByNearestTo("C")(ctx)
             .Reverse()
-            .Where(id => teams.TryGetValue(id, out var t) && t != teams["C"]) 
+            .Where(id => teams.TryGetValue(id, out var t) && t != teams["C"])
             .Take(1);
         var skill2 = SkillBuilder.Create("Farthest1").Script(ss =>
         {
@@ -515,8 +519,10 @@ public class CombatTests
         var s = EmptyWorld();
         s = WithUnit(s, "U", new Dictionary<string, object>
         {
-            [Keys.Hp] = 5, [Keys.MaxHp] = 10,
-            [Keys.Mp] = 0.0, [Keys.MaxMp] = 5.0,
+            [Keys.Hp] = 5,
+            [Keys.MaxHp] = 10,
+            [Keys.Mp] = 0.0,
+            [Keys.MaxMp] = 5.0,
             [Keys.HpRegenPerTurn] = 3.0,
             [Keys.MpRegenPerTurn] = 2.0,
             ["per_turn_add:resist_magic"] = 0.2,

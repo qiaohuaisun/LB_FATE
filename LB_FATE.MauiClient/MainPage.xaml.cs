@@ -1,10 +1,8 @@
+using System.Collections.ObjectModel;
+using System.ComponentModel;
+using System.Linq;
 using System.Net.Sockets;
 using System.Text;
-using System.Linq;
-using Microsoft.Maui.ApplicationModel;
-using Microsoft.Maui.Graphics;
-using Microsoft.Maui.Controls;
-using System.Collections.ObjectModel;
 using System.Text.RegularExpressions;
 
 namespace LB_FATE.MauiClient;
@@ -18,8 +16,15 @@ public partial class MainPage : ContentPage
     private CancellationTokenSource? _cts;
     private CancellationTokenSource? _reconnectCts;
     private readonly object _logLock = new();
-    private readonly ObservableCollection<string> _logItems = new();
+    private readonly ObservableCollection<LogItem> _logItems = new();
+    private readonly List<string> _allLogs = new();
     private const int MaxLogItems = 500;
+    private const int MaxAllLogs = 2000;
+    private bool _autoScroll = true;
+    private bool _errorsOnly = false;
+    private enum CaptureMode { None, Help, Skills, Info }
+    private CaptureMode _captureMode = CaptureMode.None;
+    private readonly List<string> _captureLines = new();
     private readonly ObservableCollection<PlayerCard> _players = new();
     private bool _capturingBoard = false;
     private readonly List<string> _boardRows = new();
@@ -65,10 +70,34 @@ public partial class MainPage : ContentPage
             // First, consume visual-only lines (board/legend). If consumed, do not add to log list.
             if (ConsumeBoard(line) || ConsumeLegend(line)) return;
 
-            var indexBefore = _logItems.Count;
+            // If capturing server output for modal dialog, accumulate and skip normal log flow
+            if (_captureMode != CaptureMode.None)
+            {
+                _captureLines.Add(line);
+                return;
+            }
+
+            // always store in backing list
+            _allLogs.Add(line);
+            // trim backing list
+            if (_allLogs.Count > MaxAllLogs)
+            {
+                var remove = _allLogs.Count - MaxAllLogs;
+                _allLogs.RemoveRange(0, remove);
+            }
             MainThread.BeginInvokeOnMainThread(() =>
             {
-                _logItems.Add(line);
+                if (!_errorsOnly || IsErrorLine(line))
+                {
+                    if (_logItems.Count > 0 && _logItems[^1].Text == line)
+                    {
+                        _logItems[^1].Count++;
+                    }
+                    else
+                    {
+                        _logItems.Add(new LogItem { Text = line, Count = 1 });
+                    }
+                }
                 // Trim old logs to keep UI responsive
                 const int trimTo = MaxLogItems;
                 if (_logItems.Count > trimTo)
@@ -80,7 +109,7 @@ public partial class MainPage : ContentPage
                 {
                     // Ensure it snaps to the latest item reliably
                     var lastIndex = _logItems.Count - 1;
-                    if (lastIndex >= 0)
+                    if (_autoScroll && lastIndex >= 0)
                         LogList.ScrollTo(lastIndex, position: ScrollToPosition.End, animate: false);
                 }
                 catch { }
@@ -380,6 +409,17 @@ public partial class MainPage : ContentPage
                 if (line is null) break;
                 if (line.Equals("PROMPT", StringComparison.OrdinalIgnoreCase))
                 {
+                    // If we were capturing output, show it as a modal dialog now
+                    if (_captureMode != CaptureMode.None)
+                    {
+                        var title = _captureMode switch { CaptureMode.Help => "Help", CaptureMode.Skills => "Skills", CaptureMode.Info => "Info", _ => "" };
+                        var text = string.Join("\n", _captureLines);
+                        _captureMode = CaptureMode.None; _captureLines.Clear();
+                        await MainThread.InvokeOnMainThreadAsync(async () =>
+                        {
+                            try { await DisplayAlert(title, text, "OK"); } catch { }
+                        });
+                    }
                     AppendLog("> ");
                     MainThread.BeginInvokeOnMainThread(() => { SetPromptState(true); CmdEntry.Focus(); });
                 }
@@ -436,6 +476,13 @@ public partial class MainPage : ContentPage
     {
         if (sender is not Button btn) return;
         var cmd = btn.CommandParameter?.ToString() ?? btn.Text ?? string.Empty;
+        // For help/skills/info, capture server output to show as modal
+        switch (cmd.ToLowerInvariant())
+        {
+            case "help": _captureMode = CaptureMode.Help; _captureLines.Clear(); break;
+            case "skills": _captureMode = CaptureMode.Skills; _captureLines.Clear(); break;
+            case "info": _captureMode = CaptureMode.Info; _captureLines.Clear(); break;
+        }
         CmdEntry.Text = cmd;
         await Task.Delay(10);
         OnSendClicked(sender, e);
@@ -443,7 +490,74 @@ public partial class MainPage : ContentPage
 
     private void OnClearLogsClicked(object? sender, EventArgs e)
     {
-        MainThread.BeginInvokeOnMainThread(() => _logItems.Clear());
+        MainThread.BeginInvokeOnMainThread(() => { _logItems.Clear(); _allLogs.Clear(); });
+    }
+
+    private async void OnCopyLogsClicked(object? sender, EventArgs e)
+    {
+        try
+        {
+            var text = string.Join("\n", _logItems.Select(i => i.Display));
+            await Clipboard.SetTextAsync(text);
+        }
+        catch { }
+    }
+
+    private void OnAutoScrollToggled(object? sender, ToggledEventArgs e)
+    {
+        _autoScroll = e.Value;
+    }
+
+    private void OnErrorsOnlyToggled(object? sender, ToggledEventArgs e)
+    {
+        _errorsOnly = e.Value;
+        RebuildLogView();
+    }
+
+    private void RebuildLogView()
+    {
+        MainThread.BeginInvokeOnMainThread(() =>
+        {
+            _logItems.Clear();
+            IEnumerable<string> source = _allLogs;
+            if (_errorsOnly) source = source.Where(IsErrorLine);
+            var folded = new List<LogItem>();
+            foreach (var s in source)
+            {
+                if (folded.Count > 0 && folded[^1].Text == s)
+                    folded[^1].Count++;
+                else
+                    folded.Add(new LogItem { Text = s, Count = 1 });
+            }
+            foreach (var item in folded.Skip(Math.Max(0, folded.Count - MaxLogItems)))
+                _logItems.Add(item);
+            try
+            {
+                if (_autoScroll && _logItems.Count > 0)
+                    LogList.ScrollTo(_logItems.Count - 1, position: ScrollToPosition.End, animate: false);
+            }
+            catch { }
+        });
+    }
+
+    private static bool IsErrorLine(string s)
+        => s.StartsWith("ERROR:", StringComparison.OrdinalIgnoreCase)
+           || s.Contains("[Error]", StringComparison.OrdinalIgnoreCase)
+           || s.Contains("Error", StringComparison.Ordinal);
+
+    public sealed class LogItem : INotifyPropertyChanged
+    {
+        private int _count = 1;
+        public string Text { get; set; } = string.Empty;
+        public int Count
+        {
+            get => _count;
+            set { if (_count != value) { _count = value; OnPropertyChanged(nameof(Count)); OnPropertyChanged(nameof(Display)); } }
+        }
+        public string Display => Count > 1 ? $"{Text} (x{Count})" : Text;
+
+        public event PropertyChangedEventHandler? PropertyChanged;
+        private void OnPropertyChanged(string name) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
     }
 
     // Discover moved to dedicated page

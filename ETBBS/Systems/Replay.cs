@@ -23,4 +23,4 @@ public sealed class ReplaySystem
         return new ReplayRecord(initial, steps, state, logs);
     }
 }
- 
+

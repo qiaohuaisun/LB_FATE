@@ -93,14 +93,17 @@ public static class ActionValidators
         var cfg = baseCfg;
         if (skill.Extras.TryGetValue("targeting", out var tval) && tval is string ts)
         {
-            cfg = cfg with { Targeting = ts.ToLowerInvariant() switch
+            cfg = cfg with
             {
-                "any" => TargetingMode.Any,
-                "enemies" => TargetingMode.EnemiesOnly,
-                "allies" => TargetingMode.AlliesOnly,
-                "self" => TargetingMode.SelfOnly,
-                _ => cfg.Targeting
-            }};
+                Targeting = ts.ToLowerInvariant() switch
+                {
+                    "any" => TargetingMode.Any,
+                    "enemies" => TargetingMode.EnemiesOnly,
+                    "allies" => TargetingMode.AlliesOnly,
+                    "self" => TargetingMode.SelfOnly,
+                    _ => cfg.Targeting
+                }
+            };
         }
         if (skill.Extras.TryGetValue("cooldown", out var cdObj) && cdObj is int cd && cooldownStore is not null)
         {
@@ -274,4 +277,4 @@ public static class ActionValidators
             _ => Math.Abs(a.X - b.X) + Math.Abs(a.Y - b.Y)
         };
 }
- 
+
