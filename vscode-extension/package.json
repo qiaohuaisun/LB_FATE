@@ -1,0 +1,78 @@
+{
+  "name": "etbbs-lbr-tools",
+  "displayName": "%displayName%",
+  "description": "%description%",
+  "version": "0.1.0",
+  "publisher": "local",
+  "engines": {
+    "vscode": "^1.87.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "main": "./extension.js",
+  "activationEvents": [
+    "onLanguage:lbr",
+    "onCommand:etbbs-lbr.validate",
+    "onCommand:etbbs-lbr.createRole",
+    "onCommand:etbbs-lbr.formatDocument"
+  ],
+  "contributes": {
+    "languages": [
+      {
+        "id": "lbr",
+        "aliases": ["LBR", "lbr"],
+        "extensions": [".lbr"],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "snippets": [
+      {
+        "language": "lbr",
+        "path": "./snippets/lbr.code-snippets.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "lbr",
+        "scopeName": "source.lbr",
+        "path": "./syntaxes/lbr.tmLanguage.json",
+        "embeddedLanguages": {
+          "meta.embedded.block.lbr-skill": "lbr"
+        }
+      }
+    ],
+    "commands": [
+      {
+        "command": "etbbs-lbr.validate",
+        "title": "%cmd.validate%"
+      },
+      {
+        "command": "etbbs-lbr.createRole",
+        "title": "%cmd.create%"
+      },
+      {
+        "command": "etbbs-lbr.formatDocument",
+        "title": "%cmd.format%"
+      }
+    ],
+    "configuration": {
+      "type": "object",
+      "title": "ETBBS LBR Tools",
+      "properties": {
+        "etbbs-lbr.format.indentSize": {
+          "type": "integer",
+          "default": 2,
+          "minimum": 1,
+          "maximum": 8,
+          "description": "Spaces per indent level for LBR formatter"
+        },
+        "etbbs-lbr.validate.workspaceDuplicates": {
+          "type": "boolean",
+          "default": true,
+          "description": "Report duplicate role ids across workspace"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="LB_FATE.MauiClient.DiscoverPage"
+             Title="Discover">
+    <VerticalStackLayout Padding="16" Spacing="12">
+        <HorizontalStackLayout Spacing="8">
+            <Button x:Name="RefreshBtn" Text="Refresh" Clicked="OnRefreshClicked" />
+            <Button x:Name="UseBtn" Text="Use Selected" Clicked="OnUseClicked" />
+        </HorizontalStackLayout>
+        <RefreshView x:Name="RefreshView" Refreshing="OnRefreshClicked">
+            <CollectionView x:Name="HostsList" SelectionMode="Single" HeightRequest="360">
+                <CollectionView.ItemTemplate>
+                    <DataTemplate>
+                        <Grid Padding="12" ColumnDefinitions="*,Auto">
+                            <Label Text="{Binding Host}" FontAttributes="Bold" />
+                            <Label Grid.Column="1" Text="{Binding Port}" />
+                        </Grid>
+                    </DataTemplate>
+                </CollectionView.ItemTemplate>
+            </CollectionView>
+        </RefreshView>
+    </VerticalStackLayout>
+</ContentPage>

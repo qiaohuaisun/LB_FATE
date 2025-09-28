@@ -1,0 +1,93 @@
+# Saber — 阿尔托莉雅（Artoria）
+role "阿尔托莉雅" id "saber_artoria" {
+  description "\n阿尔托莉雅（Saber）。机制：\n- 稳定输出：基础攻击与冲锋构成稳定近战输出链。\n- 自我强化：攻击强化与“充能”形成爆发节奏。\n- 宝具：直线群体伤害（物理/真实/魔法），在充能状态下强化（封印至第 3 回合）。\n";
+
+  vars {
+    "hp" = 38;
+    "max_hp" = 38;
+    "mp" = 6.0;
+    "atk" = 9;
+    "def" = 5;
+    "range" = 1;
+    "speed" = 3;
+    // 天赋3:每回合回一定魔力
+    "mp_regen_per_turn" = 0.5;
+    // 天赋2:低于半血时自动恢复一定生命
+    "auto_heal_below_half" = 12;
+    // 内部标志：进入风界后持有 tag "windrealm"
+  }
+
+  tags { "saber" }
+
+  skills {
+    # 基本攻击（保留，便于 'attack' 指令）
+    skill "Basic Attack" {
+      range 1; targeting enemies;
+      chance 20% then { deal physical 6 damage to target from caster ignore defense 50% } else { deal physical 6 damage to target from caster };
+    }
+
+    # 技能1：疾风突斩 — 伤害；处于风界时，对目标周围造成群伤（“沿途”用目标近身范围近似）
+    skill "疾风突斩" {
+      range 3; targeting enemies; cooldown 1;
+      dash towards target up to 3;
+      chance 30% then { deal physical 8 damage to target from caster ignore defense 50% } else { deal physical 8 damage to target from caster };
+      if caster has tag "windrealm" then {
+        for each enemies in range 1 of target in parallel do {
+          deal physical 4 damage to it from caster
+        }
+      };
+      consume mp = 1.0;
+    }
+
+    # 技能2：剑风咆哮 — 攻击提升（以标签标识），风界下对目标施加眩晕
+    skill "剑风咆哮" {
+      range 0; targeting self; cooldown 2;
+      add tag "attack_up" to caster; # 引擎不内置衰减，仅作标记
+      set unit(caster) var "atk" = var "atk" of caster + 2;
+      if caster has tag "windrealm" then {
+        # 若已选定目标，可在随后一次普通攻击/技能前先用 'ha' 命令提示范围后靠近再使用；此处直接附加控制标记
+        # 增加眩晕并统一设置持续回合（由系统在回合中衰减并自动移除）
+        add tag "stunned" to target;
+        set unit(target) var "stunned_turns" = 1
+      };
+      consume mp = 0.5;
+    }
+
+    # 技能3：誓约胜利之剑（封印5回合）—— 群体物理伤害 + 一定真实伤害；风界时额外法伤
+    # 可先以“蓄力”强化（见下），本技能在检测到“charged”时给予额外真实伤害并移除蓄力标记
+    skill "誓约胜利之剑" {
+      range 3; targeting enemies; cooldown 5; sealed_until 3;
+      # 基础“前方线”群伤（以 caster->target 方向延长 length，半径0）
+      line physical 9 to target length 3 radius 0;
+      line 3 to target length 3 radius 0; # 真实伤害
+      if caster has tag "windrealm" then {
+        line magic 5 to target length 3 radius 0
+      };
+      # 蓄力强化：距离+2，额外真实伤+3，并清除 charged
+      if caster has tag "charged" then {
+        line 3 to target length 5 radius 0;
+        remove tag "charged" from caster
+      };
+      consume mp = 2.5;
+    }
+
+    # 蓄力：可蓄力一回合，期间免疫不良影响（以 不死1回合 近似），下一次“誓约胜利之剑”获得额外真实伤害
+    skill "蓄力" {
+      targeting self; cooldown 3;
+      add tag "charged" to caster;
+      set unit(caster) var "undying_turns" = 1;
+      set unit(caster) var "status_immune_turns" = 1;
+      consume mp = 1.0;
+    }
+
+    # 天赋1：进入风界（消耗魔力，获得‘风界’标记）
+    skill "进入风界" {
+      targeting self; cooldown 2;
+      add tag "windrealm" to caster;
+      consume mp = 1.5;
+    }
+
+  }
+}
+
+

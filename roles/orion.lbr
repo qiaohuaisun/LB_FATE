@@ -1,0 +1,91 @@
+# Orion — Versatile Archer with stance shift and support NP
+role "Orion" id "archer_orion" {
+  description "
+俄里翁（Orion）。机制：
+- 天赋1：贯穿——普通射击无视一部分护甲。
+- 天赋2：每日结束回复 4 点生命（通用每回合增量实现）。
+- 一技能「贯穿齐射」：直线群攻，造成物理伤害，可附带无视护甲比例。
+- 二技能「猎手之姿」：切换形态；进入近战姿态时攻击距离=1、攻击力提升、移速提升；再次使用恢复原姿态。
+- 宝具「阿耳忒弥斯的祝福」：净化负面、回复生命与魔力、提高攻击、赋予短暂负面免疫（封印至第 3 回合）。
+";
+
+  vars {
+    "hp" = 32;
+    "max_hp" = 32;
+    "mp" = 5.0;
+    "atk" = 7;
+    "def" = 4;
+    "range" = 3;
+    "speed" = 3;
+
+    # Store base stats for stance toggling
+    "base_atk" = 7;
+    "base_speed" = 3;
+    "base_range" = 3;
+
+    # Talent 2: recover 4 HP at end of each day (turn)
+    "per_turn_add:hp" = 4;
+  }
+
+  tags { "archer" }
+
+  skills {
+    # 基础攻击：体现天赋1，固定无视部分护甲
+    skill "Basic Attack" {
+      range 3; targeting enemies;
+      deal physical 6 damage to target from caster ignore defense 30%;
+    }
+
+    # 一技能「贯穿齐射」：直线物理伤害，可配置无视护甲比例
+    skill "Piercing Volley" {
+      range 4; targeting enemies; cooldown 2;
+      line physical 7 to target length 3 radius 0 ignore defense 30%;
+      consume mp = 1.0;
+    }
+
+    # 二技能「猎手之姿」：切换形态（近战/还原）
+    skill "Hunter's Stance" {
+      range 0; targeting self; cooldown 2;
+      if caster has tag "stance_melee" then {
+        # revert to base
+        set unit(caster) var "atk" = var "base_atk" of caster;
+        set unit(caster) var "speed" = var "base_speed" of caster;
+        set unit(caster) var "range" = var "base_range" of caster;
+        remove tag "stance_melee" from caster
+      } else {
+        # enter melee stance
+        set unit(caster) var "atk" = var "base_atk" of caster + 2;
+        set unit(caster) var "speed" = var "base_speed" of caster + 1;
+        set unit(caster) var "range" = 1;
+        add tag "stance_melee" to caster
+      };
+      consume mp = 0.5;
+    }
+
+    # 宝具「阿耳忒弥斯的祝福」：净化、回血回蓝、提升攻击、短暂负免
+    skill "Artemis' Blessing" {
+      range 0; targeting self; cooldown 5; sealed_until 3;
+      # cleanse common negative tags and reset their timers
+      remove tag "stunned" from caster;
+      remove tag "silenced" from caster;
+      remove tag "rooted" from caster;
+      remove tag "bleeding" from caster;
+      remove tag "burning" from caster;
+      remove tag "frozen" from caster;
+      set unit(caster) var "stunned_turns" = 0;
+      set unit(caster) var "silenced_turns" = 0;
+      set unit(caster) var "rooted_turns" = 0;
+      set unit(caster) var "bleed_turns" = 0;
+      set unit(caster) var "burn_turns" = 0;
+
+      # heal and restore mana
+      heal 8 to caster;
+      set unit(caster) var "mp" = var "mp" of caster + 2.0;
+
+      # offensive boon and short immunity to negative statuses
+      set unit(caster) var "atk" = var "base_atk" of caster + 3;
+      set unit(caster) var "status_immune_turns" = 2;
+      consume mp = 2.5;
+    }
+  }
+}

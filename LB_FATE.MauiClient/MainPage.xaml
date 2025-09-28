@@ -1,0 +1,128 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="LB_FATE.MauiClient.MainPage"
+             Title="LB_FATE Client">
+    <!-- Sticky command bar layout: scrollable content + fixed bottom command area -->
+    <Grid RowDefinitions="*,Auto">
+    <ScrollView Grid.Row="0">
+    <VerticalStackLayout Padding="16" Spacing="16" BackgroundColor="{StaticResource ColorBackground}">
+        <!-- Connection & Status Card -->
+        <Border Style="{StaticResource CardBorder}">
+            <Grid ColumnDefinitions="*,Auto,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="12" RowSpacing="8">
+                <!-- Status chip -->
+                <Border x:Name="StatusChip" Grid.ColumnSpan="3" Padding="8,6" StrokeThickness="0">
+                    <HorizontalStackLayout Spacing="8">
+                        <Frame x:Name="StatusDot" WidthRequest="10" HeightRequest="10" Padding="0" CornerRadius="5" HasShadow="False" BackgroundColor="#9CA3AF" VerticalOptions="Center" />
+                        <Label x:Name="StatusLabel" Text="Not connected" FontAttributes="Bold" />
+                        <Label x:Name="EndpointLabel" Text="" TextColor="#6B7280" FontSize="12" />
+                    </HorizontalStackLayout>
+                </Border>
+                <!-- Host/Port/Connect -->
+                <Entry Grid.Row="1" Grid.Column="0" x:Name="HostEntry" Placeholder="Host" Text="127.0.0.1" />
+                <Entry Grid.Row="1" Grid.Column="1" x:Name="PortEntry" WidthRequest="90" Keyboard="Numeric" Placeholder="Port" Text="35500" />
+                <Button Grid.Row="1" Grid.Column="2" x:Name="ConnectBtn" Text="Connect" Clicked="OnConnectClicked" Style="{StaticResource PrimaryButton}" />
+            </Grid>
+        </Border>
+
+        <!-- Board Card -->
+        <Border Style="{StaticResource CardBorder}">
+            <Grid RowDefinitions="Auto,*" RowSpacing="8">
+                <Label x:Name="BoardTitleLabel" Text="Board" FontAttributes="Bold" />
+                <ScrollView x:Name="BoardScroll" Grid.Row="1" Orientation="Both" SizeChanged="OnBoardAreaSizeChanged">
+                    <Grid x:Name="BoardGrid" />
+                </ScrollView>
+            </Grid>
+        </Border>
+
+        <!-- Players Card -->
+        <Border Style="{StaticResource CardBorder}">
+            <Grid RowDefinitions="Auto,*" RowSpacing="8">
+                <Label Text="Players" FontAttributes="Bold" />
+                <CollectionView x:Name="PlayersList" Grid.Row="1" SelectionMode="None">
+                    <CollectionView.ItemsLayout>
+                        <LinearItemsLayout Orientation="Vertical" ItemSpacing="8" />
+                    </CollectionView.ItemsLayout>
+                    <CollectionView.ItemTemplate>
+                        <DataTemplate>
+                            <Border Style="{StaticResource ListItemBorder}">
+                                <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="12">
+                                    <!-- Avatar Circle with Symbol -->
+                                    <Frame Grid.RowSpan="2" WidthRequest="30" HeightRequest="30" Padding="0" CornerRadius="15" HasShadow="False" BackgroundColor="{Binding Color}">
+                                        <Label Text="{Binding Symbol}" HorizontalTextAlignment="Center" VerticalTextAlignment="Center" TextColor="White" FontAttributes="Bold" />
+                                    </Frame>
+                                    <!-- Name + Class chip + Pos -->
+                                    <HorizontalStackLayout Grid.Column="1" Spacing="8" VerticalOptions="Center">
+                                        <Label Text="{Binding Id}" FontAttributes="Bold" />
+                                        <Border StrokeThickness="1" Stroke="#C7D2FE" Background="#EEF2FF" Padding="8,2">
+                                            <Border.StrokeShape>
+                                                <RoundRectangle CornerRadius="12" />
+                                            </Border.StrokeShape>
+                                            <Label Text="{Binding Class}" TextColor="#374151" FontSize="12" />
+                                        </Border>
+                                        <Label Text="{Binding Pos, StringFormat='📍 {0}'}" TextColor="#6B7280" FontSize="12" />
+                                    </HorizontalStackLayout>
+                                    <!-- HP numbers (right) -->
+                                    <Label Grid.Column="2" Text="{Binding HpText}" TextColor="{Binding HpTextColor}" />
+                                    <!-- Bars + MP text -->
+                                    <Grid Grid.Row="1" Grid.Column="1" ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                        <VerticalStackLayout Spacing="4">
+                                            <ProgressBar Progress="{Binding HpRatio}" HeightRequest="8" VerticalOptions="Center" ProgressColor="{Binding HpBarColor}" BackgroundColor="#E5E7EB" />
+                                            <ProgressBar Progress="{Binding MpRatio}" HeightRequest="8" VerticalOptions="Center" ProgressColor="{Binding MpBarColor}" BackgroundColor="#E5E7EB" />
+                                        </VerticalStackLayout>
+                                        <Label Grid.Column="1" Text="{Binding MpText, StringFormat='MP: {0}'}" TextColor="#6B7280" HorizontalTextAlignment="End" />
+                                    </Grid>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </CollectionView.ItemTemplate>
+                </CollectionView>
+            </Grid>
+        </Border>
+
+        <!-- Logs Card -->
+        <Border Style="{StaticResource CardBorder}">
+            <Grid RowDefinitions="Auto,*" RowSpacing="8">
+                <Label Text="Logs" FontAttributes="Bold" />
+                <CollectionView x:Name="LogList" Grid.Row="1" SelectionMode="None">
+                    <CollectionView.ItemsLayout>
+                        <LinearItemsLayout Orientation="Vertical" ItemSpacing="4" />
+                    </CollectionView.ItemsLayout>
+                    <CollectionView.ItemTemplate>
+                        <DataTemplate>
+                            <Grid Padding="6" ColumnDefinitions="Auto,*" ColumnSpacing="8">
+                                <Frame WidthRequest="6" HeightRequest="6" Padding="0" CornerRadius="3" BackgroundColor="#9CA3AF" VerticalOptions="Center" />
+                                <Label Grid.Column="1" Text="{Binding}" FontFamily="Courier New" />
+                            </Grid>
+                        </DataTemplate>
+                    </CollectionView.ItemTemplate>
+                </CollectionView>
+            </Grid>
+        </Border>
+
+        <!-- Spacer to avoid last card being hidden behind sticky bar -->
+        <BoxView HeightRequest="8" />
+    </VerticalStackLayout>
+    </ScrollView>
+    <!-- Sticky Command Card -->
+    <Border Grid.Row="1" Style="{StaticResource CardBorder}" Padding="12,10">
+        <Grid RowDefinitions="Auto,Auto" ColumnDefinitions="*,Auto" RowSpacing="8" ColumnSpacing="8">
+            <!-- Quick chips -->
+            <ScrollView Grid.Row="0" Grid.ColumnSpan="2" Orientation="Horizontal">
+                <HorizontalStackLayout Spacing="8">
+                    <Button Text="help" Style="{StaticResource ChipButton}" Clicked="OnQuickCmdClicked" CommandParameter="help" />
+                    <Button Text="info" Style="{StaticResource ChipButton}" Clicked="OnQuickCmdClicked" CommandParameter="info" />
+                    <Button Text="skills" Style="{StaticResource ChipButton}" Clicked="OnQuickCmdClicked" CommandParameter="skills" />
+                    <Button Text="hm" Style="{StaticResource ChipButton}" Clicked="OnQuickCmdClicked" CommandParameter="hm" />
+                    <Button Text="ha" Style="{StaticResource ChipButton}" Clicked="OnQuickCmdClicked" CommandParameter="ha" />
+                    <Button Text="pass" Style="{StaticResource ChipButton}" Clicked="OnQuickCmdClicked" CommandParameter="pass" />
+                    <Button Text="Clear" Style="{StaticResource ChipButton}" Clicked="OnClearLogsClicked" />
+                </HorizontalStackLayout>
+            </ScrollView>
+            <!-- Command entry + send -->
+            <Entry Grid.Row="1" Grid.Column="0" x:Name="CmdEntry" Placeholder="Type command after PROMPT..." Completed="OnSendCompleted" />
+            <Button Grid.Row="1" Grid.Column="1" x:Name="SendBtn" Text="Send" Clicked="OnSendClicked" Style="{StaticResource PrimaryButton}" />
+        </Grid>
+    </Border>
+    </Grid>
+</ContentPage>

@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="LB_FATE.MauiClient.SettingsPage"
+             Title="Settings">
+    <ScrollView>
+      <VerticalStackLayout Padding="16" Spacing="16">
+        <!-- Auto reconnect card -->
+        <Border Style="{StaticResource CardBorder}">
+          <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+            <VerticalStackLayout>
+              <Label x:Name="AutoReconnectLabel" Text="Auto reconnect" FontAttributes="Bold" />
+              <Label Text="When connection fails or drops, retry automatically." FontSize="12" TextColor="#6B7280" />
+            </VerticalStackLayout>
+            <Switch x:Name="AutoReconnectSwitch" Grid.Column="1" Toggled="OnAutoReconnectToggled"/>
+          </Grid>
+        </Border>
+
+        <!-- Reconnect strategy card -->
+        <Border Style="{StaticResource CardBorder}">
+          <VerticalStackLayout Spacing="12">
+            <!-- Delay seconds slider -->
+            <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12" RowDefinitions="Auto">
+              <Label x:Name="DelayLabel" Text="Delay (s)" VerticalOptions="Center"/>
+              <Slider x:Name="DelaySlider" Grid.Column="1" Minimum="1" Maximum="30" ValueChanged="OnDelayChanged" />
+              <Label x:Name="DelayValue" Grid.Column="2" Text="1" WidthRequest="40" HorizontalTextAlignment="End" VerticalOptions="Center" />
+            </Grid>
+            <!-- Max attempts slider -->
+            <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12" RowDefinitions="Auto">
+              <Label x:Name="MaxAttemptsLabel" Text="Max attempts" VerticalOptions="Center"/>
+              <Slider x:Name="MaxAttemptsSlider" Grid.Column="1" Minimum="0" Maximum="50" ValueChanged="OnMaxAttemptsChanged" />
+              <Label x:Name="MaxAttemptsValue" Grid.Column="2" Text="10" WidthRequest="40" HorizontalTextAlignment="End" VerticalOptions="Center" />
+            </Grid>
+          </VerticalStackLayout>
+        </Border>
+
+        <!-- Language card -->
+        <Border Style="{StaticResource CardBorder}">
+          <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
+            <Label x:Name="LanguageLabel" Text="Language"/>
+            <Picker x:Name="LanguagePicker" Grid.Column="1" SelectedIndexChanged="OnLanguageChanged"/>
+          </Grid>
+        </Border>
+
+        <!-- Reset card -->
+        <Border Style="{StaticResource CardBorder}">
+          <Button Text="Reset to defaults" Clicked="OnResetClicked" Style="{StaticResource SecondaryButton}" />
+        </Border>
+      </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>

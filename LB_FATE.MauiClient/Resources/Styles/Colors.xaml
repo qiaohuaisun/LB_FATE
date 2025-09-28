@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ResourceDictionary xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml">
+
+  <!-- App theme aware colors -->
+  <!-- Use static colors to avoid AppThemeColor resolution issues in some toolchains -->
+  <Color x:Key="ColorBackground">#FFFFFF</Color>
+  <Color x:Key="ColorSurface">#F6F6F6</Color>
+  <Color x:Key="ColorOnSurface">#1F2937</Color>
+  <Color x:Key="ColorPrimary">#512BD4</Color>
+  <Color x:Key="ColorOnPrimary">#FFFFFF</Color>
+  <Color x:Key="ColorSecondary">#06B6D4</Color>
+  <Color x:Key="ColorWarn">#F59E0B</Color>
+  <Color x:Key="ColorDanger">#EF4444</Color>
+  <Color x:Key="ColorSuccess">#10B981</Color>
+
+</ResourceDictionary>

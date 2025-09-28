@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
+  <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
+
+  <data name="AppTitle"><value>LB_FATE 客户端</value></data>
+  <data name="HostPlaceholder"><value>主机地址</value></data>
+  <data name="PortPlaceholder"><value>端口</value></data>
+  <data name="Connect"><value>连接</value></data>
+  <data name="Disconnect"><value>断开</value></data>
+  <data name="StatusConnected"><value>已连接</value></data>
+  <data name="StatusNotConnected"><value>未连接</value></data>
+  <data name="Discover"><value>发现主机</value></data>
+  <data name="DiscoveredHostsTitle"><value>已发现主机（请选择）</value></data>
+  <data name="Use"><value>使用</value></data>
+  <data name="Send"><value>发送</value></data>
+  <data name="Settings"><value>设置</value></data>
+  <data name="AutoReconnect"><value>自动重连</value></data>
+  <data name="DiscoverTitle"><value>发现主机</value></data>
+  <data name="Refresh"><value>刷新</value></data>
+  <data name="UseSelected"><value>使用所选</value></data>
+  <data name="NoSelection"><value>请先选择主机</value></data>
+  <data name="CommandPlaceholderWaiting"><value>等待服务器 PROMPT...</value></data>
+  <data name="CommandPlaceholderReady"><value>输入命令，例如：help | move x y | attack P#</value></data>
+
+  <data name="ErrorTitle"><value>错误</value></data>
+  <data name="ErrorHostRequired"><value>请填写主机地址</value></data>
+  <data name="ErrorInvalidPort"><value>端口无效</value></data>
+  <data name="ConnectFailed"><value>连接失败</value></data>
+  <data name="SendFailed"><value>发送失败</value></data>
+  <data name="NotConnectedTitle"><value>未连接</value></data>
+  <data name="NotConnectedMessage"><value>请先连接到服务器</value></data>
+  <data name="DiscoveryFailed"><value>发现主机失败</value></data>
+
+  <data name="ToastConnectFailedAutoRetry"><value>连接失败，自动重试中...</value></data>
+  <data name="ToastDisconnectedAutoRetry"><value>已断开，自动重试中...</value></data>
+  <data name="ToastReconnectingInFormat"><value>{0} 秒后重连（第 {1} 次）...</value></data>
+  <data name="ToastReconnected"><value>已重新连接</value></data>
+
+  <data name="ConnectedToFormat"><value>已连接到 {0}:{1}</value></data>
+  <data name="DiscoverFoundFormat"><value>已发现 {0} 个主机。</value></data>
+  <data name="DiscoverNone"><value>未发现主机。</value></data>
+  <data name="ReconnectAttemptLogFormat"><value>[重连] 第 {0} 次，{1} 秒后重试...</value></data>
+  <data name="ConnectFailedLogPrefix"><value>[连接失败]</value></data>
+  <data name="ReconnectDelaySeconds"><value>重连间隔（秒）</value></data>
+  <data name="MaxAttempts"><value>最多重试次数（0=无限）</value></data>
+  <data name="Language"><value>界面语言</value></data>
+  <data name="SystemDefault"><value>跟随系统</value></data>
+  <data name="English"><value>English</value></data>
+  <data name="ChineseSimplified"><value>简体中文</value></data>
+  <data name="ResetDefaults"><value>恢复默认设置</value></data>
+  <data name="AutoReconnectHint"><value>当连接失败或断开时自动重试。</value></data>
+</root>

@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+              <xsd:attribute name="xml:space" use="preserve" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
+  <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
+
+  <data name="AppTitle"><value>LB_FATE Client</value></data>
+  <data name="HostPlaceholder"><value>Host</value></data>
+  <data name="PortPlaceholder"><value>Port</value></data>
+  <data name="Connect"><value>Connect</value></data>
+  <data name="Disconnect"><value>Disconnect</value></data>
+  <data name="StatusConnected"><value>Connected</value></data>
+  <data name="StatusNotConnected"><value>Not connected</value></data>
+  <data name="Discover"><value>Discover</value></data>
+  <data name="DiscoveredHostsTitle"><value>Discovered hosts (select one)</value></data>
+  <data name="Use"><value>Use</value></data>
+  <data name="Send"><value>Send</value></data>
+  <data name="Settings"><value>Settings</value></data>
+  <data name="AutoReconnect"><value>Auto reconnect</value></data>
+  <data name="DiscoverTitle"><value>Discover Hosts</value></data>
+  <data name="Refresh"><value>Refresh</value></data>
+  <data name="UseSelected"><value>Use Selected</value></data>
+  <data name="NoSelection"><value>Please select a host</value></data>
+  <data name="CommandPlaceholderWaiting"><value>Waiting for PROMPT from server...</value></data>
+  <data name="CommandPlaceholderReady"><value>Type command, e.g., help | move x y | attack P#</value></data>
+
+  <data name="ErrorTitle"><value>Error</value></data>
+  <data name="ErrorHostRequired"><value>Host is required</value></data>
+  <data name="ErrorInvalidPort"><value>Invalid port</value></data>
+  <data name="ConnectFailed"><value>Connect failed</value></data>
+  <data name="SendFailed"><value>Send failed</value></data>
+  <data name="NotConnectedTitle"><value>Not connected</value></data>
+  <data name="NotConnectedMessage"><value>Please connect first</value></data>
+  <data name="DiscoveryFailed"><value>Discovery failed</value></data>
+
+  <data name="ToastConnectFailedAutoRetry"><value>Connect failed. Auto-retrying...</value></data>
+  <data name="ToastDisconnectedAutoRetry"><value>Disconnected. Auto-retrying...</value></data>
+  <data name="ToastReconnectingInFormat"><value>Reconnecting in {0}s (#{1})...</value></data>
+  <data name="ToastReconnected"><value>Reconnected.</value></data>
+
+  <data name="ConnectedToFormat"><value>Connected to {0}:{1}</value></data>
+  <data name="DiscoverFoundFormat"><value>Discovered {0} host(s).</value></data>
+  <data name="DiscoverNone"><value>No hosts found.</value></data>
+  <data name="ReconnectAttemptLogFormat"><value>[Reconnect] attempt {0} in {1}s...</value></data>
+  <data name="ConnectFailedLogPrefix"><value>[Connect failed]</value></data>
+  <data name="ReconnectDelaySeconds"><value>Reconnect delay (s)</value></data>
+  <data name="MaxAttempts"><value>Max attempts (0=infinite)</value></data>
+  <data name="Language"><value>Language</value></data>
+  <data name="SystemDefault"><value>System Default</value></data>
+  <data name="English"><value>English</value></data>
+  <data name="ChineseSimplified"><value>Chinese (Simplified)</value></data>
+  <data name="ResetDefaults"><value>Reset to defaults</value></data>
+  <data name="AutoReconnectHint"><value>When connection fails or drops, retry automatically.</value></data>
+</root>

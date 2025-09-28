@@ -1,0 +1,141 @@
+{
+  "Role Skeleton": {
+    "prefix": "role",
+    "body": [
+      "role \"${1:Name}\" id \"${2:id}\" {",
+      "  description \"${3:Describe the role}\";",
+      "  vars {",
+      "    \"hp\" = ${4:30};",
+      "    \"mp\" = ${5:5};",
+      "    \"atk\" = ${6:5};",
+      "    \"def\" = ${7:3};",
+      "    \"range\" = ${8:1};",
+      "    \"speed\" = ${9:1};",
+      "  }",
+      "  tags { \"${10:tag}\" }",
+      "  skills {",
+      "    skill \"${11:Skill Name}\" {",
+      "      range ${12:3}; targeting ${13|self,allies,enemies,any|}; cooldown ${14:1};",
+      "      deal ${15:5} damage to ${16|target,caster,it|};",
+      "      consume mp = ${17:1};",
+      "    }",
+      "  }",
+      "}"
+    ],
+    "description": "Scaffold a new .lbr role file"
+  },
+  "Skill Block": {
+    "prefix": "skill",
+    "body": [
+      "skill \"${1:Skill Name}\" {",
+      "  range ${2:3}; targeting ${3|self,allies,enemies,any|}; cooldown ${4:1};",
+      "  # actions...",
+      "}"
+    ],
+    "description": "Insert a skill block"
+  },
+  "If Then Else": {
+    "prefix": "if",
+    "body": [
+      "if ${1:caster} has tag \"${2:tag}\" then {",
+      "  ${3:deal 3 damage to target}",
+      "} else {",
+      "  ${4:heal 2 to caster}",
+      "}"
+    ],
+    "description": "if/then/else block"
+  },
+  "For Each": {
+    "prefix": "foreach",
+    "body": [
+      "for each ${1|enemies,allies,units|} ${2:of caster} ${3:in range ${4:2} of caster} ${5:with tag \"${6:tag}\"} ${7:limit ${8:3}} do {",
+      "  ${9:deal 3 damage to it}",
+      "}"
+    ],
+    "description": "Loop selector"
+  },
+  "Deal Damage": {
+    "prefix": "deal",
+    "body": [
+      "deal ${1:5} damage to ${2|target,caster,it|}"
+    ],
+    "description": "Deal true damage"
+  },
+  "Deal Physical": {
+    "prefix": "dealp",
+    "body": [
+      "deal physical ${1:8} damage to ${2|target,caster,it|} from ${3|caster,target,it|} ${4:ignore defense ${5:50}%}"
+    ],
+    "description": "Deal physical damage (optional from/ignore defense)"
+  },
+  "Deal Magic": {
+    "prefix": "dealm",
+    "body": [
+      "deal magic ${1:8} damage to ${2|target,caster,it|} from ${3|caster,target,it|} ${4:ignore resist ${5:50}%}"
+    ],
+    "description": "Deal magic damage (optional from/ignore resist)"
+  },
+  "Line AOE": {
+    "prefix": "line",
+    "body": [
+      "line ${1|physical,magic|} ${2:6} to ${3|target,caster,it|} length ${4:3} radius ${5:0}"
+    ],
+    "description": "Line area damage"
+  },
+  "Move": {
+    "prefix": "move",
+    "body": [
+      "move ${1|target,caster,it|} to (${2:0},${3:0})"
+    ],
+    "description": "Move unit"
+  },
+  "Dash": {
+    "prefix": "dash",
+    "body": [
+      "dash towards ${1|target,caster,it|} up to ${2:3}"
+    ],
+    "description": "Dash towards target"
+  },
+  "Add Tag": {
+    "prefix": "addtag",
+    "body": [
+      "add tag \"${1:tag}\" to ${2|target,caster,it|}"
+    ],
+    "description": "Add unit tag"
+  },
+  "Remove Tag": {
+    "prefix": "removetag",
+    "body": [
+      "remove tag \"${1:tag}\" from ${2|target,caster,it|}"
+    ],
+    "description": "Remove unit tag"
+  },
+  "Set Unit Var": {
+    "prefix": "setuv",
+    "body": [
+      "set unit(${1|caster,target,it|}) var \"${2:key}\" = ${3:value}"
+    ],
+    "description": "Set unit variable"
+  },
+  "Set Tile Var": {
+    "prefix": "settv",
+    "body": [
+      "set tile(${1:0},${2:0}) var \"${3:key}\" = ${4:value}"
+    ],
+    "description": "Set tile variable"
+  },
+  "Set Global Var": {
+    "prefix": "setgv",
+    "body": [
+      "set global var \"${1:key}\" = ${2:value}"
+    ],
+    "description": "Set global variable"
+  },
+  "Consume MP": {
+    "prefix": "mp",
+    "body": [
+      "consume mp = ${1:1}"
+    ],
+    "description": "Consume MP"
+  }
+}
