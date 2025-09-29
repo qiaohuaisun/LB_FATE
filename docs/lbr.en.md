@@ -34,7 +34,10 @@ role "<Name>" id "<id>" {
 - `cooldown <N>;`
 - `targeting any|enemies|allies|self|tile;`
 - `min_range <N>;` (optional minimal range)
-- `sealed_until <T>;` (unusable before global turn T)
+- `sealed_until <T>;` (legacy: unusable before global turn T)
+- `sealed_until day <D> [phase <P>];` (new, intuitive): unusable before Day D Phase P
+  - Day is 1‑based; Phase is 1..5; if phase omitted, unlocks at start of Day D.
+- `ends_turn;` (optional): using this skill immediately ends the user's turn.
 
 ## Statements
 

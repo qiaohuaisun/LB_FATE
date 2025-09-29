@@ -1,8 +1,0 @@
-{
-  "displayName": "ETBBS LBR 工具",
-  "description": "为 .lbr 角色文件提供语法高亮、片段、补全、大纲与诊断等功能。",
-  "cmd.validate": "ETBBS LBR：校验当前文件",
-  "cmd.create": "ETBBS LBR：创建新角色",
-  "cmd.format": "ETBBS LBR：格式化文档"
-}
-

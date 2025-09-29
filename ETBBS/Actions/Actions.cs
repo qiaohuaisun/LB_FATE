@@ -135,7 +135,24 @@ public sealed record Move(string Id, Coord To) : AtomicAction
 public sealed record Heal(string TargetId, int Amount) : AtomicAction
 {
     public override Effect Compile() => state =>
-        WorldStateOps.WithUnit(state, TargetId, u =>
+    {
+        // Global heal reversal (generic toggle): if reverse_heal_turns > 0, convert heal to damage
+        int reverseTurns = 0;
+        if (state.Global.Vars.TryGetValue(Keys.ReverseHealTurnsGlobal, out var rvt))
+            reverseTurns = rvt switch { int i => i, long l => (int)l, double d => (int)Math.Round(d), _ => 0 };
+        if (reverseTurns > 0)
+        {
+            return new Damage(TargetId, Math.Max(0, Amount)).Compile()(state);
+        }
+
+        // Unit is currently unhealable -> no-op
+        if (state.Units.TryGetValue(TargetId, out var tu) && tu.Vars.TryGetValue(Keys.NoHealTurns, out var nht)
+            && nht is int n && n > 0)
+        {
+            return state; // ignore heal
+        }
+
+        return WorldStateOps.WithUnit(state, TargetId, u =>
         {
             var hp = 0;
             if (u.Vars.TryGetValue(Keys.Hp, out var v))
@@ -151,6 +168,7 @@ public sealed record Heal(string TargetId, int Amount) : AtomicAction
             }
             return u with { Vars = u.Vars.SetItem(Keys.Hp, nhp) };
         });
+    };
 
     public override ImmutableHashSet<string> ReadVars => ImmutableHashSet<string>.Empty.Add(UnitVarKey(TargetId, Keys.Hp));
     public override ImmutableHashSet<string> WriteVars => ImmutableHashSet<string>.Empty.Add(UnitVarKey(TargetId, Keys.Hp));
@@ -420,7 +438,8 @@ public sealed record LineAoeDamage(string AttackerId, string TargetId, int Power
         var cur = aPos;
         for (int i = 0; i < steps; i++)
         {
-            if (Math.Abs(cur.X - tPos.X) + Math.Abs(cur.Y - tPos.Y) <= 1) break;
+            // Stop only when we have reached the target cell; allows including tiles up to 'steps' away
+            if (cur.Equals(tPos)) break;
             Coord next = cur;
             if (cur.X != tPos.X) next = new Coord(cur.X + dx, cur.Y);
             else if (cur.Y != tPos.Y) next = new Coord(cur.X, cur.Y + dy);

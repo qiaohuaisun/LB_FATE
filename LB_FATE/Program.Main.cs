@@ -4,6 +4,9 @@ class Program
 {
     static void Main(string[] args)
     {
+        // Ensure UTF-8 console I/O for correct Chinese display on Windows terminals
+        System.Console.OutputEncoding = new System.Text.UTF8Encoding(encoderShouldEmitUTF8Identifier: false);
+        System.Console.InputEncoding = new System.Text.UTF8Encoding(encoderShouldEmitUTF8Identifier: false);
         Console.WriteLine("LB_FATE - Console Turn-based 2D Grid (ETBBS)");
         string? rolesDir = null;
         bool host = false, client = false;
@@ -37,23 +40,33 @@ class Program
 
         if (client)
         {
-            NetClient.Run(hostName, port);
+            try { NetClient.Run(hostName, port); }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Client fatal error: {ex.Message}");
+            }
             return;
         }
         if (host)
         {
             using var server = new NetServer(port);
             server.Start();
-            var endpoints = server.WaitForPlayers(Math.Max(1, Math.Min(7, players)));
+            var playerSeats = Math.Max(1, Math.Min(7, players));
+            var endpoints = server.WaitForPlayers(playerSeats);
             Console.WriteLine("Hosting: games will auto-restart. Press Ctrl+C to stop.");
+            Game? currentGame = null;
+            var seats = Enumerable.Range(1, playerSeats).Select(i => $"P{i}");
+            server.StartReconnections(
+                seatIds: seats,
+                isOccupied: pid => currentGame?.HasEndpoint(pid) ?? false,
+                attach: (pid, ep) => { currentGame?.AttachEndpoint(pid, ep); }
+            );
             while (true)
             {
-                new Game(rolesDir, endpoints.Count, endpoints, mapW, mapH).Run();
-                // Inform clients and immediately continue to next game
-                foreach (var ep in endpoints.Values)
-                {
-                    try { ep.SendLine("NEW GAME STARTING..."); } catch { }
-                }
+                currentGame = new Game(rolesDir, endpoints.Count, endpoints, mapW, mapH);
+                currentGame.Run();
+                // Inform clients with a prominent banner + countdown and continue to next game
+                ShowNextGameBanner(endpoints, seconds: 3);
             }
         }
         Console.WriteLine("Local mode: 7 players on one console.");
@@ -65,6 +78,41 @@ class Program
             var resp = Console.ReadLine();
             if (!string.IsNullOrWhiteSpace(resp) && (resp.StartsWith("n", StringComparison.OrdinalIgnoreCase) || resp.StartsWith("q", StringComparison.OrdinalIgnoreCase)))
                 break;
+            ShowNextGameBanner(null, seconds: 3);
         }
+    }
+
+    private static void ShowNextGameBanner(Dictionary<string, IPlayerEndpoint>? endpoints, int seconds)
+    {
+        try
+        {
+            // Local console banner
+            Console.ForegroundColor = ConsoleColor.Cyan;
+            Console.WriteLine();
+            Console.WriteLine("+==================================+");
+            Console.WriteLine("|         NEW GAME STARTING        |");
+            Console.WriteLine("+==================================+");
+            Console.ResetColor();
+            for (int s = seconds; s >= 1; s--)
+            {
+                Console.WriteLine($"Starting in {s}...");
+                if (endpoints != null)
+                {
+                    foreach (var ep in endpoints.Values)
+                    {
+                        try
+                        {
+                            ep.SendLine("==================================");
+                            ep.SendLine("NEW GAME STARTING");
+                            ep.SendLine($"Starting in {s}...");
+                            ep.SendLine("==================================");
+                        }
+                        catch { }
+                    }
+                }
+                Thread.Sleep(800);
+            }
+        }
+        catch { }
     }
 }

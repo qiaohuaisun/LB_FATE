@@ -1,0 +1,66 @@
+role "莱地科（沧溟寻踪者）" id "berserker_laidico" {
+  description "\n沧溟死海的复仇者与猎龙者。以绝望为火、以死海为刃。\n- 狂化：以高机动与强袭见长\n- 复仇：针对龙/秩序之敌的克制打击\n- 死域：短时颠倒治愈并以死海侵蚀全域\n";
+
+  vars {
+    "hp" = 34; "max_hp" = 34; "mp" = 6.0;
+    "atk" = 9; "def" = 3; "range" = 1; "speed" = 3;
+    "class" = "Berserker"
+  }
+
+  tags { "berserker" }
+
+  skills {
+    # 基础攻击：对龙/秩序更痛（以龙为主，示例使用 dragon 标签）
+    skill "Basic Attack" {
+      range 1; targeting enemies;
+      if target has tag "dragon" then {
+        deal physical 8 damage to target from caster ignore defense 50%
+      } else {
+        deal physical 7 damage to target from caster
+      }
+    }
+
+    # 固有：死海侵蚀（小幅魔伤 + 持续流血/灼烧）
+    skill "死海侵蚀" {
+      range 2; targeting enemies; cooldown 1; cost mp 1;
+      deal magic 6 damage to target from caster;
+      set unit(target) var "burn_turns" = 2;
+      set unit(target) var "burn_per_turn" = 2
+    }
+
+    # 复仇觉醒：下一次攻击更强 + 短时无视防御
+    skill "复仇觉醒" {
+      range 0; targeting self; cooldown 2; cost mp 1; ends_turn;
+      set unit(caster) var "next_attack_multiplier" = 1.5;
+      set unit(caster) var "force_ignore_def_turns" = 1
+    }
+
+    # 宝具：沧溟死域·永夜归墟（反转治疗 + 全域死海侵蚀 + 自身强袭）
+    skill "沧溟死域·永夜归墟" {
+      range 0; targeting self; cooldown 5; sealed_until day 3; cost mp 3;
+      # 2 回合内反转治疗（系统已支持 global reverse）
+      set global var "reverse_heal_turns" = 2;
+      # 全场敌人并行承受死海侵蚀，龙额外受创
+      for each enemies in parallel do {
+        set unit(it) var "burn_turns" = 2;
+        set unit(it) var "burn_per_turn" = 2;
+        if it has tag "dragon" then { deal 2 damage to it }
+      };
+      # 自身短时强袭与机动（忽视防御 2 回合 + 速度 +2）
+      set unit(caster) var "force_ignore_def_turns" = 2;
+      set unit(caster) var "speed" = var "speed" of caster + 2
+    }
+
+    # 『莱地科之剑·死海镰刃』：重创 + 无法治愈 + 腐蚀 + 对龙真实伤害 + 斩波
+    skill "死海镰刃" {
+      range 1; targeting enemies; cooldown 3; cost mp 2;
+      deal physical 9 damage to target from caster ignore defense 50%;
+      set unit(target) var "no_heal_turns" = 2;   # 在系统内被治疗将被忽略
+      set unit(target) var "bleed_turns" = 2;
+      set unit(target) var "bleed_per_turn" = 2;
+      if target has tag "dragon" then { deal 3 damage to target };
+      # 斩波（短程真伤波）
+      line 3 to target length 2 radius 0
+    }
+  }
+}

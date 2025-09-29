@@ -35,6 +35,10 @@ public partial class MainPage : ContentPage
     private bool _manualDisconnect = false;
     private string? _lastHost;
     private int _lastPort;
+    // Lightweight banner detection for GAME OVER / NEW GAME STARTING
+    private bool _pendingGameOver = false;
+    private DateTime _lastPopupGameOver = DateTime.MinValue;
+    private DateTime _lastPopupNextGame = DateTime.MinValue;
 
     public MainPage()
     {
@@ -79,6 +83,8 @@ public partial class MainPage : ContentPage
 
             // always store in backing list
             _allLogs.Add(line);
+            // Try banner popups for important server notices
+            TryHandleServerBanner(line);
             // trim backing list
             if (_allLogs.Count > MaxAllLogs)
             {
@@ -114,6 +120,39 @@ public partial class MainPage : ContentPage
                 }
                 catch { }
             });
+        }
+    }
+
+    private void TryHandleServerBanner(string line)
+    {
+        // Detect GAME OVER banner and capture the next Winner/No winner line
+        if (line.IndexOf("GAME OVER", StringComparison.OrdinalIgnoreCase) >= 0)
+        {
+            _pendingGameOver = true; return;
+        }
+        if (_pendingGameOver && (line.StartsWith("Winner:", StringComparison.OrdinalIgnoreCase) || line.StartsWith("No winner", StringComparison.OrdinalIgnoreCase)))
+        {
+            _pendingGameOver = false;
+            if ((DateTime.UtcNow - _lastPopupGameOver).TotalSeconds < 2) return; // throttle
+            _lastPopupGameOver = DateTime.UtcNow;
+            var msg = line.Trim();
+            MainThread.BeginInvokeOnMainThread(async () =>
+            {
+                try { await DisplayAlert("GAME OVER", msg, "OK"); } catch { }
+            });
+            return;
+        }
+
+        // Detect NEW GAME STARTING banner
+        if (line.IndexOf("NEW GAME STARTING", StringComparison.OrdinalIgnoreCase) >= 0)
+        {
+            if ((DateTime.UtcNow - _lastPopupNextGame).TotalSeconds < 2) return; // throttle duplicates
+            _lastPopupNextGame = DateTime.UtcNow;
+            MainThread.BeginInvokeOnMainThread(async () =>
+            {
+                try { await DisplayAlert("NEXT GAME", "New game starting...", "OK"); } catch { }
+            });
+            return;
         }
     }
 
@@ -282,43 +321,46 @@ public partial class MainPage : ContentPage
         }
         // Example: " 1: P1 Saber       HP[#####.....](30/40) MP=5 Pos=(1,2)"
         // Regex groups: symbol, id, class, hp, maxhp, mp, pos
-        var rx = new Regex(@"\s*(?<sym>\d):\s*(?<id>P\d+)\s+(?<class>\S+)\s+HP\[[#\.]+\]\((?<hp>\d+)\/(?<max>\d+)\)\s+MP=(?<mp>[^\s]+)\s+Pos=\((?<x>-?\d+),(?<y>-?\d+)\)");
+        var rx = new Regex(@"\s*(?<sym>[!\d]):\s*(?<id>P\d+)\s+(?<class>\S+)\s+HP\[[#\.]+\]\((?<hp>\d+)\/(?<max>\d+)\)\s+MP=(?<mp>[^\s]+)\s+Pos=\((?<x>-?\d+),(?<y>-?\d+)\)(?:\s+\(offline\))?", RegexOptions.Compiled);
         var m = rx.Match(line);
         if (!m.Success) return false;
 
         var mpRaw = m.Groups["mp"].Value;
-        int mpVal = 0;
-        int maxMpVal = 10; // will be overridden; no-max => MaxMp = Mp (full bar)
+        double mpVal = 0;
+        double maxMpVal = 10; // will be overridden; no-max => MaxMp = Mp (full bar)
         if (mpRaw.Contains('/'))
         {
             var parts = mpRaw.Split('/', StringSplitOptions.TrimEntries);
             if (parts.Length >= 2)
             {
-                _ = int.TryParse(parts[0], out mpVal);
-                if (!int.TryParse(parts[1], out maxMpVal)) maxMpVal = Math.Max(1, mpVal);
+                _ = double.TryParse(parts[0], out mpVal);
+                if (!double.TryParse(parts[1], out maxMpVal)) maxMpVal = Math.Max(1, mpVal);
             }
         }
         else
         {
-            _ = int.TryParse(mpRaw, out mpVal);
+            _ = double.TryParse(mpRaw, out mpVal);
             maxMpVal = Math.Max(1, mpVal);
             // Make bar full when there is no explicit max
             mpVal = Math.Max(1, maxMpVal);
         }
 
+        var sym = m.Groups["sym"].Value;
+        bool isOffline = sym == "!" || line.Contains("(offline)");
         var card = new PlayerCard
         {
-            Symbol = m.Groups["sym"].Value,
+            Symbol = sym,
             Id = m.Groups["id"].Value,
             Class = m.Groups["class"].Value,
             Hp = int.TryParse(m.Groups["hp"].Value, out var hpv) ? hpv : 0,
             MaxHp = int.TryParse(m.Groups["max"].Value, out var mhv) ? mhv : 1,
             MpText = mpRaw,
-            Mp = mpVal,
-            MaxMp = Math.Max(1, maxMpVal),
+            Mp = (int)Math.Round(mpVal),
+            MaxMp = (int)Math.Max(1, Math.Round(maxMpVal)),
             Pos = $"({m.Groups["x"].Value},{m.Groups["y"].Value})",
+            Offline = isOffline
         };
-        card.Color = ColorForSymbol(card.Symbol);
+        card.Color = isOffline ? Color.FromArgb("#B91C1C") : ColorForSymbol(card.Symbol);
         _players.Add(card);
         return true;
     }
@@ -333,6 +375,7 @@ public partial class MainPage : ContentPage
             "5" => Color.FromArgb("#3B82F6"),
             "6" => Color.FromArgb("#6366F1"),
             "7" => Color.FromArgb("#8B5CF6"),
+            "!" => Color.FromArgb("#B91C1C"), // offline
             _ => Color.FromArgb("#9CA3AF")
         };
 
@@ -347,6 +390,7 @@ public partial class MainPage : ContentPage
         public int Mp { get; set; }
         public int MaxMp { get; set; } = 10;
         public string Pos { get; set; } = string.Empty;
+        public bool Offline { get; set; }
         public string HpText => $"{Hp}/{MaxHp}";
         public double HpRatio => Math.Max(0.0, Math.Min(1.0, MaxHp > 0 ? (double)Hp / MaxHp : 0.0));
         public double MpRatio => Math.Max(0.0, Math.Min(1.0, MaxMp > 0 ? (double)Mp / MaxMp : 0.0));
@@ -589,7 +633,7 @@ public partial class MainPage : ContentPage
         var chipBgConnected = Color.FromArgb("#ECFDF5"); // light green
         var chipBgDisconnected = Color.FromArgb("#F3F4F6"); // light gray
         StatusChip.Background = new SolidColorBrush(connected ? chipBgConnected : chipBgDisconnected);
-        StatusDot.BackgroundColor = connected ? success : Color.FromArgb("#9CA3AF");
+        StatusDot.Fill = new SolidColorBrush(connected ? success : Color.FromArgb("#9CA3AF"));
 
         // Connect/Disconnect button styling
         ConnectBtn.Text = connected ? AppResources.Disconnect : AppResources.Connect;

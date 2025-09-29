@@ -14,6 +14,13 @@ partial class Game
 
         while (true)
         {
+            // 若连接已关闭：移除并广播离线
+            if (ep is not null && !ep.IsAlive)
+            {
+                endpoints.Remove(pid);
+                foreach (var kv in endpoints) kv.Value.SendLine($"玩家离线：{pid}");
+                break;
+            }
             // refresh context/dynamic stats each loop to reflect latest state after previous actions
             ctx = new Context(state);
             var speed = GetInt(pid, Keys.Speed, 3);
@@ -24,13 +31,26 @@ partial class Game
             {
                 ep.SendLine("PROMPT");
                 var line = ep.ReadLine() ?? string.Empty;
+                if (!ep.IsAlive)
+                {
+                    endpoints.Remove(pid);
+                    foreach (var kv in endpoints) kv.Value.SendLine($"玩家离线：{pid}");
+                    break;
+                }
                 line = line.Trim();
                 if (string.IsNullOrWhiteSpace(line)) continue;
                 var parts = line.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
                 var cmd = parts[0].ToLowerInvariant();
                 bool restricted = (phase is >= 2 and <= 4);
-                if (restricted && cmd is not ("move" or "m" or "pass" or "p" or "help" or "h"))
-                { WriteLineTo(pid, "Phases 2-4: only move/pass allowed."); continue; }
+                if (restricted)
+                {
+                    bool allowed = cmd is "move" or "m" or "pass" or "p" or "help" or "h" or "info" or "i" or "skills" or "s" or "hint" or "hm";
+                    if (!allowed)
+                    {
+                        WriteLineTo(pid, "Phases 2-4: allowed commands are move/pass/skills/info/help/hint move.");
+                        continue;
+                    }
+                }
 
                 if (cmd is "help" or "h")
                 {
@@ -40,10 +60,9 @@ partial class Game
                     WriteLineTo(pid, "info | i         : show role description");
                     WriteLineTo(pid, "use n P# | u n P#: cast skill #n (target optional by targeting)");
                     WriteLineTo(pid, "hint move|hm     : highlight reachable tiles");
-                    WriteLineTo(pid, "hint attack|ha   : highlight enemies in range");
                     WriteLineTo(pid, "pass | p         : end your turn");
                     WriteLineTo(pid, "Costs           : Move 0.5 MP; Attack 0.5 MP");
-                    WriteLineTo(pid, "Phases          : 1 & 5 all commands; 2-4 move/pass only");
+                    WriteLineTo(pid, "Phases          : 1 & 5 all commands; 2-4 move/pass/skills/info/help/hint");
                     continue;
                 }
                 if (cmd is "info" or "i")
@@ -64,7 +83,7 @@ partial class Game
                 }
                 if (cmd == "quit") { Environment.Exit(0); }
                 if (cmd is "pass" or "p") break;
-                if (cmd is "hint" or "hm" or "ha")
+                if (cmd is "hint" or "hm")
                 {
                     if (cmd == "hm" || (cmd == "hint" && parts.Length >= 2 && parts[1] == "move"))
                     {
@@ -82,9 +101,7 @@ partial class Game
                         if (ep is not null) { SendBoardTo(pid, day, phase); } else { ShowBoard(day, phase); }
                         continue;
                     }
-                    if (cmd == "ha" || (cmd == "hint" && parts.Length >= 2 && parts[1] == "attack"))
-                    { highlightCells = EnemiesInRange(pid, range); highlightChar = 'x'; if (ep is not null) { SendBoardTo(pid, day, phase); } else { ShowBoard(day, phase); } continue; }
-                    WriteLineTo(pid, "Usage: hint move | hint attack"); continue;
+                    WriteLineTo(pid, "Usage: hint move"); continue;
                 }
                 if (cmd is "move" or "m")
                 {
@@ -112,7 +129,7 @@ partial class Game
                     var se = new SkillExecutor();
                     var actions = new List<AtomicAction> { new Move(pid, dest), new ModifyUnitVar(pid, Keys.Mp, v => (v is double d ? d : Convert.ToDouble(v)) - moveCost) };
                     (state, var log) = se.Execute(state, actions.ToArray(), validator: moveValidator);
-                    AppendLog(log.Messages);
+                    AppendDebugFor(pid, log.Messages);
                     BroadcastBoard(day, phase);
                     highlightCells = null;
                     continue;
@@ -157,28 +174,52 @@ partial class Game
                     if (parts.Length < 2 || !int.TryParse(parts[1], out var idx)) { WriteLineTo(pid, "Usage: use <n> [P#]"); continue; }
                     var role = roleOf[pid];
                     if (idx < 0 || idx >= role.Skills.Length) { WriteLineTo(pid, "Out of range."); continue; }
-                    string? tid = parts.Length >= 3 ? parts[2].ToUpperInvariant() : null;
-                    if (tid != null && (!state.Units.ContainsKey(tid) || GetInt(tid, Keys.Hp, 0) <= 0))
-                    { WriteLineTo(pid, "Invalid target."); continue; }
                     var skill = role.Skills[idx];
-                    // derive $point and optional $dir from arguments: [P#|x y|up|down|left|right]
+
+                    // Parse target argument robustly: allow unit id OR coordinates OR direction.
+                    // We only treat the 3rd token as a unit id if it matches an existing unit; otherwise try x y or direction.
+                    string? tid = null;
                     var casterPos = ctx.GetUnitVar<Coord>(pid, Keys.Pos, default);
                     Coord point = new Coord(Math.Clamp(casterPos.X, 0, width - 1), Math.Max(0, casterPos.Y - 1));
                     string dir = string.Empty;
+                    bool hasPointArg = false;
+
                     if (parts.Length >= 4 && int.TryParse(parts[2], out var px) && int.TryParse(parts[3], out var py))
                     {
+                        // Explicit coordinates: use as $point
                         point = new Coord(Math.Clamp(px, 0, width - 1), Math.Clamp(py, 0, height - 1));
+                        hasPointArg = true;
                     }
-                    else if (parts.Length >= 3 && string.IsNullOrWhiteSpace(tid))
+                    else if (parts.Length >= 3)
                     {
-                        var d = parts[2].ToLowerInvariant();
-                        int steps = 1;
-                        if (parts.Length >= 4 && int.TryParse(parts[3], out var st) && st > 0) steps = st;
-                        steps = Math.Max(1, Math.Min(Math.Max(width, height), steps));
-                        if (d == "up") { dir = "up"; point = new Coord(casterPos.X, Math.Max(0, casterPos.Y - steps)); }
-                        else if (d == "down") { dir = "down"; point = new Coord(casterPos.X, Math.Min(height - 1, casterPos.Y + steps)); }
-                        else if (d == "left") { dir = "left"; point = new Coord(Math.Max(0, casterPos.X - steps), casterPos.Y); }
-                        else if (d == "right") { dir = "right"; point = new Coord(Math.Min(width - 1, casterPos.X + steps), casterPos.Y); }
+                        var arg = parts[2];
+                        var argUpper = arg.ToUpperInvariant();
+                        var argLower = arg.ToLowerInvariant();
+
+                        // Directional hint with optional steps
+                        if (argLower is "up" or "down" or "left" or "right")
+                        {
+                            int steps = 1;
+                            if (parts.Length >= 4 && int.TryParse(parts[3], out var st) && st > 0) steps = st;
+                            steps = Math.Max(1, Math.Min(Math.Max(width, height), steps));
+                            if (argLower == "up") { dir = "up"; point = new Coord(casterPos.X, Math.Max(0, casterPos.Y - steps)); }
+                            else if (argLower == "down") { dir = "down"; point = new Coord(casterPos.X, Math.Min(height - 1, casterPos.Y + steps)); }
+                            else if (argLower == "left") { dir = "left"; point = new Coord(Math.Max(0, casterPos.X - steps), casterPos.Y); }
+                            else if (argLower == "right") { dir = "right"; point = new Coord(Math.Min(width - 1, casterPos.X + steps), casterPos.Y); }
+                            hasPointArg = true;
+                        }
+                        else if (state.Units.ContainsKey(argUpper))
+                        {
+                            // Valid unit id
+                            tid = argUpper;
+                            if (GetInt(tid, Keys.Hp, 0) <= 0) { WriteLineTo(pid, "Invalid target."); continue; }
+                        }
+                        else
+                        {
+                            // Not a unit, not direction, and not coordinates → invalid
+                            WriteLineTo(pid, "Invalid target.");
+                            continue;
+                        }
                     }
                     state = WorldStateOps.WithGlobal(state, g => g with
                     {
@@ -193,17 +234,23 @@ partial class Game
                     var cfg = new ActionValidationConfig(
                         CasterId: pid,
                         TargetUnitId: tid,
+                        TargetPos: hasPointArg ? point : null,
                         TeamOfUnit: teamOf,
                         Targeting: TargetingMode.Any,
-                        CurrentTurn: state.Global.Turn
+                        CurrentTurn: state.Global.Turn,
+                        CurrentDay: day,
+                        CurrentPhase: phase
                     );
                     var validator = ActionValidators.ForSkillWithExtras(skill.Compiled, cfg, cooldowns);
                     var se = new SkillExecutor();
                     (state, var log) = se.ExecutePlan(state, skill.Compiled.BuildPlan(new Context(state)), validator);
-                    AppendLog(log.Messages);
+                    AppendDebugFor(pid, log.Messages);
                     BroadcastBoard(day, phase);
                     cooldowns.SetLastUseTurn(pid, skill.Name, state.Global.Turn);
                     highlightCells = null;
+                    // If skill is marked as ending the turn, break the command loop
+                    if (skill.Compiled.Extras.TryGetValue("ends_turn", out var et) && et is bool b && b)
+                        break;
                     // If inspection outputs exist, log and clear them
                     object? ihp = null, imp = null, ipos = null;
                     bool gotHp = state.Global.Vars.TryGetValue("inspect_hp", out ihp);
@@ -215,6 +262,27 @@ partial class Game
                         double mpV = imp is double dmp ? dmp : (imp is int impi ? impi : 0);
                         string posV = ipos is Coord pc ? pc.ToString() : "(?,?)";
                         WriteLineTo(pid, $"Inspect: HP={hpV}, MP={mpV:0.##}, Pos={posV}");
+                        // Also show target role/class and a short description (self-only)
+                        if (!string.IsNullOrWhiteSpace(tid))
+                        {
+                            try
+                            {
+                                if (roleOf.ContainsKey(tid))
+                                {
+                                    var r = roleOf[tid];
+                                    WriteLineTo(pid, $"Inspect: Role={r.Name} ({r.Id})");
+                                    var desc = r.Description ?? string.Empty;
+                                    var firstLine = desc.Split('\n').Select(s => s.Trim()).FirstOrDefault(s => !string.IsNullOrEmpty(s));
+                                    if (!string.IsNullOrEmpty(firstLine))
+                                        WriteLineTo(pid, $"Desc: {firstLine}");
+                                }
+                                else if (classOf.ContainsKey(tid))
+                                {
+                                    WriteLineTo(pid, $"Inspect: Class={classOf[tid]}");
+                                }
+                            }
+                            catch { }
+                        }
                         state = WorldStateOps.WithGlobal(state, g => g with { Vars = g.Vars.Remove("inspect_hp").Remove("inspect_mp").Remove("inspect_pos") });
                     }
                     continue;
@@ -250,7 +318,9 @@ partial class Game
                             TargetUnitId: tid,
                             TeamOfUnit: teamOf,
                             Targeting: TargetingMode.EnemiesOnly,
-                            CurrentTurn: state.Global.Turn
+                            CurrentTurn: state.Global.Turn,
+                            CurrentDay: day,
+                            CurrentPhase: phase
                         );
                         var validator2 = ActionValidators.ForSkillWithExtras(basic.Compiled, cfg2, cooldowns);
                         var se2 = new SkillExecutor();
@@ -263,11 +333,14 @@ partial class Game
                         for (int i = 0; i < repeats; i++)
                         {
                             (state, var log) = se2.ExecutePlan(state, basic.Compiled.BuildPlan(new Context(state)), validator2);
-                            AppendLog(log.Messages);
+                            AppendDebugFor(pid, log.Messages);
                         }
                         (state, var log2) = se2.Execute(state, new AtomicAction[] { new ModifyUnitVar(pid, Keys.Mp, v => (v is double d0 ? d0 : Convert.ToDouble(v)) - basicCost) });
-                        AppendLog(log2.Messages);
+                        AppendDebugFor(pid, log2.Messages);
                         BroadcastBoard(day, phase);
+                        // If basic attack had ends_turn (unlikely), honor it
+                        if (basic.Compiled.Extras.TryGetValue("ends_turn", out var et2) && et2 is bool bb && bb)
+                            break;
                         cooldowns.SetLastUseTurn(pid, basic.Name, state.Global.Turn);
                     }
                     else
@@ -285,7 +358,7 @@ partial class Game
                         for (int i = 0; i < repeats2; i++) actions.Add(new PhysicalDamage(pid, tid, power, 0.0));
                         var se3 = new SkillExecutor();
                         (state, var log) = se3.Execute(state, actions.ToArray());
-                        AppendLog(log.Messages);
+                        AppendDebugFor(pid, log.Messages);
                         BroadcastBoard(day, phase);
                     }
                     highlightCells = null;

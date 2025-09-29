@@ -53,7 +53,7 @@
 
 - 角色文件：`role "名称" id "id" { description/vars/tags/skills }`
 - 技能：命令式迷你 DSL，包含元信息与语句：
-  - 元信息：`cost mp N; range N; cooldown N; targeting any|enemies|allies|self|tile; min_range N; sealed_until T;`
+  - 元信息：`cost mp N; range N; cooldown N; targeting any|enemies|allies|self|tile; min_range N; sealed_until day D [phase P]; [ends_turn;]`（保留 `sealed_until T;` 旧语法，T 为内部回合索引，0 基）
   - 控制：`if ... then ... [else ...]`、`repeat N times ...`、`parallel { ... }`、`for each <selector> [in parallel] do { ... }`、`chance P% then ... [else ...]`
   - 动作：`deal [physical|magic] N ... [ignore ...%]`、`line ... length L [radius R]`、`heal`、`move`、`dash towards`、`add/remove tag`、
     `set unit(...) var "k" = value`、`set tile(...) var "k" = value`、`set global var "k" = value`、`consume mp = N`
@@ -70,4 +70,11 @@
 
 - 使用 `publish/win-x64/` 下脚本启动 host/client/local 模式。
 - 角色来源依次为应用目录 `roles/`、环境变量 `LB_FATE_ROLES_DIR`、命令行 `--roles`。
+
+## 控制台中文显示（Windows）
+
+阶段规则：第 1/5 阶段可用全部指令；第 2~4 阶段可用 move/pass/skills/info/help/hint。
+
+- 控制台程序已强制使用 UTF-8 输入/输出以正确显示中文。
+- 若仍出现乱码，建议使用 Windows Terminal，确保字体支持中文，或在启动前执行 `chcp 65001`。
 

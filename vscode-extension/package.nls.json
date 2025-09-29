@@ -1,8 +1,0 @@
-{
-  "displayName": "ETBBS LBR Tools",
-  "description": "Language support for .lbr role files: syntax, snippets, completion, symbols, and diagnostics.",
-  "cmd.validate": "ETBBS LBR: Validate File",
-  "cmd.create": "ETBBS LBR: Create New Role",
-  "cmd.format": "ETBBS LBR: Format Document"
-}
-

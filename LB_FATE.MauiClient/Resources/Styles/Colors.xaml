@@ -2,16 +2,25 @@
 <ResourceDictionary xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
                     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml">
 
-  <!-- App theme aware colors -->
-  <!-- Use static colors to avoid AppThemeColor resolution issues in some toolchains -->
-  <Color x:Key="ColorBackground">#FFFFFF</Color>
-  <Color x:Key="ColorSurface">#F6F6F6</Color>
-  <Color x:Key="ColorOnSurface">#1F2937</Color>
-  <Color x:Key="ColorPrimary">#512BD4</Color>
+  <!-- Modern gradient-inspired color palette for gaming theme -->
+  <Color x:Key="ColorBackground">#FAFBFC</Color>
+  <Color x:Key="ColorSurface">#FFFFFF</Color>
+  <Color x:Key="ColorOnSurface">#1E293B</Color>
+  <Color x:Key="ColorPrimary">#6366F1</Color>
   <Color x:Key="ColorOnPrimary">#FFFFFF</Color>
-  <Color x:Key="ColorSecondary">#06B6D4</Color>
+  <Color x:Key="ColorSecondary">#8B5CF6</Color>
+  <Color x:Key="ColorAccent">#06B6D4</Color>
   <Color x:Key="ColorWarn">#F59E0B</Color>
   <Color x:Key="ColorDanger">#EF4444</Color>
   <Color x:Key="ColorSuccess">#10B981</Color>
+
+  <!-- Additional semantic colors -->
+  <Color x:Key="ColorMuted">#64748B</Color>
+  <Color x:Key="ColorBorder">#E2E8F0</Color>
+  <Color x:Key="ColorCardShadow">#0F172A</Color>
+
+  <!-- Gradient colors for enhanced visual appeal -->
+  <Color x:Key="ColorGradientStart">#6366F1</Color>
+  <Color x:Key="ColorGradientEnd">#8B5CF6</Color>
 
 </ResourceDictionary>

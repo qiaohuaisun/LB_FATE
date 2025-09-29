@@ -3,48 +3,60 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              x:Class="LB_FATE.MauiClient.SettingsPage"
              Title="Settings">
-    <ScrollView>
-      <VerticalStackLayout Padding="16" Spacing="16">
+    <ScrollView BackgroundColor="{StaticResource ColorBackground}">
+      <VerticalStackLayout Padding="20" Spacing="20">
         <!-- Auto reconnect card -->
         <Border Style="{StaticResource CardBorder}">
-          <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
-            <VerticalStackLayout>
-              <Label x:Name="AutoReconnectLabel" Text="Auto reconnect" FontAttributes="Bold" />
-              <Label Text="When connection fails or drops, retry automatically." FontSize="12" TextColor="#6B7280" />
+          <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16">
+            <VerticalStackLayout Spacing="4">
+              <Label x:Name="AutoReconnectLabel" Text="Auto reconnect" FontAttributes="Bold" FontSize="16" />
+              <Label Text="When connection fails or drops, retry automatically." FontSize="14" TextColor="{StaticResource ColorMuted}" />
             </VerticalStackLayout>
-            <Switch x:Name="AutoReconnectSwitch" Grid.Column="1" Toggled="OnAutoReconnectToggled"/>
+            <Switch x:Name="AutoReconnectSwitch" Grid.Column="1" Toggled="OnAutoReconnectToggled" VerticalOptions="Center"/>
           </Grid>
         </Border>
 
         <!-- Reconnect strategy card -->
         <Border Style="{StaticResource CardBorder}">
-          <VerticalStackLayout Spacing="12">
-            <!-- Delay seconds slider -->
-            <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12" RowDefinitions="Auto">
-              <Label x:Name="DelayLabel" Text="Delay (s)" VerticalOptions="Center"/>
-              <Slider x:Name="DelaySlider" Grid.Column="1" Minimum="1" Maximum="30" ValueChanged="OnDelayChanged" />
-              <Label x:Name="DelayValue" Grid.Column="2" Text="1" WidthRequest="40" HorizontalTextAlignment="End" VerticalOptions="Center" />
-            </Grid>
-            <!-- Max attempts slider -->
-            <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12" RowDefinitions="Auto">
-              <Label x:Name="MaxAttemptsLabel" Text="Max attempts" VerticalOptions="Center"/>
-              <Slider x:Name="MaxAttemptsSlider" Grid.Column="1" Minimum="0" Maximum="50" ValueChanged="OnMaxAttemptsChanged" />
-              <Label x:Name="MaxAttemptsValue" Grid.Column="2" Text="10" WidthRequest="40" HorizontalTextAlignment="End" VerticalOptions="Center" />
-            </Grid>
+          <VerticalStackLayout Spacing="16">
+            <!-- Enhanced Delay seconds slider -->
+            <VerticalStackLayout Spacing="8">
+              <Label x:Name="DelayLabel" Text="Reconnect Delay" FontAttributes="Bold" FontSize="16"/>
+              <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16">
+                <Slider x:Name="DelaySlider" Minimum="1" Maximum="30" ValueChanged="OnDelayChanged" />
+                <Border Grid.Column="1" Style="{StaticResource StatusChip}" BackgroundColor="#EEF2FF">
+                  <Label x:Name="DelayValue" Text="1s" WidthRequest="40" HorizontalTextAlignment="Center" TextColor="{StaticResource ColorPrimary}" FontAttributes="Bold" />
+                </Border>
+              </Grid>
+            </VerticalStackLayout>
+            <!-- Enhanced Max attempts slider -->
+            <VerticalStackLayout Spacing="8">
+              <Label x:Name="MaxAttemptsLabel" Text="Max Attempts" FontAttributes="Bold" FontSize="16"/>
+              <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16">
+                <Slider x:Name="MaxAttemptsSlider" Minimum="0" Maximum="50" ValueChanged="OnMaxAttemptsChanged" />
+                <Border Grid.Column="1" Style="{StaticResource StatusChip}" BackgroundColor="#EEF2FF">
+                  <Label x:Name="MaxAttemptsValue" Text="10" WidthRequest="40" HorizontalTextAlignment="Center" TextColor="{StaticResource ColorPrimary}" FontAttributes="Bold" />
+                </Border>
+              </Grid>
+            </VerticalStackLayout>
           </VerticalStackLayout>
         </Border>
 
-        <!-- Language card -->
+        <!-- Enhanced Language card -->
         <Border Style="{StaticResource CardBorder}">
-          <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
-            <Label x:Name="LanguageLabel" Text="Language"/>
-            <Picker x:Name="LanguagePicker" Grid.Column="1" SelectedIndexChanged="OnLanguageChanged"/>
+          <Grid ColumnDefinitions="*,*" ColumnSpacing="16">
+            <VerticalStackLayout Spacing="4">
+              <Label x:Name="LanguageLabel" Text="Language" FontAttributes="Bold" FontSize="16"/>
+              <Label Text="Select your preferred language" FontSize="14" TextColor="{StaticResource ColorMuted}" />
+            </VerticalStackLayout>
+            <Picker x:Name="LanguagePicker" Grid.Column="1" SelectedIndexChanged="OnLanguageChanged" VerticalOptions="Center" />
           </Grid>
         </Border>
 
-        <!-- Reset card -->
-        <Border Style="{StaticResource CardBorder}">
-          <Button Text="Reset to defaults" Clicked="OnResetClicked" Style="{StaticResource SecondaryButton}" />
+        <!-- Enhanced Reset card -->
+        <Border Style="{StaticResource FeatureCard}">
+          <Button Text="Reset to defaults" Clicked="OnResetClicked" Style="{StaticResource PrimaryButton}"
+                  TextColor="White" BackgroundColor="Transparent" />
         </Border>
       </VerticalStackLayout>
     </ScrollView>

@@ -59,6 +59,10 @@ public static class Keys
     public const string ForceIgnoreDefTurns = "force_ignore_def_turns"; // int
     public const string Level = "level";                // int
     public const string Exp = "exp";                    // int
+
+    // Generic mechanics toggles and durations
+    public const string NoHealTurns = "no_heal_turns";              // int (target cannot be healed while >0)
+    public const string ReverseHealTurnsGlobal = "reverse_heal_turns"; // int (global: heals are reversed while >0)
 }
 
 /// <summary>

@@ -61,6 +61,8 @@ Notes
 
 ## Controls
 
+Phases 1 & 5: all commands; Phases 2-4: move/pass/skills/info/help/hint.
+
 - `move x y` — Move to a reachable tile (clear path ≤ speed). Cost: 0.5 MP per move.
 - `attack P#` — Basic attack the target player id. Cost: 0.5 MP.
 
@@ -68,7 +70,8 @@ Notes
 
 - Role files: `role "Name" id "id" { description/vars/tags/skills }`
 - Skills: imperative mini‑DSL with meta and statements:
-  - Meta: `cost mp N; range N; cooldown N; targeting any|enemies|allies|self|tile; min_range N; sealed_until T;`
+  - Meta: `cost mp N; range N; cooldown N; targeting any|enemies|allies|self|tile; min_range N; sealed_until day D [phase P]; [ends_turn;]`
+    - Legacy: `sealed_until T;` still works but uses 0-based internal turn index.
   - Control: `if ... then ... [else ...]`, `repeat N times ...`, `parallel { ... }`,
     `for each <selector> [in parallel] do { ... }`, `chance P% then ... [else ...]`
   - Actions: `deal [physical|magic] N ... [ignore ...%]`, `line ... length L [radius R]`,
@@ -88,3 +91,11 @@ See `docs/lbr.zh-CN.md` for the full guide.
 
 - Use scripts under `publish/win-x64/` to start host/client/local modes.
 - Roles are loaded from the app `roles/` folder, `LB_FATE_ROLES_DIR`, or `--roles`.
+  - Verbose variants: `runServer-logs.cmd` (enables `LB_FATE_SERVER_LOGS=1`, `LB_FATE_DEBUG_LOGS=1`), `runClient-logs.cmd` (auto-reconnect hints).
+
+## Encoding Note (Windows)
+
+- The console app now forces UTF-8 I/O so Chinese text renders correctly.
+- If you still see garbled characters, use Windows Terminal, ensure the font supports CJK, or run `chcp 65001` before starting.
+
+

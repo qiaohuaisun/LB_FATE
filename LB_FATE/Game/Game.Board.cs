@@ -10,7 +10,7 @@ partial class Game
         if (endpoints.TryGetValue(pid, out var ep)) ep.SendLine(text);
     }
 
-    private List<string> GetBoardLines(int day, int phase, bool includeHighlights = true)
+    private List<string> GetBoardLines(int day, int phase, bool includeHighlights = true, string? viewerPid = null)
     {
         var lines = new List<string>();
         lines.Add($"=== LB_FATE | Day {day} | Phase {phase} ===");
@@ -20,7 +20,8 @@ partial class Game
         {
             if (GetInt(id, Keys.Hp, 0) <= 0) continue;
             var pos = (Coord)u.Vars[Keys.Pos];
-            grid[pos.Y, pos.X] = symbolOf[id];
+            bool isOffline = endpoints.Count > 0 && !endpoints.ContainsKey(id);
+            grid[pos.Y, pos.X] = isOffline ? '!' : symbolOf[id];
         }
         if (includeHighlights && highlightCells is not null)
         {
@@ -42,7 +43,8 @@ partial class Game
         }
         lines.Add(border);
         lines.Add("Legend / Status:");
-        foreach (var pid in playerIds)
+        var idsToShow = viewerPid is null ? playerIds.AsEnumerable() : new[] { viewerPid };
+        foreach (var pid in idsToShow)
         {
             var u = state.Units[pid];
             var hp = GetInt(pid, Keys.Hp, 0);
@@ -50,16 +52,23 @@ partial class Game
             object? mpObj = u.Vars.TryGetValue(Keys.Mp, out var mpv) ? mpv : null;
             string mpStr = mpObj is double d ? d.ToString("0.##") : (mpObj?.ToString() ?? "0");
             var pos = (Coord)u.Vars[Keys.Pos];
-            lines.Add($" {symbolOf[pid]}: {pid} {classOf[pid],-10} HP[{Bar(hp, maxHp, 10)}]({hp}/{maxHp}) MP={mpStr} Pos={pos}");
+            bool isOffline = endpoints.Count > 0 && !endpoints.ContainsKey(pid);
+            var head = isOffline ? "!" : symbolOf[pid].ToString();
+            var offMark = isOffline ? " (offline)" : string.Empty;
+            lines.Add($" {head}: {pid} {classOf[pid],-10} HP[{Bar(hp, maxHp, 10)}]({hp}/{maxHp}) MP={mpStr} Pos={pos}{offMark}");
         }
         lines.Add("");
-        lines.Add("Commands: move x y | attack P# | skills | use <n> [P#|x y|up|down|left|right] | info | hint move|attack | pass | help | quit");
+        lines.Add("Commands: move x y | attack P# | skills | use <n> [P#|x y|up|down|left|right] | info | hint move | pass | help | quit");
         lines.Add("Costs   : Move 0.5 MP; Attack 0.5 MP");
-        lines.Add("Phases 1 & 5: all commands; Phases 2-4: move/pass only.");
-        if (recentLog.Count > 0)
+        lines.Add("Phases 1 & 5: all commands; Phases 2-4: move/pass/skills/info/help/hint.");
+        // Recent logs: 合并公共日志 + 当前观者的私有日志（仅 debug 写入）
+        var mergedLogs = new List<string>();
+        mergedLogs.AddRange(publicLog);
+        if (viewerPid is not null && privateLog.TryGetValue(viewerPid, out var priv)) mergedLogs.AddRange(priv);
+        if (mergedLogs.Count > 0)
         {
             lines.Add("Recent:");
-            foreach (var m in recentLog.TakeLast(5)) lines.Add(" - " + m);
+            foreach (var m in mergedLogs.TakeLast(5)) lines.Add(" - " + m);
         }
         return lines;
     }
@@ -67,15 +76,19 @@ partial class Game
     private void SendBoardTo(string pid, int day, int phase)
     {
         if (!endpoints.TryGetValue(pid, out var ep)) return;
-        foreach (var line in GetBoardLines(day, phase, includeHighlights: true)) ep.SendLine(line);
+        foreach (var line in GetBoardLines(day, phase, includeHighlights: true, viewerPid: pid)) ep.SendLine(line);
     }
 
     private void BroadcastBoard(int day, int phase)
     {
         if (endpoints.Count == 0) return;
-        var lines = GetBoardLines(day, phase, includeHighlights: false);
-        foreach (var ep in endpoints.Values)
+        foreach (var kv in endpoints)
+        {
+            var pid = kv.Key;
+            var ep = kv.Value;
+            var lines = GetBoardLines(day, phase, includeHighlights: false, viewerPid: pid);
             foreach (var line in lines) ep.SendLine(line);
+        }
     }
 
     private void ShowBoard(int day, int phase)
@@ -88,7 +101,8 @@ partial class Game
         {
             if (GetInt(id, Keys.Hp, 0) <= 0) continue;
             var pos = (Coord)u.Vars[Keys.Pos];
-            grid[pos.Y, pos.X] = symbolOf[id];
+            bool isOffline = endpoints.Count > 0 && !endpoints.ContainsKey(id);
+            grid[pos.Y, pos.X] = isOffline ? '!' : symbolOf[id];
         }
         if (highlightCells is not null)
         {
@@ -115,6 +129,10 @@ partial class Game
                 {
                     Console.ForegroundColor = ConsoleColor.DarkYellow; colored = true;
                 }
+                else if (ch == '!')
+                {
+                    Console.ForegroundColor = ConsoleColor.DarkRed; colored = true;
+                }
                 Console.Write(ch);
                 if (colored) Console.ResetColor();
             }
@@ -130,17 +148,21 @@ partial class Game
             object? mpObj = u.Vars.TryGetValue(Keys.Mp, out var mpv) ? mpv : null;
             string mpStr = mpObj is double d ? d.ToString("0.##") : (mpObj?.ToString() ?? "0");
             var pos = (Coord)u.Vars[Keys.Pos];
-            Console.ForegroundColor = GetColor(classOf[pid]); Console.Write($" {symbolOf[pid]}: {pid} {classOf[pid],-10} "); Console.ResetColor();
-            Console.Write($"HP[{Bar(hp, maxHp, 10)}]({hp}/{maxHp}) MP={mpStr} Pos={pos}");
+            bool isOffline = endpoints.Count > 0 && !endpoints.ContainsKey(pid);
+            var head = isOffline ? "!" : symbolOf[pid].ToString();
+            Console.ForegroundColor = GetColor(classOf[pid]); Console.Write($" {head}: {pid} {classOf[pid],-10} "); Console.ResetColor();
+            Console.Write($"HP[{Bar(hp, maxHp, 10)}]({hp}/{maxHp}) MP={mpStr} Pos={pos}{(isOffline ? " (offline)" : string.Empty)}");
             Console.WriteLine();
         }
         Console.WriteLine();
-        Console.WriteLine("Commands: move x y | attack P# | skills | use <n> P# | info | hint move|attack | pass | help | quit");
+        Console.WriteLine("Commands: move x y | attack P# | skills | use <n> P# | info | hint move | pass | help | quit");
         Console.WriteLine("Phases 1 & 5: all commands; Phases 2-4: move/pass only.");
-        if (recentLog.Count > 0)
+        // 控制台本地模式：显示公共日志（无私有视角）
+        var mergedLogs = new List<string>(publicLog);
+        if (mergedLogs.Count > 0)
         {
             Console.WriteLine("Recent:");
-            foreach (var m in recentLog.TakeLast(5)) Console.WriteLine(" - " + m);
+            foreach (var m in mergedLogs.TakeLast(5)) Console.WriteLine(" - " + m);
         }
     }
 
@@ -163,9 +185,17 @@ partial class Game
         return new string('#', filled) + new string('.', width - filled);
     }
 
-    private void AppendLog(IEnumerable<string> msgs)
+    private void AppendPublic(IEnumerable<string> msgs)
     {
-        foreach (var m in msgs) recentLog.Add(m);
-        while (recentLog.Count > 10) recentLog.RemoveAt(0);
+        foreach (var m in msgs) publicLog.Add(m);
+        while (publicLog.Count > 20) publicLog.RemoveAt(0);
+    }
+
+    private void AppendDebugFor(string pid, IEnumerable<string> msgs)
+    {
+        if (!debugLogs) return;
+        if (!privateLog.TryGetValue(pid, out var list)) { list = new List<string>(); privateLog[pid] = list; }
+        foreach (var m in msgs) list.Add(m);
+        while (list.Count > 20) list.RemoveAt(0);
     }
 }

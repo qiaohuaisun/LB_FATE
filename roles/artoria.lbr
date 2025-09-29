@@ -56,7 +56,7 @@ role "阿尔托莉雅" id "saber_artoria" {
     # 技能3：誓约胜利之剑（封印5回合）—— 群体物理伤害 + 一定真实伤害；风界时额外法伤
     # 可先以“蓄力”强化（见下），本技能在检测到“charged”时给予额外真实伤害并移除蓄力标记
     skill "誓约胜利之剑" {
-      range 3; targeting enemies; cooldown 5; sealed_until 3;
+      range 3; targeting enemies; cooldown 5; sealed_until day 3;
       # 基础“前方线”群伤（以 caster->target 方向延长 length，半径0）
       line physical 9 to target length 3 radius 0;
       line 3 to target length 3 radius 0; # 真实伤害
@@ -73,7 +73,7 @@ role "阿尔托莉雅" id "saber_artoria" {
 
     # 蓄力：可蓄力一回合，期间免疫不良影响（以 不死1回合 近似），下一次“誓约胜利之剑”获得额外真实伤害
     skill "蓄力" {
-      targeting self; cooldown 3;
+      targeting self; cooldown 3; ends_turn;
       add tag "charged" to caster;
       set unit(caster) var "undying_turns" = 1;
       set unit(caster) var "status_immune_turns" = 1;
@@ -82,7 +82,7 @@ role "阿尔托莉雅" id "saber_artoria" {
 
     # 天赋1：进入风界（消耗魔力，获得‘风界’标记）
     skill "进入风界" {
-      targeting self; cooldown 2;
+      targeting self; cooldown 2; ends_turn;
       add tag "windrealm" to caster;
       consume mp = 1.5;
     }

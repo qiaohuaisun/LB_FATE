@@ -3,22 +3,35 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              x:Class="LB_FATE.MauiClient.DiscoverPage"
              Title="Discover">
-    <VerticalStackLayout Padding="16" Spacing="12">
-        <HorizontalStackLayout Spacing="8">
-            <Button x:Name="RefreshBtn" Text="Refresh" Clicked="OnRefreshClicked" />
-            <Button x:Name="UseBtn" Text="Use Selected" Clicked="OnUseClicked" />
-        </HorizontalStackLayout>
-        <RefreshView x:Name="RefreshView" Refreshing="OnRefreshClicked">
-            <CollectionView x:Name="HostsList" SelectionMode="Single" HeightRequest="360">
-                <CollectionView.ItemTemplate>
-                    <DataTemplate>
-                        <Grid Padding="12" ColumnDefinitions="*,Auto">
-                            <Label Text="{Binding Host}" FontAttributes="Bold" />
-                            <Label Grid.Column="1" Text="{Binding Port}" />
-                        </Grid>
-                    </DataTemplate>
-                </CollectionView.ItemTemplate>
-            </CollectionView>
-        </RefreshView>
-    </VerticalStackLayout>
+    <Grid RowDefinitions="Auto,*" BackgroundColor="{StaticResource ColorBackground}">
+        <!-- Action Buttons Card -->
+        <Border Style="{StaticResource CardBorder}" Margin="20,20,20,10">
+            <HorizontalStackLayout Spacing="12" HorizontalOptions="Center">
+                <Button x:Name="RefreshBtn" Text="Refresh" Clicked="OnRefreshClicked" Style="{StaticResource AccentButton}" />
+                <Button x:Name="UseBtn" Text="Use Selected" Clicked="OnUseClicked" Style="{StaticResource PrimaryButton}" />
+            </HorizontalStackLayout>
+        </Border>
+
+        <!-- Enhanced Host List -->
+        <Border Grid.Row="1" Style="{StaticResource CardBorder}" Margin="20,10,20,20">
+            <Grid RowDefinitions="Auto,*" RowSpacing="12">
+                <Label Text="Available Servers" FontAttributes="Bold" FontSize="18" />
+                <RefreshView x:Name="RefreshView" Grid.Row="1" Refreshing="OnRefreshClicked">
+                    <CollectionView x:Name="HostsList" SelectionMode="Single">
+                        <CollectionView.ItemTemplate>
+                            <DataTemplate>
+                                <Border Style="{StaticResource ListItemBorder}">
+                                    <Grid Padding="16" ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="12">
+                                        <Label Text="{Binding Host}" FontAttributes="Bold" FontSize="16" />
+                                        <Label Grid.Column="1" Text="{Binding Port}" TextColor="{StaticResource ColorPrimary}" FontAttributes="Bold" FontSize="16" />
+                                        <Label Grid.Row="1" Grid.ColumnSpan="2" Text="Click to select this server" TextColor="{StaticResource ColorMuted}" FontSize="13" />
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </CollectionView.ItemTemplate>
+                    </CollectionView>
+                </RefreshView>
+            </Grid>
+        </Border>
+    </Grid>
 </ContentPage>

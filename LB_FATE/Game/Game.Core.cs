@@ -31,9 +31,17 @@ partial class Game
     private readonly Dictionary<string, RoleDefinition> roleOf = new();
     private readonly ICooldownStore cooldowns = new InMemoryCooldownStore();
     private readonly string? rolesDirArg;
-    private readonly List<string> recentLog = new();
+    // 日志：public 面向所有玩家；private 面向各自玩家（仅在 debug 模式下追加内部执行细节）
+    private readonly List<string> publicLog = new();
+    private readonly Dictionary<string, List<string>> privateLog = new();
+    private readonly bool debugLogs = Environment.GetEnvironmentVariable("LB_FATE_DEBUG_LOGS") is string v &&
+                                       (v.Equals("1") || v.Equals("true", StringComparison.OrdinalIgnoreCase));
+    private readonly bool serverLogs = Environment.GetEnvironmentVariable("LB_FATE_SERVER_LOGS") is string sv &&
+                                       (sv.Equals("1") || sv.Equals("true", StringComparison.OrdinalIgnoreCase));
     private HashSet<Coord>? highlightCells = null;
     private char highlightChar = 'o';
+    private int lastDay = 1;
+    private int lastPhase = 1;
 
     public Game(string? rolesDir = null, int playerCount = 7, Dictionary<string, IPlayerEndpoint>? endpointMap = null, int? mapWidth = null, int? mapHeight = null)
     {
@@ -45,5 +53,93 @@ partial class Game
         if (endpointMap is not null)
             foreach (var kv in endpointMap) endpoints[kv.Key] = kv.Value;
     }
-}
 
+    // --- Reconnection helpers ---
+    public bool HasEndpoint(string pid) => endpoints.ContainsKey(pid);
+
+    public void AttachEndpoint(string pid, IPlayerEndpoint ep)
+    {
+        lock (endpoints)
+        {
+            endpoints[pid] = ep;
+        }
+        try
+        {
+            ep.SendLine($"WELCOME {pid} (reconnected)");
+            SendBoardTo(pid, lastDay, lastPhase);
+            foreach (var kv in endpoints)
+                if (kv.Key != pid)
+                    kv.Value.SendLine($"玩家重连：{pid}");
+        }
+        catch { }
+    }
+
+    // --- Server-side logging helpers ---
+    private void ServerLog(string msg)
+    {
+        if (!serverLogs) return;
+        try { Console.WriteLine(msg); } catch { }
+        if (endpoints.Count > 0)
+        {
+            foreach (var ep in endpoints.Values)
+            {
+                try { ep.SendLine($"[Srv] {msg}"); } catch { }
+            }
+        }
+        try { publicLog.Add(msg); } catch { }
+    }
+
+    private void SetupEventLogging()
+    {
+        if (!serverLogs) return;
+        try
+        {
+            events.Subscribe(EventTopics.ActionExecuting, o =>
+            {
+                if (o is ActionExecutingEvent a)
+                    ServerLog($"ActionExecuting: {a.Action}");
+            });
+            events.Subscribe(EventTopics.ActionExecuted, o =>
+            {
+                if (o is ActionExecutedEvent a)
+                    ServerLog($"ActionExecuted: {a.Action}");
+            });
+            events.Subscribe(EventTopics.ValidationFailed, o =>
+            {
+                if (o is ValidationFailedEvent v)
+                    ServerLog($"ValidationFailed: {v.Reason}");
+            });
+            events.Subscribe(EventTopics.ConflictDetected, o =>
+            {
+                if (o is ConflictDetectedEvent c)
+                    ServerLog($"Conflict: #{c.IndexA} vs #{c.IndexB} ({c.A.GetType().Name} vs {c.B.GetType().Name})");
+            });
+            events.Subscribe(EventTopics.UnitDamaged, o =>
+            {
+                if (o is UnitDamagedEvent e)
+                    ServerLog($"Damaged: {e.UnitId} -{e.Amount} HP {e.BeforeHp}->{e.AfterHp}");
+            });
+            events.Subscribe(EventTopics.UnitMoved, o =>
+            {
+                if (o is UnitMovedEvent e)
+                    ServerLog($"Moved: {e.UnitId} {e.Before} -> {e.After}");
+            });
+            events.Subscribe(EventTopics.UnitTagAdded, o => { if (o is UnitTagEvent e && e.Added) ServerLog($"UnitTag+ {e.UnitId}:{e.Tag}"); });
+            events.Subscribe(EventTopics.UnitTagRemoved, o => { if (o is UnitTagEvent e && !e.Added) ServerLog($"UnitTag- {e.UnitId}:{e.Tag}"); });
+            events.Subscribe(EventTopics.TileTagAdded, o => { if (o is TileTagEvent e && e.Added) ServerLog($"TileTag+ {e.Pos}:{e.Tag}"); });
+            events.Subscribe(EventTopics.TileTagRemoved, o => { if (o is TileTagEvent e && !e.Added) ServerLog($"TileTag- {e.Pos}:{e.Tag}"); });
+            events.Subscribe(EventTopics.GlobalVarChanged, o =>
+            {
+                if (o is VarChangedEvent e)
+                {
+                    var before = e.Before is null ? "<null>" : e.Before.ToString();
+                    var after = e.After is null ? "<null>" : e.After.ToString();
+                    ServerLog($"GlobalVar: {e.Key} {before} -> {after}");
+                }
+            });
+            events.Subscribe(EventTopics.GlobalTagAdded, o => { if (o is string tag) ServerLog($"GlobalTag+ {tag}"); });
+            events.Subscribe(EventTopics.GlobalTagRemoved, o => { if (o is string tag) ServerLog($"GlobalTag- {tag}"); });
+        }
+        catch { }
+    }
+}

@@ -18,7 +18,16 @@ public static partial class TextDsl
         if (prog.Cooldown.HasValue) builder = builder.WithExtra("cooldown", prog.Cooldown.Value);
         if (!string.IsNullOrEmpty(prog.Targeting)) builder = builder.WithExtra("targeting", prog.Targeting!);
         if (prog.MinRange.HasValue) builder = builder.WithExtra("min_range", prog.MinRange.Value);
-        if (prog.SealedUntil.HasValue) builder = builder.WithExtra("sealed_until", prog.SealedUntil.Value);
+        if (prog.SealedUntilDay.HasValue)
+        {
+            builder = builder.WithExtra("sealed_until_day", prog.SealedUntilDay.Value);
+            if (prog.SealedUntilPhase.HasValue) builder = builder.WithExtra("sealed_until_phase", prog.SealedUntilPhase.Value);
+        }
+        else if (prog.SealedUntil.HasValue)
+        {
+            builder = builder.WithExtra("sealed_until", prog.SealedUntil.Value);
+        }
+        if (prog.EndsTurn) builder = builder.WithExtra("ends_turn", true);
         return builder.Script(build).Build();
     }
 

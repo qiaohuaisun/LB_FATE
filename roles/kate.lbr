@@ -25,13 +25,13 @@ role "凯特神父" id "caster_kate" {
     # 号召：设置强制行动触发标记，由服务端在同一阶段调用该目标执行一次 Turn
     skill "号召" {
       range 2; targeting any; cost mp 5; cooldown 2;
-      set global var "force_act_now" = true;
+      add global tag "force_act_now";
     }
 
     # 宝具：利用 $point（由服务端设为“前方”）在 3×3（切比雪夫 1）范围处理敌人
     skill "烧掉他们" {
-      range 0; targeting self; cost mp 3; cooldown 5; sealed_until 3;
-      for each enemies of point in range 1 of point in parallel do {
+      range 0; targeting self; cost mp 3; cooldown 5; sealed_until day 3;
+      for each enemies in range 1 of point in parallel do {
         deal 8 damage to it; # 真实伤害
         set unit(it) var "burn_turns" = 2;
         set unit(it) var "burn_per_turn" = 2;
@@ -45,8 +45,7 @@ role "凯特神父" id "caster_kate" {
       set unit(caster) var "_tmp_val" = var "hp" of caster;
       set unit(caster) var "hp" = var "mp" of caster;
       set unit(caster) var "mp" = var "_tmp_val" of caster;
-      # 可选：清理临时变量（不影响逻辑）
-      remove unit var "_tmp_val" from caster;
+      # 可选：清理临时变量（不影响逻辑）——当前 DSL 不支持删除变量，保留无需清理
     }
   }
 }

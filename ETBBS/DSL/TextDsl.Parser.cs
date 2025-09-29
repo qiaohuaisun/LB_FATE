@@ -65,7 +65,21 @@ public static partial class TextDsl
             }
             if (TryKeyword("sealed_until"))
             {
+                // Support: sealed_until <turn>  (legacy) OR sealed_until day <D> [phase <P>]
+                var save = _pos;
+                if (TryKeyword("day"))
+                {
+                    prog.SealedUntilDay = ParseInt();
+                    if (TryKeyword("phase")) prog.SealedUntilPhase = ParseInt();
+                    return true;
+                }
+                _pos = save;
                 prog.SealedUntil = ParseInt();
+                return true;
+            }
+            if (TryKeyword("ends_turn"))
+            {
+                prog.EndsTurn = true;
                 return true;
             }
             return false;
@@ -336,8 +350,26 @@ public static partial class TextDsl
                 }
                 if (TryKeyword("global"))
                 {
-                    RequireKeyword("tag"); var tag = ParseString();
-                    return new ActionStmt { Kind = ActionKind.RemoveGlobalTag, StrArg = tag, Target = new UnitRefCaster() };
+                    if (TryKeyword("tag"))
+                    {
+                        var tag = ParseString();
+                        return new ActionStmt { Kind = ActionKind.RemoveGlobalTag, StrArg = tag, Target = new UnitRefCaster() };
+                    }
+                    if (TryKeyword("var"))
+                    {
+                        var key = ParseString();
+                        return new ActionStmt { Kind = ActionKind.RemoveGlobalVar, KeyArg = key, Target = new UnitRefCaster() };
+                    }
+                }
+                if (TryKeyword("unit"))
+                {
+                    RequireKeyword("var"); var key = ParseString(); RequireKeyword("from"); var ur = ParseUnitRef();
+                    return new ActionStmt { Kind = ActionKind.RemoveUnitVar, KeyArg = key, Target = ur };
+                }
+                if (TryKeyword("tile"))
+                {
+                    RequireKeyword("var"); var key = ParseString(); RequireKeyword("at"); var pos = ParseCoord();
+                    return new ActionStmt { Kind = ActionKind.RemoveTileVar, KeyArg = key, PosArg = pos, Target = new UnitRefCaster() };
                 }
             }
             // move <unit> to (x,y)

@@ -41,7 +41,7 @@ role "Lindamel" id "rider_lindamel" {
 
     # 宝具「决斗裁决」：目标回满，施法者 3 回合不灭；双方获得决斗标签，并 +1 MP/回合（封印至第 3 回合）
     skill "Duel Judgement" {
-      sealed_until 3;
+      sealed_until day 3;
       set unit(target) var "hp" = var "max_hp" of target;
       add tag "duel" to caster;
       add tag "duel" to target;
@@ -51,4 +51,3 @@ role "Lindamel" id "rider_lindamel" {
     }
   }
 }
-

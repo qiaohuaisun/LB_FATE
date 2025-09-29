@@ -34,12 +34,11 @@ role "杰克" id "assassin_jack" {
 
     # 宝具：天赋一翻倍（变成 50%），天赋二无条件触发（低血量阈值 = 100%）
     skill "解体圣母" {
-      range 0; targeting self; cooldown 5; sealed_until 3;
+      range 0; targeting self; cooldown 5; sealed_until day 3;
       set unit(caster) var "night_or_dawn_evasion_bonus" = 0.5;
       set unit(caster) var "low_hp_ignore_def_ratio" = 1.0;
       consume mp = 2.0;
     }
   }
 }
-
 

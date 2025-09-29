@@ -45,7 +45,7 @@ role "Orion" id "archer_orion" {
 
     # 二技能「猎手之姿」：切换形态（近战/还原）
     skill "Hunter's Stance" {
-      range 0; targeting self; cooldown 2;
+      range 0; targeting self; cooldown 2; ends_turn;
       if caster has tag "stance_melee" then {
         # revert to base
         set unit(caster) var "atk" = var "base_atk" of caster;
@@ -64,7 +64,7 @@ role "Orion" id "archer_orion" {
 
     # 宝具「阿耳忒弥斯的祝福」：净化、回血回蓝、提升攻击、短暂负免
     skill "Artemis' Blessing" {
-      range 0; targeting self; cooldown 5; sealed_until 3;
+      range 0; targeting self; cooldown 5; sealed_until day 3;
       # cleanse common negative tags and reset their timers
       remove tag "stunned" from caster;
       remove tag "silenced" from caster;

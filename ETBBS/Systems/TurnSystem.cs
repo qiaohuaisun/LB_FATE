@@ -11,6 +11,20 @@ public sealed class TurnSystem
         // increment global turn
         cur = WorldStateOps.WithGlobal(cur, g => g with { Turn = g.Turn + 1 });
 
+        // Global toggles that tick down per day: reverse heal
+        if (cur.Global.Vars.TryGetValue(Keys.ReverseHealTurnsGlobal, out var rvt))
+        {
+            var turns = rvt is int i ? i : (rvt is long l ? (int)l : (rvt is double d ? (int)Math.Round(d) : 0));
+            if (turns > 0)
+            {
+                var nt = turns - 1;
+                if (nt > 0)
+                    cur = WorldStateOps.WithGlobal(cur, g => g with { Vars = g.Vars.SetItem(Keys.ReverseHealTurnsGlobal, nt) });
+                else
+                    cur = WorldStateOps.WithGlobal(cur, g => g with { Vars = g.Vars.Remove(Keys.ReverseHealTurnsGlobal) });
+            }
+        }
+
         // per-unit maintenance
         foreach (var (id, unit) in state.Units)
         {
@@ -56,6 +70,13 @@ public sealed class TurnSystem
             {
                 var ns = im - 1;
                 cur = WorldStateOps.WithUnit(cur, id, u => u with { Vars = u.Vars.SetItem(Keys.StatusImmuneTurns, ns) });
+            }
+
+            // no heal tick
+            if (unit.Vars.TryGetValue(Keys.NoHealTurns, out var nht) && nht is int nhti && nhti > 0)
+            {
+                var ns = nhti - 1;
+                cur = WorldStateOps.WithUnit(cur, id, u => u with { Vars = u.Vars.SetItem(Keys.NoHealTurns, ns) });
             }
 
             // Timed evasion bonus tick

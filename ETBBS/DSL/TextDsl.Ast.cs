@@ -191,6 +191,15 @@ public static partial class TextDsl
                 case ActionKind.RemoveGlobalTag:
                     s.RemoveGlobalTag(StrArg);
                     break;
+                case ActionKind.RemoveUnitVar:
+                    s.TargetUnit(Target.BuildSelector(opts, getIt), (sub, id) => sub.RemoveUnitVar(id, KeyArg));
+                    break;
+                case ActionKind.RemoveTileVar:
+                    s.RemoveTileVar(PosArg, KeyArg);
+                    break;
+                case ActionKind.RemoveGlobalVar:
+                    s.RemoveGlobalVar(KeyArg);
+                    break;
                 case ActionKind.LinePhysicalAoe:
                     s.TargetUnit(Target.BuildSelector(opts, getIt), (sub, tid) =>
                     {
@@ -234,6 +243,9 @@ public static partial class TextDsl
         SetGlobalVar,
         AddGlobalTag,
         RemoveGlobalTag
+        , RemoveUnitVar
+        , RemoveTileVar
+        , RemoveGlobalVar
     }
 
     private abstract class CondExpr
@@ -441,6 +453,9 @@ public static partial class TextDsl
         public string? Targeting;
         public int? MinRange;
         public int? SealedUntil;
+        public int? SealedUntilDay;
+        public int? SealedUntilPhase;
+        public bool EndsTurn;
     }
 
     // simple arithmetic expression node for values

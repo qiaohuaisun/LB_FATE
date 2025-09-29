@@ -81,7 +81,10 @@ role "<名称>" id "<id>" {
   - `cost mp <N>;`
   - `range <N>;`
   - `cooldown <N>;`
-  - `sealed_until <T>;`（新增：在第 T 回合（天）开始之前不可用，达到/超过 T 后可用）
+  - `sealed_until <T>;`（旧语义：按内部“回合索引”判定，0 基；一般不推荐）
+  - `sealed_until day <D> [phase <P>];`（新推荐：在“第 D 天 第 P 阶段”之前不可用）
+    - 天数从 1 开始；阶段 1..5；省略 phase 时表示在“第 D 天开始”解封。
+  - `ends_turn;`（可选）：使用该技能后立即结束当前回合。
   - `targeting any|enemies|allies|self;`
 - 行动（部分）：
   - 伤害/治疗：

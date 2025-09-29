@@ -70,7 +70,7 @@ role "Enkidu" id "lancer_enkidu" {
 
     # 宝具「天之锁」：点选坐标，对半径 2（约 5×5）范围敌人多段打击并定身（封印到第 3 回合）
     skill "Chains of Heaven" {
-      range 5; min_range 4; targeting tile; cooldown 5; sealed_until 3;
+      range 5; min_range 4; targeting tile; cooldown 5; sealed_until day 3;
       for each enemies in range 2 of point in parallel do {
         repeat 6 times {
           deal 1 damage to it
@@ -82,4 +82,3 @@ role "Enkidu" id "lancer_enkidu" {
     }
   }
 }
-

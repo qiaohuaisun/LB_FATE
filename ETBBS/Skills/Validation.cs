@@ -25,6 +25,8 @@ public sealed record ActionValidationConfig(
     DistanceMetric DistanceMetric = DistanceMetric.Manhattan,
     int? RangeOverride = null,
     int CurrentTurn = 0,
+    int CurrentDay = 0,
+    int CurrentPhase = 0,
     int? CooldownTurns = null,
     string MpVarKey = Keys.Mp,
     string PosVarKey = Keys.Pos,
@@ -119,6 +121,14 @@ public static class ActionValidators
         if (skill.Extras.TryGetValue("sealed_until", out var suObj) && suObj is int sealedUntil)
         {
             return Compose(baseValidator, CreateSealedUntilValidator(sealedUntil, cfg));
+        }
+        // sealed_until_day[/phase]
+        if (skill.Extras.TryGetValue("sealed_until_day", out var sdObj) && sdObj is int sealedDay)
+        {
+            int? sealedPhase = null;
+            if (skill.Extras.TryGetValue("sealed_until_phase", out var spObj) && spObj is int sp)
+                sealedPhase = sp;
+            return Compose(baseValidator, CreateSealedUntilDayPhaseValidator(sealedDay, sealedPhase, cfg));
         }
         return baseValidator;
     }
@@ -262,6 +272,25 @@ public static class ActionValidators
             if (cfg.CurrentTurn < sealedUntilTurn)
             {
                 reason = $"Sealed until turn {sealedUntilTurn}";
+                return false;
+            }
+            reason = null;
+            return true;
+        };
+
+    public static ActionValidator CreateSealedUntilDayPhaseValidator(int sealedUntilDay, int? sealedUntilPhase, ActionValidationConfig cfg)
+        => (Context ctx, AtomicAction[] actions, out string? reason) =>
+        {
+            // Day/Phase are 1-based in UX; cfg carries exact current values from host game.
+            int curDay = cfg.CurrentDay;
+            int curPhase = cfg.CurrentPhase;
+            int reqDay = Math.Max(1, sealedUntilDay);
+            int reqPhase = Math.Max(1, sealedUntilPhase ?? 1); // default unlock at day start
+
+            bool locked = (curDay < reqDay) || (curDay == reqDay && curPhase < reqPhase);
+            if (locked)
+            {
+                reason = $"Sealed until day {reqDay} phase {reqPhase}";
                 return false;
             }
             reason = null;
