@@ -5,7 +5,7 @@
 
 **Language**: English | [中文](README.zh-CN.md)
 
-A reusable .NET 8 framework for grid-based turn-based strategy games, featuring an immutable state engine, text-based skill DSL, and a playable sample game with GUI client.
+A reusable .NET 8 framework for grid-based turn-based strategy games, featuring an immutable state engine, text-based skill DSL, and a playable sample console game. Assisted by Claude Code
 
 ---
 
@@ -20,11 +20,9 @@ A reusable .NET 8 framework for grid-based turn-based strategy games, featuring 
   - [Building](#building)
   - [Running the Game](#running-the-game)
 - [Clients](#-clients)
-  - [Avalonia GUI Client](#avalonia-gui-client-recommended)
   - [Console Client](#console-client)
 - [Development Tools](#-development-tools)
   - [LBR Validator](#lbr-validator)
-  - [VS Code Extension](#vs-code-extension)
 - [Game Modes](#-game-modes)
 - [LBR DSL](#-lbr-dsl-roles--skills)
 - [Configuration](#-configuration)
@@ -47,8 +45,7 @@ A reusable .NET 8 framework for grid-based turn-based strategy games, featuring 
 - **TCP Multiplayer**: Host/client architecture for network play
 - **Boss Mode**: Cooperative 7v1 with AI-controlled boss using script-based decision trees
 - **Free-for-All Mode**: Traditional battle royale
-- **Modern GUI**: Cross-platform Avalonia UI with mouse controls
-- **Traditional Console**: Text-based interface for terminal enthusiasts
+- **Console Interface**: Text-based interface for terminal play
 
 ### Developer Experience
 - **Syntax Validator**: CLI tool to validate `.lbr` files before runtime
@@ -59,26 +56,6 @@ A reusable .NET 8 framework for grid-based turn-based strategy games, featuring 
 ---
 
 ## 🚀 Quick Start
-
-### GUI Client (Recommended)
-
-1. **Start the server**:
-   ```bash
-   cd publish
-   runServer.cmd  # Windows
-   # Or: dotnet run --project LB_FATE -- --host --players 4
-   ```
-
-2. **Launch the GUI client**:
-   ```bash
-   dotnet run --project LB_FATE.AvaloniaClient
-   ```
-
-3. **Connect and play**:
-   - Enter server address (e.g., `127.0.0.1:35500`)
-   - Use mouse to control units (left-click to move, right-click to attack)
-
-### Console Client
 
 ```bash
 # Local single-player (simulates 7 AI players)
@@ -98,11 +75,11 @@ dotnet run --project LB_FATE -- --client 127.0.0.1:35500
 ```
 ┌──────────────────────────────────────────────────────┐
 │                   LB_FATE (Game)                     │
-│  ┌────────────┐  ┌────────────┐  ┌────────────┐    │
-│  │ Console UI │  │ Avalonia   │  │  TCP Net   │    │
-│  │            │  │ GUI Client │  │ Host/Client│    │
-│  └──────┬─────┘  └──────┬─────┘  └──────┬─────┘    │
-│         └────────────────┴────────────────┘          │
+│  ┌────────────┐  ┌────────────┐                     │
+│  │ Console UI │  │  TCP Net   │                     │
+│  │            │  │ Host/Client│                     │
+│  └──────┬─────┘  └──────┬─────┘                     │
+│         └────────────────┘                           │
 └───────────────────┬──────────────────────────────────┘
                     │
 ┌───────────────────▼──────────────────────────────────┐
@@ -142,13 +119,6 @@ ETBBS/
 │   ├── Game/                   # Game loop, initialization, turn logic
 │   ├── Program.Main.cs         # Entry point
 │   └── Net.cs                  # TCP networking
-│
-├── LB_FATE.AvaloniaClient/     # Modern GUI client
-│   ├── ViewModels/             # MVVM view models
-│   ├── Views/                  # XAML views
-│   ├── Controls/               # Custom game board control
-│   ├── Services/               # Network client, state parser
-│   └── README.md               # GUI client documentation
 │
 ├── ETBBS.LbrValidator/         # CLI validation tool
 │   ├── Program.cs              # Validator logic
@@ -223,33 +193,7 @@ dotnet run --project LB_FATE -- --host --mode boss --players 7
 
 ---
 
-## 🖥 Clients
-
-### Avalonia GUI Client (Recommended)
-
-**Modern cross-platform interface with:**
-- Interactive game board (drag-and-drop, click to move/attack)
-- Real-time HP/MP bars and status effects
-- Skills panel with cooldown tracking
-- Combat log with event history
-- Command console for advanced users
-
-**Launch**:
-```bash
-dotnet run --project LB_FATE.AvaloniaClient
-```
-
-**Controls**:
-- **Left-click**: Select unit / Move to tile
-- **Right-click**: Attack target
-- **Mouse wheel**: Zoom (planned)
-- **Command bar**: Type commands directly
-
-📖 **Full Guide**: [LB_FATE.AvaloniaClient/README.md](LB_FATE.AvaloniaClient/README.md)
-
----
-
-### Console Client
+## 🖥 Console Client
 
 **Text-based interface for:**
 - Terminal enthusiasts
@@ -485,7 +429,6 @@ export LB_FATE_LOG_LEVEL=Debug
 |----------|-------------|
 | [LBR DSL Guide (Chinese)](docs/lbr.zh-CN.md) | Complete LBR syntax reference |
 | [LBR DSL Guide (English)](docs/lbr.en.md) | English LBR syntax summary |
-| [Avalonia Client Guide](LB_FATE.AvaloniaClient/README.md) | GUI client usage and architecture |
 | [LBR Validator Guide](ETBBS.LbrValidator/README.md) | Validator tool documentation |
 
 ---
@@ -498,9 +441,8 @@ This project is licensed under the MIT License - see [LICENSE.txt](LICENSE.txt) 
 
 ## 🙏 Acknowledgments
 
-- **Avalonia UI** - Cross-platform UI framework
-- **CommunityToolkit.Mvvm** - MVVM helpers
 - **.NET Team** - For the amazing runtime and SDK
+- **Claude code** - A powerful agentic coding tool
 
 ---
 

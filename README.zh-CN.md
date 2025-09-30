@@ -5,7 +5,7 @@
 
 **语言**: [English](README.md) | 中文
 
-一个可复用的 .NET 8 网格回合制策略游戏框架，提供不可变状态引擎、文本技能 DSL，以及带图形界面的示例游戏。
+一个由Claude code 协助完成，可复用的 .NET 8 网格回合制策略游戏框架，提供不可变状态引擎、文本技能 DSL，以及可运行的示例控制台游戏。
 
 ---
 
@@ -20,11 +20,9 @@
   - [构建](#构建)
   - [运行游戏](#运行游戏)
 - [客户端](#-客户端)
-  - [Avalonia GUI 客户端](#avalonia-gui-客户端推荐)
   - [控制台客户端](#控制台客户端)
 - [开发工具](#-开发工具)
   - [LBR 验证器](#lbr-验证器)
-  - [VS Code 扩展](#vs-code-扩展)
 - [游戏模式](#-游戏模式)
 - [LBR DSL](#-lbr-dsl角色与技能)
 - [配置](#-配置)
@@ -47,8 +45,7 @@
 - **TCP 多人游戏**：主机/客户端网络架构
 - **Boss 模式**：7 人合作对抗使用脚本决策树的 AI Boss
 - **混战模式**：传统大逃杀玩法
-- **现代 GUI**：跨平台 Avalonia UI 与鼠标控制
-- **传统控制台**：为终端爱好者提供的文本界面
+- **控制台界面**：为终端游戏提供的文本界面
 
 ### 开发者体验
 - **语法验证器**：在运行前验证 `.lbr` 文件的 CLI 工具
@@ -59,26 +56,6 @@
 ---
 
 ## 🚀 快速开始
-
-### GUI 客户端（推荐）
-
-1. **启动服务器**：
-   ```bash
-   cd publish
-   runServer.cmd  # Windows
-   # 或：dotnet run --project LB_FATE -- --host --players 4
-   ```
-
-2. **启动 GUI 客户端**：
-   ```bash
-   dotnet run --project LB_FATE.AvaloniaClient
-   ```
-
-3. **连接并游玩**：
-   - 输入服务器地址（如 `127.0.0.1:35500`）
-   - 使用鼠标控制单位（左键移动，右键攻击）
-
-### 控制台客户端
 
 ```bash
 # 本地单人（模拟 7 个 AI 玩家）
@@ -98,11 +75,11 @@ dotnet run --project LB_FATE -- --client 127.0.0.1:35500
 ```
 ┌──────────────────────────────────────────────────────┐
 │                   LB_FATE (游戏)                     │
-│  ┌────────────┐  ┌────────────┐  ┌────────────┐    │
-│  │  控制台UI  │  │  Avalonia  │  │  TCP 网络  │    │
-│  │            │  │ GUI 客户端 │  │  主机/客户端│   │
-│  └──────┬─────┘  └──────┬─────┘  └──────┬─────┘    │
-│         └────────────────┴────────────────┘          │
+│  ┌────────────┐  ┌────────────┐                     │
+│  │  控制台UI  │  │  TCP 网络  │                     │
+│  │            │  │ 主机/客户端│                     │
+│  └──────┬─────┘  └──────┬─────┘                     │
+│         └────────────────┘                           │
 └───────────────────┬──────────────────────────────────┘
                     │
 ┌───────────────────▼──────────────────────────────────┐
@@ -142,13 +119,6 @@ ETBBS/
 │   ├── Game/                   # 游戏循环、初始化、回合逻辑
 │   ├── Program.Main.cs         # 入口点
 │   └── Net.cs                  # TCP 网络
-│
-├── LB_FATE.AvaloniaClient/     # 现代 GUI 客户端
-│   ├── ViewModels/             # MVVM 视图模型
-│   ├── Views/                  # XAML 视图
-│   ├── Controls/               # 自定义游戏棋盘控件
-│   ├── Services/               # 网络客户端、状态解析器
-│   └── README.md               # GUI 客户端文档
 │
 ├── ETBBS.LbrValidator/         # CLI 验证工具
 │   ├── Program.cs              # 验证器逻辑
@@ -223,33 +193,7 @@ dotnet run --project LB_FATE -- --host --mode boss --players 7
 
 ---
 
-## 🖥 客户端
-
-### Avalonia GUI 客户端（推荐）
-
-**现代跨平台界面，包含：**
-- 交互式游戏棋盘（拖放、点击移动/攻击）
-- 实时 HP/MP 条和状态效果
-- 技能面板与冷却时间追踪
-- 战斗日志与事件历史
-- 命令控制台供高级用户使用
-
-**启动**：
-```bash
-dotnet run --project LB_FATE.AvaloniaClient
-```
-
-**控制**：
-- **左键**：选择单位 / 移动到格子
-- **右键**：攻击目标
-- **鼠标滚轮**：缩放（计划中）
-- **命令栏**：直接输入命令
-
-📖 **完整指南**：[LB_FATE.AvaloniaClient/README.md](LB_FATE.AvaloniaClient/README.md)
-
----
-
-### 控制台客户端
+## 🖥 控制台客户端
 
 **文本界面适用于：**
 - 终端爱好者
@@ -485,7 +429,6 @@ export LB_FATE_LOG_LEVEL=Debug
 |------|------|
 | [LBR DSL 指南（中文）](docs/lbr.zh-CN.md) | 完整 LBR 语法参考 |
 | [LBR DSL 指南（英文）](docs/lbr.en.md) | 英文 LBR 语法摘要 |
-| [Avalonia 客户端指南](LB_FATE.AvaloniaClient/README.md) | GUI 客户端使用与架构 |
 | [LBR 验证器指南](ETBBS.LbrValidator/README.md) | 验证器工具文档 |
 
 ---
@@ -498,9 +441,8 @@ export LB_FATE_LOG_LEVEL=Debug
 
 ## 🙏 致谢
 
-- **Avalonia UI** - 跨平台 UI 框架
-- **CommunityToolkit.Mvvm** - MVVM 助手
 - **.NET 团队** - 卓越的运行时和 SDK
+- **Claude code** - 强大的 Agentic Coding 工具
 
 ---
 

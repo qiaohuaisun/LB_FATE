@@ -23,11 +23,39 @@ class Program
             return 1;
         }
 
+        // Check if it's a single file or directory
+        if (File.Exists(options.Directory))
+        {
+            // Validate single file
+            var result = ValidateFile(options.Directory, options);
+            Console.WriteLine();
+            if (result.Success)
+            {
+                Console.ForegroundColor = ConsoleColor.Green;
+                Console.WriteLine("✓ FILE PASSED VALIDATION");
+                Console.ResetColor();
+                if (options.ShowDetails)
+                {
+                    Console.WriteLine($"\nRole: {result.RoleName} (id: {result.RoleId})");
+                    Console.WriteLine($"Skills: {result.SkillCount}");
+                }
+                return 0;
+            }
+            else
+            {
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine($"✗ FILE FAILED VALIDATION");
+                Console.WriteLine($"\nError: {result.ErrorMessage}");
+                Console.ResetColor();
+                return 1;
+            }
+        }
+
         // Validate directory
         if (!Directory.Exists(options.Directory))
         {
             Console.ForegroundColor = ConsoleColor.Red;
-            Console.WriteLine($"✗ Error: Directory not found: {options.Directory}");
+            Console.WriteLine($"✗ Error: Path not found: {options.Directory}");
             Console.ResetColor();
             return 1;
         }
@@ -276,10 +304,10 @@ class Program
 
     private static void ShowUsage()
     {
-        Console.WriteLine("Usage: ETBBS.LbrValidator [directory] [options]");
+        Console.WriteLine("Usage: ETBBS.LbrValidator [path] [options]");
         Console.WriteLine();
         Console.WriteLine("Arguments:");
-        Console.WriteLine("  directory              Directory to scan for .lbr files (default: current directory)");
+        Console.WriteLine("  path                   File or directory to validate (default: current directory)");
         Console.WriteLine();
         Console.WriteLine("Options:");
         Console.WriteLine("  -r, --recursive        Scan subdirectories recursively");
