@@ -191,6 +191,7 @@ public static partial class TextDsl
                 }
                 if (TryKeyword("with")) { RequireKeyword("tag"); sel.TagFilter = ParseString(); }
                 if (TryKeyword("with")) { RequireKeyword("var"); sel.VarKey = ParseString(); sel.VarOp = ParseOp(); sel.VarValue = ParseInt(); }
+                if (TryKeyword("order")) { RequireKeyword("by"); RequireKeyword("var"); sel.VarOrderKey = ParseString(); sel.VarOrderDesc = TryKeyword("desc"); if (!sel.VarOrderDesc) { sel.VarOrderDesc = false; TryKeyword("asc"); } }
                 if (TryKeyword("limit")) sel.Limit = ParseInt();
                 return sel;
             }
@@ -215,6 +216,7 @@ public static partial class TextDsl
                 }
                 if (TryKeyword("with")) { RequireKeyword("tag"); sel.TagFilter = ParseString(); }
                 if (TryKeyword("with")) { RequireKeyword("var"); sel.VarKey = ParseString(); sel.VarOp = ParseOp(); sel.VarValue = ParseInt(); }
+                if (TryKeyword("order")) { RequireKeyword("by"); RequireKeyword("var"); sel.VarOrderKey = ParseString(); sel.VarOrderDesc = TryKeyword("desc"); if (!sel.VarOrderDesc) { sel.VarOrderDesc = false; TryKeyword("asc"); } }
                 if (TryKeyword("limit")) sel.Limit = ParseInt();
                 return sel;
             }
@@ -227,6 +229,7 @@ public static partial class TextDsl
                     else if (TryKeyword("var")) { sel.VarKey = ParseString(); sel.VarOp = ParseOp(); sel.VarValue = ParseInt(); }
                     else throw Error("expected tag|var after 'with'");
                 }
+                if (TryKeyword("order")) { RequireKeyword("by"); RequireKeyword("var"); sel.VarOrderKey = ParseString(); sel.VarOrderDesc = TryKeyword("desc"); if (!sel.VarOrderDesc) { sel.VarOrderDesc = false; TryKeyword("asc"); } }
                 if (TryKeyword("limit")) sel.Limit = ParseInt();
                 return sel;
             }

@@ -1,0 +1,23 @@
+{
+  "rules": [
+    {
+      "if": { "hp_pct_lte": 0.6, "phase_in": [3, 4, 5], "skill_ready": "Rage" }
+    },
+    {
+      "if": { "skill_ready": "Mass Sweep", "min_hits": 2, "range_of": "Mass Sweep" },
+      "target": { "type": "cluster", "origin": "caster", "radius": 2 },
+      "telegraph": true,
+      "telegraph_delay": 1,
+      "telegraph_message": "野兽蓄力横扫：下一阶段范围2"
+    },
+    {
+      "if": { "skill_ready": "Ruin Roar", "distance_lte": 4 },
+      "target": { "type": "nearest_enemy" }
+    },
+    {
+      "action": "move_to",
+      "target": { "type": "approach", "to": "nearest_enemy", "stop_at_range_of": "Basic Attack" }
+    }
+  ],
+  "fallback": "basic_attack"
+}

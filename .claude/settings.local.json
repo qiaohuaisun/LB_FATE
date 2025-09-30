@@ -1,7 +1,14 @@
 {
   "permissions": {
     "allow": [
-      "Bash(dotnet build:*)"
+      "Bash(dotnet build:*)",
+      "Bash(git restore:*)",
+      "Bash(dotnet test:*)",
+      "Bash(findstr:*)",
+      "Bash(dir:*)",
+      "Bash(find:*)",
+      "Bash(dotnet new:*)",
+      "Bash(dotnet sln:*)"
     ],
     "deny": [],
     "ask": []

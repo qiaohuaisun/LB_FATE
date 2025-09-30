@@ -303,6 +303,8 @@ public static partial class TextDsl
         public string? VarKey;            // numeric var filter
         public string? VarOp;             // ">=", ">", "<=", "<", "==", "!="
         public int? VarValue;
+        public string? VarOrderKey;       // order by var key
+        public bool VarOrderDesc;         // order desc
         public bool OrderByDistance;      // nearest/farthest
         public bool OrderDesc;            // farthest if true
         public UnitRef? DistanceOrigin;   // order distance origin
@@ -392,6 +394,13 @@ public static partial class TextDsl
                     }
                     if (oPos.Equals(default(Coord))) return Array.Empty<string>();
                     ids = (OrderDesc ? ids.OrderByDescending(id => Dist(ctx, id, oPos)) : ids.OrderBy(id => Dist(ctx, id, oPos)));
+                }
+
+                if (!string.IsNullOrEmpty(VarOrderKey))
+                {
+                    var key = VarOrderKey!;
+                    ids = (VarOrderDesc ? ids.OrderByDescending(id => ctx.GetUnitVar<int>(id, key, int.MinValue))
+                                        : ids.OrderBy(id => ctx.GetUnitVar<int>(id, key, int.MaxValue)));
                 }
 
                 if (Limit.HasValue && Limit.Value >= 0)

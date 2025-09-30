@@ -1,12 +1,44 @@
 using LB_FATE;
+using LB_FATE.Logging;
+using Serilog;
+using Serilog.Events;
 
 class Program
 {
     static void Main(string[] args)
     {
+        // Parse command-line flags
+        bool enablePerfTracking = args.Contains("--perf") || args.Contains("--performance");
+        bool verboseMode = args.Contains("--verbose") || args.Contains("-v");
+        bool debugMode = args.Contains("--debug") || args.Contains("-d");
+
+        // Determine log level from environment or flags
+        var minLevel = DetermineLogLevel(verboseMode, debugMode);
+
+        // Initialize logging system with performance tracking
+        LoggerSetup.InitializeGlobalLogger(enableFileLogging: true, enablePerformanceMetrics: enablePerfTracking, minLevel: minLevel);
+
+        try
+        {
+            RunApplication(args);
+        }
+        catch (Exception ex)
+        {
+            Log.Fatal(ex, "Application terminated unexpectedly");
+        }
+        finally
+        {
+            LoggerSetup.CloseLogger();
+        }
+    }
+
+    static void RunApplication(string[] args)
+    {
         // Ensure UTF-8 console I/O for correct Chinese display on Windows terminals
         System.Console.OutputEncoding = new System.Text.UTF8Encoding(encoderShouldEmitUTF8Identifier: false);
         System.Console.InputEncoding = new System.Text.UTF8Encoding(encoderShouldEmitUTF8Identifier: false);
+
+        Log.Information("LB_FATE - Console Turn-based 2D Grid (ETBBS)");
         Console.WriteLine("LB_FATE - Console Turn-based 2D Grid (ETBBS)");
         string? rolesDir = null;
         bool host = false, client = false;
@@ -14,6 +46,7 @@ class Program
         int port = 35500;
         int players = 7;
         int mapW = 15, mapH = 9;
+        string mode = Environment.GetEnvironmentVariable("LB_FATE_MODE") ?? "";
         for (int i = 0; i < args.Length; i++)
         {
             switch (args[i])
@@ -24,6 +57,13 @@ class Program
                 case "--hostaddr": if (i + 1 < args.Length) hostName = args[++i]; break;
                 case "--port": if (i + 1 < args.Length && int.TryParse(args[i + 1], out var p)) { port = p; i++; } break;
                 case "--players": if (i + 1 < args.Length && int.TryParse(args[i + 1], out var n)) { players = Math.Max(1, Math.Min(7, n)); i++; } break;
+                case "--mode":
+                    if (i + 1 < args.Length)
+                    {
+                        var m = args[++i].ToLowerInvariant();
+                        if (m is "boss" or "ffa") mode = m;
+                    }
+                    break;
                 case "--size":
                     if (i + 1 < args.Length)
                     {
@@ -38,11 +78,29 @@ class Program
             }
         }
 
-        if (client)
+        if (!string.IsNullOrWhiteSpace(mode))
         {
-            try { NetClient.Run(hostName, port); }
+            try
+            {
+                Environment.SetEnvironmentVariable("LB_FATE_MODE", mode, EnvironmentVariableTarget.Process);
+                Log.Information("Game mode set to: {Mode}", mode);
+            }
             catch (Exception ex)
             {
+                Log.Warning(ex, "Failed to set environment variable LB_FATE_MODE");
+            }
+        }
+
+        if (client)
+        {
+            try
+            {
+                Log.Information("Starting client mode, connecting to {Host}:{Port}", hostName, port);
+                NetClient.Run(hostName, port);
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "Client fatal error");
                 Console.WriteLine($"Client fatal error: {ex.Message}");
             }
             return;
@@ -107,12 +165,42 @@ class Program
                             ep.SendLine($"Starting in {s}...");
                             ep.SendLine("==================================");
                         }
-                        catch { }
+                        catch (Exception ex)
+                        {
+                            Log.Debug(ex, "Failed to send countdown to client endpoint");
+                        }
                     }
                 }
                 Thread.Sleep(800);
             }
         }
-        catch { }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "Countdown display interrupted");
+        }
+    }
+
+    /// <summary>
+    /// Determines the appropriate log level based on environment variables and command-line flags.
+    /// Priority: command-line flags > environment variable > default (Information).
+    /// </summary>
+    static LogEventLevel DetermineLogLevel(bool verboseMode, bool debugMode)
+    {
+        // Command-line flags take highest priority
+        if (verboseMode) return LogEventLevel.Verbose;
+        if (debugMode) return LogEventLevel.Debug;
+
+        // Check environment variable
+        var envLevel = Environment.GetEnvironmentVariable("LB_FATE_LOG_LEVEL");
+        if (!string.IsNullOrWhiteSpace(envLevel))
+        {
+            if (Enum.TryParse<LogEventLevel>(envLevel, ignoreCase: true, out var level))
+            {
+                return level;
+            }
+        }
+
+        // Default: Information for production
+        return LogEventLevel.Information;
     }
 }

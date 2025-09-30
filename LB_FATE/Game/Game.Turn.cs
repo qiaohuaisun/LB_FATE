@@ -25,6 +25,13 @@ partial class Game
             ctx = new Context(state);
             var speed = GetInt(pid, Keys.Speed, 3);
             var range = GetInt(pid, Keys.Range, 1);
+            // skip turn if cannot act
+            if (GetInt(pid, Keys.CannotActTurns, 0) > 0)
+            {
+                if (ep is not null) WriteLineTo(pid, "You are incapacitated and cannot act this phase.");
+                else AppendPublic(new[] { $"{pid} cannot act this phase." });
+                break;
+            }
             bool isRooted = state.Units[pid].Tags.Contains(Tags.Rooted);
             bool isSilenced = state.Units[pid].Tags.Contains(Tags.Silenced);
             if (ep is not null)
@@ -281,7 +288,11 @@ partial class Game
                                     WriteLineTo(pid, $"Inspect: Class={classOf[tid]}");
                                 }
                             }
-                            catch { }
+                            catch (Exception ex)
+                            {
+                                // Non-critical: inspection display failed, but continue game
+                                Console.WriteLine($"Warning: Failed to display inspect info for {tid}: {ex.Message}");
+                            }
                         }
                         state = WorldStateOps.WithGlobal(state, g => g with { Vars = g.Vars.Remove("inspect_hp").Remove("inspect_mp").Remove("inspect_pos") });
                     }
@@ -368,9 +379,701 @@ partial class Game
             }
             else
             {
-                // local console mode could be implemented similarly; for brevity, assume endpoints used
+                // No endpoint: if this is the AI boss, perform AI script (if any) or fallback heuristic; otherwise, end turn.
+                if (bossMode && pid == bossId)
+                {
+                    bool done = TryExecuteBossAiScript(pid, phase, day);
+                    if (!done) RunBossAiTurn(pid, phase, day);
+                }
                 break;
             }
+        }
+    }
+
+    private int EstimateLineAoeHits(string attackerId, string targetId, int length, int radius)
+    {
+        var ctx = new Context(state);
+        if (!state.Units.TryGetValue(attackerId, out var au) || !state.Units.TryGetValue(targetId, out var tu)) return 0;
+        if (!au.Vars.TryGetValue(Keys.Pos, out var ap) || ap is not Coord aPos) return 0;
+        if (!tu.Vars.TryGetValue(Keys.Pos, out var tp) || tp is not Coord tPos) return 0;
+        int steps = Math.Max(0, length);
+        int rad = Math.Max(0, radius);
+        int dx = Math.Sign(tPos.X - aPos.X);
+        int dy = Math.Sign(tPos.Y - aPos.Y);
+        var path = new List<Coord>();
+        var cur = aPos;
+        for (int i = 0; i < steps; i++)
+        {
+            if (cur.Equals(tPos)) break;
+            Coord next = cur;
+            if (cur.X != tPos.X) next = new Coord(cur.X + dx, cur.Y);
+            else if (cur.Y != tPos.Y) next = new Coord(cur.X, cur.Y + dy);
+            cur = next; path.Add(cur);
+        }
+        // teams map
+        string? atkTeam = teamOf.TryGetValue(attackerId, out var tteam) ? tteam : null;
+        int hits = 0;
+        foreach (var (id, u) in state.Units)
+        {
+            if (id == attackerId) continue;
+            if (teamOf.TryGetValue(id, out var tt) && atkTeam is not null && tt == atkTeam) continue;
+            if (GetInt(id, Keys.Hp, 0) <= 0) continue;
+            if (!u.Vars.TryGetValue(Keys.Pos, out var pv) || pv is not Coord pos) continue;
+            bool inRange = path.Any(c => Math.Abs(c.X - pos.X) + Math.Abs(c.Y - pos.Y) <= rad);
+            if (inRange) hits++;
+        }
+        return hits;
+    }
+
+    private bool TryExecuteBossAiScript(string pid, int phase, int day)
+    {
+        // If a telegraph is pending and due, resolve it first
+        try
+        {
+            if (state.Global.Vars.TryGetValue("boss_telegraph", out var tele) && tele is string payload)
+            {
+                var parts = payload.Split('|');
+                // pid|skill|day|phase|tid|px|py|msg
+                if (parts.Length >= 8)
+                {
+                    var pid0 = parts[0]; var skillName = parts[1];
+                    int d = int.Parse(parts[2]); int ph = int.Parse(parts[3]);
+                    var tid = string.IsNullOrWhiteSpace(parts[4]) ? null : parts[4];
+                    int px = int.Parse(parts[5]); int py = int.Parse(parts[6]);
+                    var msg = parts[7];
+                    if (pid0 == pid && (day > d || (day == d && phase >= ph)))
+                    {
+                        var role = roleOf.ContainsKey(pid) ? roleOf[pid] : null; if (role is null) return false;
+                        var s = role.Skills.FirstOrDefault(x => string.Equals(x.Name, skillName, StringComparison.OrdinalIgnoreCase));
+                        if (s is not null)
+                        {
+                            var point = new Coord(Math.Clamp(px, 0, width - 1), Math.Clamp(py, 0, height - 1));
+                            // prepare baseline globals
+                            state = WorldStateOps.WithGlobal(state, g => g with
+                            {
+                                Vars = g.Vars
+                                    .SetItem(DslRuntime.CasterKey, pid)
+                                    .SetItem(DslRuntime.TargetKey, tid ?? "")
+                                    .SetItem(DslRuntime.RngKey, rng)
+                                    .SetItem(DslRuntime.TeamsKey, teamOf)
+                                    .SetItem(DslRuntime.TargetPointKey, point)
+                                    .Remove("boss_telegraph").Remove("boss_telegraph_msg")
+                            });
+                            var cfg = new ActionValidationConfig(
+                                CasterId: pid, TargetUnitId: tid, TeamOfUnit: teamOf, Targeting: TargetingMode.Any,
+                                CurrentTurn: state.Global.Turn, CurrentDay: day, CurrentPhase: phase, TargetPos: point);
+                            var validator = ActionValidators.ForSkillWithExtras(s.Compiled, cfg, cooldowns);
+                            var plan = s.Compiled.BuildPlan(new Context(state));
+                            var batch = plan.Count > 0 ? plan[0] : Array.Empty<AtomicAction>();
+                            // If validation fails due to target invalidation, try fallbacks
+                            if (!validator(new Context(state), batch, out var _))
+                            {
+                                // Determine targeting mode
+                                string targeting = s.Compiled.Extras.TryGetValue("targeting", out var tv) && tv is string ts ? ts : "any";
+                                // Find nearest alive enemy
+                                string? newTid = null; Coord myPos = new Context(state).GetUnitVar<Coord>(pid, Keys.Pos, default); int bestD2 = int.MaxValue;
+                                foreach (var (id, u2) in state.Units)
+                                {
+                                    if (id == pid) continue; if (GetInt(id, Keys.Hp, 0) <= 0) continue;
+                                    if (teamOf.TryGetValue(id, out var t2) && teamOf.TryGetValue(pid, out var tb2) && t2 == tb2) continue;
+                                    var p2 = new Context(state).GetUnitVar<Coord>(id, Keys.Pos, default);
+                                    int dd = Math.Abs(p2.X - myPos.X) + Math.Abs(p2.Y - myPos.Y);
+                                    if (dd < bestD2) { bestD2 = dd; newTid = id; }
+                                }
+                                if (targeting == "tile")
+                                {
+                                    // choose a tile within range nearest to nearest enemy
+                                    int range = s.Compiled.Metadata.Range;
+                                    Coord best = point; int bestScore = int.MaxValue;
+                                    var targetPos = (newTid is null) ? point : new Context(state).GetUnitVar<Coord>(newTid, Keys.Pos, default);
+                                    for (int dx = -range; dx <= range; dx++)
+                                    for (int dy = -range; dy <= range; dy++)
+                                    {
+                                        int md = Math.Abs(dx) + Math.Abs(dy); if (md > range) continue;
+                                        var c = new Coord(Math.Clamp(myPos.X + dx, 0, width - 1), Math.Clamp(myPos.Y + dy, 0, height - 1));
+                                        int score = Math.Abs(c.X - targetPos.X) + Math.Abs(c.Y - targetPos.Y);
+                                        if (score < bestScore) { bestScore = score; best = c; }
+                                    }
+                                    point = best; tid = newTid; // prefer proximity
+                                }
+                                else
+                                {
+                                    // unit-targeting or self/any -> prefer best line-aoe target if applicable, else nearest enemy id
+                                    // Try extract line aoe params from current plan
+                                    int lineLen = 0, lineRad = 0; bool hasLine = false;
+                                    foreach (var b in plan)
+                                    {
+                                        foreach (var a in b)
+                                        {
+                                            if (a is LineAoeDamage lad && lad.AttackerId == pid)
+                                            {
+                                                lineLen = lad.Length; lineRad = lad.Radius; hasLine = true; break;
+                                            }
+                                        }
+                                        if (hasLine) break;
+                                    }
+                                    if (hasLine)
+                                    {
+                                        string? bestId = null; int bestHits = -1; int bestTieDist = int.MaxValue;
+                                        foreach (var (id, u2) in state.Units)
+                                        {
+                                            if (id == pid) continue; if (GetInt(id, Keys.Hp, 0) <= 0) continue;
+                                            if (teamOf.TryGetValue(id, out var t2) && teamOf.TryGetValue(pid, out var tb2) && t2 == tb2) continue;
+                                            int hits = EstimateLineAoeHits(pid, id, lineLen, lineRad);
+                                            var p2 = new Context(state).GetUnitVar<Coord>(id, Keys.Pos, default);
+                                            int dist = Math.Abs(p2.X - myPos.X) + Math.Abs(p2.Y - myPos.Y);
+                                            if (hits > bestHits || (hits == bestHits && dist < bestTieDist))
+                                            {
+                                                bestHits = hits; bestTieDist = dist; bestId = id;
+                                            }
+                                        }
+                                        if (bestId is not null) tid = bestId; else if (newTid is not null) tid = newTid;
+                                    }
+                                    else
+                                    {
+                                        if (newTid is not null) tid = newTid;
+                                    }
+                                }
+                                // update globals + cfg with fallback
+                                state = WorldStateOps.WithGlobal(state, g => g with
+                                {
+                                    Vars = g.Vars
+                                        .SetItem(DslRuntime.CasterKey, pid)
+                                        .SetItem(DslRuntime.TargetKey, tid ?? "")
+                                        .SetItem(DslRuntime.TargetPointKey, point)
+                                });
+                                cfg = cfg with { TargetUnitId = tid, TargetPos = point };
+                                validator = ActionValidators.ForSkillWithExtras(s.Compiled, cfg, cooldowns);
+                                plan = s.Compiled.BuildPlan(new Context(state));
+                            }
+                            var se = new SkillExecutor();
+                            (state, var log) = se.ExecutePlan(state, plan, validator);
+                            AppendDebugFor(pid, log.Messages);
+                            AppendPublic(new[] { $"[Telegraph] {msg} -> 已释放" });
+                            BroadcastBoard(day, phase);
+                            cooldowns.SetLastUseTurn(pid, s.Name, state.Global.Turn);
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
+        catch (FormatException ex)
+        {
+            Console.WriteLine($"Error: Boss AI telegraph data is corrupted: {ex.Message}");
+            // Clear corrupted telegraph data
+            state = WorldStateOps.WithGlobal(state, g => g with
+            {
+                Vars = g.Vars.Remove("boss_telegraph").Remove("boss_telegraph_msg")
+            });
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error: Unexpected error in boss telegraph execution: {ex.GetType().Name} - {ex.Message}");
+        }
+
+        if (bossAi is null) return false;
+        try
+        {
+            var ctx = new Context(state);
+            // compute nearest enemy
+            string? nearestId = null; int bestD = int.MaxValue; Coord myPos = ctx.GetUnitVar<Coord>(pid, Keys.Pos, default);
+            foreach (var (id, u) in state.Units)
+            {
+                if (id == pid) continue; if (GetInt(id, Keys.Hp, 0) <= 0) continue;
+                if (teamOf.TryGetValue(id, out var t) && teamOf.TryGetValue(pid, out var tb) && t == tb) continue;
+                var pos = ctx.GetUnitVar<Coord>(id, Keys.Pos, default);
+                int d = Math.Abs(pos.X - myPos.X) + Math.Abs(pos.Y - myPos.Y);
+                if (d < bestD) { bestD = d; nearestId = id; }
+            }
+            var role = roleOf.ContainsKey(pid) ? roleOf[pid] : null;
+            bool telePending = false;
+            try
+            {
+                telePending = state.Global.Vars.TryGetValue("boss_telegraph", out var tv) && tv is string s && s.StartsWith(pid + "|");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Warning: Failed to check telegraph status for {pid}: {ex.Message}");
+                telePending = false;
+            }
+
+            foreach (var rule in bossAi.Rules)
+            {
+                // Skip scheduling new telegraphs if one is already pending
+                if (telePending && (rule.Telegraph ?? false)) continue;
+                // Chance gate
+                if (rule.Chance is double pc && pc >= 0.0 && pc <= 1.0)
+                {
+                    var rv = rng.NextDouble(); if (rv > pc) continue;
+                }
+                if (!RuleMatches(rule, pid, role, nearestId, bestD, phase)) continue;
+                var ok = ExecuteRule(rule, pid, role, nearestId, day, phase);
+                if (ok) return true;
+            }
+            // fallback
+            if (string.Equals(bossAi.Fallback, "basic_attack", StringComparison.OrdinalIgnoreCase))
+            {
+                return RunBasicAttackFallback(pid, nearestId, day, phase);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error: Boss AI execution failed for {pid}: {ex.GetType().Name} - {ex.Message}");
+            return false;
+        }
+
+        return false;
+    }
+
+    private bool RuleMatches(BossAiRule rule, string pid, RoleDefinition? role, string? nearestId, int nearestDist, int phase)
+    {
+        var cond = rule.If; if (cond is null) return true;
+        var u = state.Units[pid];
+        if (cond.HpPctLte is double hpPct)
+        {
+            int hp = GetInt(pid, Keys.Hp, 0); int maxHp = GetInt(pid, Keys.MaxHp, Math.Max(1, hp));
+            if (hp > (int)Math.Round(maxHp * Math.Clamp(hpPct, 0.0, 1.0))) return false;
+        }
+        if (cond.MinMp is double mmp)
+        {
+            var mpObj = u.Vars.TryGetValue(Keys.Mp, out var mv) ? mv : 0.0;
+            double mp = mpObj is double dd ? dd : (mpObj is int ii ? ii : 0.0);
+            if (mp < mmp) return false;
+        }
+        if (cond.PhaseIn is int[] ph && ph.Length > 0)
+        {
+            bool allowed = ph.Contains(phase);
+            if (!allowed) return false;
+        }
+        if (!string.IsNullOrEmpty(cond.HasTag))
+        {
+            if (!u.Tags.Contains(cond.HasTag)) return false;
+        }
+        if (cond.DistanceLte is int dl)
+        {
+            if (nearestId is null) return false; if (nearestDist > dl) return false;
+        }
+        if (!string.IsNullOrEmpty(cond.TargetHasTag))
+        {
+            if (nearestId is null) return false;
+            if (!state.Units[nearestId].Tags.Contains(cond.TargetHasTag)) return false;
+        }
+        if (!string.IsNullOrEmpty(cond.SkillReady))
+        {
+            if (role is null) return false;
+            var s = role.Skills.FirstOrDefault(x => string.Equals(x.Name, cond.SkillReady, StringComparison.OrdinalIgnoreCase));
+            if (s is null) return false;
+            // minimal readiness: MP/CD only (range may be validated by target)
+            var cfg = new ActionValidationConfig(
+                CasterId: pid,
+                TeamOfUnit: teamOf,
+                Targeting: TargetingMode.Any,
+                CurrentTurn: state.Global.Turn,
+                CurrentDay: state.Global.Vars.TryGetValue(DslRuntime.PhaseKey, out var _) ? state.Global.Turn : state.Global.Turn,
+                CurrentPhase: phase
+            );
+            var val = ActionValidators.ForSkillWithExtras(s.Compiled, cfg, cooldowns);
+            var plan = s.Compiled.BuildPlan(new Context(state));
+            var batch = plan.Count > 0 ? plan[0] : Array.Empty<AtomicAction>();
+            if (!val(new Context(state), batch, out var _)) return false;
+        }
+        if (cond.MinHits is int need && need > 0)
+        {
+            // ballpark estimate: cluster radius from target.radius
+            int rad = rule.Target?.Radius ?? 0;
+            int hits = EstimateClusterHits(pid, rad);
+            if (hits < need) return false;
+        }
+        return true;
+    }
+
+    private int EstimateClusterHits(string pid, int radius)
+    {
+        var ctx = new Context(state);
+        var p = ctx.GetUnitVar<Coord>(pid, Keys.Pos, default);
+        int best = 0;
+        for (int dx = -radius; dx <= radius; dx++)
+        {
+            for (int dy = -radius; dy <= radius; dy++)
+            {
+                var c = new Coord(Math.Clamp(p.X + dx, 0, width - 1), Math.Clamp(p.Y + dy, 0, height - 1));
+                int count = 0;
+                foreach (var (id, u) in state.Units)
+                {
+                    if (id == pid) continue; if (GetInt(id, Keys.Hp, 0) <= 0) continue;
+                    if (teamOf.TryGetValue(id, out var t) && teamOf.TryGetValue(pid, out var tb) && t == tb) continue;
+                    var pos = ctx.GetUnitVar<Coord>(id, Keys.Pos, default);
+                    int d = Math.Max(Math.Abs(pos.X - c.X), Math.Abs(pos.Y - c.Y));
+                    if (d <= radius) count++;
+                }
+                if (count > best) best = count;
+            }
+        }
+        return best;
+    }
+
+    private bool ExecuteRule(BossAiRule rule, string pid, RoleDefinition? role, string? nearestId, int day, int phase)
+    {
+        string action = rule.Action ?? "cast";
+        if (action.Equals("move_to", StringComparison.OrdinalIgnoreCase))
+        {
+            return ExecuteMoveTo(rule, pid, nearestId, day, phase);
+        }
+        if (action.Equals("retreat", StringComparison.OrdinalIgnoreCase))
+        {
+            return ExecuteRetreat(rule, pid, nearestId, day, phase);
+        }
+        if (action.Equals("basic_attack", StringComparison.OrdinalIgnoreCase))
+        {
+            return RunBasicAttackFallback(pid, nearestId, day, phase);
+        }
+        if (role is null) return false;
+        string? skillName = rule.Skill ?? rule.If?.SkillReady;
+        if (string.IsNullOrEmpty(skillName)) return false;
+        var s = role.Skills.FirstOrDefault(x => string.Equals(x.Name, skillName, StringComparison.OrdinalIgnoreCase));
+        if (s is null) return false;
+
+        // target resolution
+        string? tid = nearestId;
+        Coord point = new Coord(); bool usePoint = false; string dir = string.Empty;
+        if (rule.Target is BossAiTarget tgt)
+        {
+            if (tgt.Type.Equals("cluster", StringComparison.OrdinalIgnoreCase))
+            {
+                int radius = tgt.Radius ?? 1; // find best cluster tile around caster
+                var ctx = new Context(state); var p0 = ctx.GetUnitVar<Coord>(pid, Keys.Pos, default);
+                int best = -1; Coord bestC = p0;
+                for (int dx = -radius; dx <= radius; dx++)
+                for (int dy = -radius; dy <= radius; dy++)
+                {
+                    var c = new Coord(Math.Clamp(p0.X + dx, 0, width - 1), Math.Clamp(p0.Y + dy, 0, height - 1));
+                    int count = 0;
+                    foreach (var (id, u) in state.Units)
+                    {
+                        if (id == pid) continue; if (GetInt(id, Keys.Hp, 0) <= 0) continue;
+                        if (teamOf.TryGetValue(id, out var t) && teamOf.TryGetValue(pid, out var tb) && t == tb) continue;
+                        var pos = ctx.GetUnitVar<Coord>(id, Keys.Pos, default);
+                        int d = Math.Max(Math.Abs(pos.X - c.X), Math.Abs(pos.Y - c.Y));
+                        if (d <= radius) count++;
+                    }
+                    if (count > best) { best = count; bestC = c; }
+                }
+                point = bestC; usePoint = true;
+            }
+            else if (tgt.Type.Equals("nearest_enemy", StringComparison.OrdinalIgnoreCase))
+            {
+                // choose by prefer_tag/order_var if provided
+                var enemies = state.Units.Where(kv => kv.Key != pid && GetInt(kv.Key, Keys.Hp, 0) > 0 && (!teamOf.TryGetValue(kv.Key, out var t) || !teamOf.TryGetValue(pid, out var tb) || t != tb)).Select(kv => kv.Key);
+                if (!string.IsNullOrEmpty(tgt.PreferTag))
+                {
+                    var tagged = enemies.Where(id => state.Units[id].Tags.Contains(tgt.PreferTag)).ToList();
+                    if (tagged.Count > 0) enemies = tagged;
+                }
+                if (!string.IsNullOrEmpty(tgt.OrderVarKey))
+                {
+                    string key = tgt.OrderVarKey!;
+                    enemies = (tgt.OrderVarDesc ? enemies.OrderByDescending(id => new Context(state).GetUnitVar<int>(id, key, int.MinValue))
+                                                : enemies.OrderBy(id => new Context(state).GetUnitVar<int>(id, key, int.MaxValue)));
+                }
+                tid = enemies.FirstOrDefault() ?? tid;
+            }
+        }
+
+        // Telegraph support: if rule requires telegraph, announce now and schedule execution next phase
+        if (rule.Telegraph is bool tg && tg)
+        {
+            int delay = Math.Max(1, rule.TelegraphDelay ?? 1);
+            int totalPhases = 5;
+            int curIndex = (day - 1) * totalPhases + (phase - 1); // zero-based
+            int execIndex = curIndex + delay;
+            int nextDay = (execIndex / totalPhases) + 1;
+            int nextPhase = (execIndex % totalPhases) + 1;
+            var msg = rule.TelegraphMessage ?? (usePoint ? $"Boss 预警：{skillName} 将落在 {point}" : $"Boss 预警：{skillName} 将对 {tid ?? "?"} 释放");
+            var payload = string.Join('|', new string[]
+            {
+                pid,
+                skillName,
+                nextDay.ToString(),
+                nextPhase.ToString(),
+                tid ?? string.Empty,
+                (usePoint ? point.X : 0).ToString(),
+                (usePoint ? point.Y : 0).ToString(),
+                msg
+            });
+            state = WorldStateOps.WithGlobal(state, g => g with { Vars = g.Vars.SetItem("boss_telegraph", payload).SetItem("boss_telegraph_msg", msg) });
+            AppendPublic(new[] { $"[Telegraph] {msg}" });
+            BroadcastBoard(day, phase);
+            return true;
+        }
+
+        // prepare globals
+        state = WorldStateOps.WithGlobal(state, g => g with
+        {
+            Vars = g.Vars
+                .SetItem(DslRuntime.CasterKey, pid)
+                .SetItem(DslRuntime.TargetKey, tid ?? "")
+                .SetItem(DslRuntime.RngKey, rng)
+                .SetItem(DslRuntime.TeamsKey, teamOf)
+                .SetItem(DslRuntime.TargetPointKey, usePoint ? point : g.Vars.TryGetValue(DslRuntime.TargetPointKey, out var v) ? v : new Coord())
+                .SetItem(DslRuntime.DirKey, dir)
+        });
+        var cfg = new ActionValidationConfig(
+            CasterId: pid,
+            TargetUnitId: tid,
+            TeamOfUnit: teamOf,
+            Targeting: TargetingMode.Any,
+            CurrentTurn: state.Global.Turn,
+            CurrentDay: day,
+            CurrentPhase: phase,
+            TargetPos: usePoint ? point : null
+        );
+        var validator = ActionValidators.ForSkillWithExtras(s.Compiled, cfg, cooldowns);
+        var plan = s.Compiled.BuildPlan(new Context(state));
+        var se = new SkillExecutor();
+        (state, var log) = se.ExecutePlan(state, plan, validator);
+        AppendDebugFor(pid, log.Messages);
+        BroadcastBoard(day, phase);
+        cooldowns.SetLastUseTurn(pid, s.Name, state.Global.Turn);
+        return true;
+    }
+
+    private bool ExecuteMoveTo(BossAiRule rule, string pid, string? nearestId, int day, int phase)
+    {
+        if (nearestId is null) return false;
+        var ctx = new Context(state);
+        var speed = GetInt(pid, Keys.Speed, 3);
+        var reachable = ReachableCells(pid, speed);
+        if (reachable.Count == 0) return false;
+        int desiredRange = GetInt(pid, Keys.Range, 1);
+        var stopKey = rule.Target?.StopAtRangeOf;
+        if (!string.IsNullOrEmpty(stopKey))
+        {
+            var role = roleOf.ContainsKey(pid) ? roleOf[pid] : null;
+            var s = role?.Skills.FirstOrDefault(x => string.Equals(x.Name, stopKey, StringComparison.OrdinalIgnoreCase));
+            if (s is not null) desiredRange = s.Compiled.Metadata.Range;
+        }
+        var tgPos = ctx.GetUnitVar<Coord>(nearestId, Keys.Pos, default);
+        Coord best = default; int bestScore = int.MaxValue; // prefer within desiredRange, else closest
+        foreach (var p in reachable)
+        {
+            int d = Math.Abs(p.X - tgPos.X) + Math.Abs(p.Y - tgPos.Y);
+            int score = (d <= desiredRange) ? d : (1000 + d); // prioritize tiles within range
+            if (score < bestScore) { bestScore = score; best = p; }
+        }
+        if (best.Equals(default(Coord))) return false;
+        var mpObj0 = ctx.GetUnitVar<object>(pid, Keys.Mp, 0);
+        double mp0 = mpObj0 is double dd0 ? dd0 : (mpObj0 is int ii0 ? ii0 : 0);
+        double moveCost = 0.5; if (mp0 < moveCost) return false;
+        var se = new SkillExecutor();
+        (state, var log) = se.Execute(state, new AtomicAction[] { new Move(pid, best), new ModifyUnitVar(pid, Keys.Mp, v => (v is double d ? d : Convert.ToDouble(v)) - moveCost) });
+        AppendDebugFor(pid, log.Messages);
+        BroadcastBoard(day, phase);
+        return true;
+    }
+
+    private bool ExecuteRetreat(BossAiRule rule, string pid, string? nearestId, int day, int phase)
+    {
+        if (nearestId is null) return false;
+        var ctx = new Context(state);
+        var speed = GetInt(pid, Keys.Speed, 3);
+        var reachable = ReachableCells(pid, speed);
+        if (reachable.Count == 0) return false;
+        var myPos = ctx.GetUnitVar<Coord>(pid, Keys.Pos, default);
+        var tgPos = ctx.GetUnitVar<Coord>(nearestId, Keys.Pos, default);
+        Coord best = myPos; int bestDist = Math.Abs(myPos.X - tgPos.X) + Math.Abs(myPos.Y - tgPos.Y);
+        foreach (var p in reachable)
+        {
+            int d = Math.Abs(p.X - tgPos.X) + Math.Abs(p.Y - tgPos.Y);
+            if (d > bestDist) { bestDist = d; best = p; }
+        }
+        if (best.Equals(myPos)) return false;
+        var mpObj0 = ctx.GetUnitVar<object>(pid, Keys.Mp, 0);
+        double mp0 = mpObj0 is double dd0 ? dd0 : (mpObj0 is int ii0 ? ii0 : 0);
+        double moveCost = 0.5; if (mp0 < moveCost) return false;
+        var se = new SkillExecutor();
+        (state, var log) = se.Execute(state, new AtomicAction[] { new Move(pid, best), new ModifyUnitVar(pid, Keys.Mp, v => (v is double d ? d : Convert.ToDouble(v)) - moveCost) });
+        AppendDebugFor(pid, log.Messages);
+        BroadcastBoard(day, phase);
+        return true;
+    }
+
+    private bool RunBasicAttackFallback(string pid, string? nearestId, int day, int phase)
+    {
+        if (nearestId is null) return false;
+        var ctx = new Context(state);
+        var myPos2 = ctx.GetUnitVar<Coord>(pid, Keys.Pos, default);
+        var tgPos = ctx.GetUnitVar<Coord>(nearestId, Keys.Pos, default);
+        var d = Math.Abs(myPos2.X - tgPos.X) + Math.Abs(myPos2.Y - tgPos.Y);
+        var range = GetInt(pid, Keys.Range, 1);
+        var roleLocal = roleOf.ContainsKey(pid) ? roleOf[pid] : null;
+        var basic = roleLocal?.Skills.FirstOrDefault(s => s.Name == "Basic Attack");
+        if (basic is null) return false;
+        if (d > range) return false;
+        var cfg2 = new ActionValidationConfig(
+            CasterId: pid,
+            TargetUnitId: nearestId,
+            TeamOfUnit: teamOf,
+            Targeting: TargetingMode.EnemiesOnly,
+            CurrentTurn: state.Global.Turn,
+            CurrentDay: day,
+            CurrentPhase: phase
+        );
+        var validator2 = ActionValidators.ForSkillWithExtras(basic.Compiled, cfg2, cooldowns);
+        var se2 = new SkillExecutor();
+        var mpObj = ctx.GetUnitVar<object>(pid, Keys.Mp, 0);
+        double mp = mpObj is double dd ? dd : (mpObj is int i2 ? i2 : 0);
+        double cost = 0.5; if (mp < cost) return false;
+        (state, var log) = se2.ExecutePlan(state, basic.Compiled.BuildPlan(new Context(state)), validator2);
+        AppendDebugFor(pid, log.Messages);
+        (state, var log2) = se2.Execute(state, new AtomicAction[] { new ModifyUnitVar(pid, Keys.Mp, v => (v is double d0 ? d0 : Convert.ToDouble(v)) - cost) });
+        AppendDebugFor(pid, log2.Messages);
+        BroadcastBoard(day, phase);
+        cooldowns.SetLastUseTurn(pid, basic.Name, state.Global.Turn);
+        return true;
+    }
+
+    // --- Very simple Boss AI (MVP): use best in-range enemies-targeting skill; else basic; else move towards nearest enemy ---
+    private void RunBossAiTurn(string pid, int phase, int day)
+    {
+        try
+        {
+            var ctx = new Context(state);
+            // Find nearest enemy
+            string? nearestId = null; int bestD = int.MaxValue; Coord myPos = ctx.GetUnitVar<Coord>(pid, Keys.Pos, default);
+            foreach (var (id, u) in state.Units)
+            {
+                if (id == pid) continue;
+                if (GetInt(id, Keys.Hp, 0) <= 0) continue;
+                if (teamOf.TryGetValue(id, out var t) && teamOf.TryGetValue(pid, out var tb) && t == tb) continue;
+                var pos = ctx.GetUnitVar<Coord>(id, Keys.Pos, default);
+                int d = Math.Abs(pos.X - myPos.X) + Math.Abs(pos.Y - myPos.Y);
+                if (d < bestD) { bestD = d; nearestId = id; }
+            }
+            if (nearestId is null) return;
+
+            var role = roleOf.ContainsKey(pid) ? roleOf[pid] : null;
+            // Try enemies-targeting skills first (skip Basic Attack to keep it as fallback)
+            if (role != null)
+            {
+                var skills = role.Skills;
+                // Order by range descending
+                var ordered = skills.OrderByDescending(s => s.Compiled.Metadata.Range).ToList();
+                foreach (var s in ordered)
+                {
+                    if (s.Name == "Basic Attack") continue;
+                    if (s.Compiled.Extras.TryGetValue("targeting", out var tv) && tv is string ts && ts == "enemies")
+                    {
+                        // Prepare runtime globals for DSL
+                        state = WorldStateOps.WithGlobal(state, g => g with
+                        {
+                            Vars = g.Vars
+                                .SetItem(DslRuntime.CasterKey, pid)
+                                .SetItem(DslRuntime.TargetKey, nearestId)
+                                .SetItem(DslRuntime.RngKey, rng)
+                                .SetItem(DslRuntime.TeamsKey, teamOf)
+                        });
+                        var cfg = new ActionValidationConfig(
+                            CasterId: pid,
+                            TargetUnitId: nearestId,
+                            TeamOfUnit: teamOf,
+                            Targeting: TargetingMode.EnemiesOnly,
+                            CurrentTurn: state.Global.Turn,
+                            CurrentDay: day,
+                            CurrentPhase: phase
+                        );
+                        var validator = ActionValidators.ForSkillWithExtras(s.Compiled, cfg, cooldowns);
+                        var plan = s.Compiled.BuildPlan(new Context(state));
+                        // Validate first batch
+                        var batch = plan.Count > 0 ? plan[0] : Array.Empty<AtomicAction>();
+                        if (validator(new Context(state), batch, out var _))
+                        {
+                            var se = new SkillExecutor();
+                            (state, var log) = se.ExecutePlan(state, plan, validator);
+                            AppendDebugFor(pid, log.Messages);
+                            BroadcastBoard(day, phase);
+                            cooldowns.SetLastUseTurn(pid, s.Name, state.Global.Turn);
+                            return;
+                        }
+                    }
+                }
+            }
+
+            // Fallback: Basic Attack if in range
+            {
+                var myPos2 = ctx.GetUnitVar<Coord>(pid, Keys.Pos, default);
+                var tgPos = ctx.GetUnitVar<Coord>(nearestId, Keys.Pos, default);
+                var d = Math.Abs(myPos2.X - tgPos.X) + Math.Abs(myPos2.Y - tgPos.Y);
+                var range = GetInt(pid, Keys.Range, 1);
+                if (d <= range)
+                {
+                    var roleLocal = roleOf.ContainsKey(pid) ? roleOf[pid] : null;
+                    var basic = roleLocal?.Skills.FirstOrDefault(s => s.Name == "Basic Attack");
+                    if (basic is not null)
+                    {
+                        // Prepare runtime globals
+                        state = WorldStateOps.WithGlobal(state, g => g with
+                        {
+                            Vars = g.Vars
+                                .SetItem(DslRuntime.CasterKey, pid)
+                                .SetItem(DslRuntime.TargetKey, nearestId)
+                                .SetItem(DslRuntime.RngKey, rng)
+                                .SetItem(DslRuntime.TeamsKey, teamOf)
+                        });
+                        var cfg2 = new ActionValidationConfig(
+                            CasterId: pid,
+                            TargetUnitId: nearestId,
+                            TeamOfUnit: teamOf,
+                            Targeting: TargetingMode.EnemiesOnly,
+                            CurrentTurn: state.Global.Turn,
+                            CurrentDay: day,
+                            CurrentPhase: phase
+                        );
+                        var validator2 = ActionValidators.ForSkillWithExtras(basic.Compiled, cfg2, cooldowns);
+                        var se2 = new SkillExecutor();
+                        // attack costs 0.5 MP like client
+                        var mpObj = ctx.GetUnitVar<object>(pid, Keys.Mp, 0);
+                        double mp = mpObj is double dd ? dd : (mpObj is int i2 ? i2 : 0);
+                        double cost = 0.5; if (mp < cost) return;
+                        (state, var log) = se2.ExecutePlan(state, basic.Compiled.BuildPlan(new Context(state)), validator2);
+                        AppendDebugFor(pid, log.Messages);
+                        (state, var log2) = se2.Execute(state, new AtomicAction[] { new ModifyUnitVar(pid, Keys.Mp, v => (v is double d0 ? d0 : Convert.ToDouble(v)) - cost) });
+                        AppendDebugFor(pid, log2.Messages);
+                        BroadcastBoard(day, phase);
+                        cooldowns.SetLastUseTurn(pid, basic.Name, state.Global.Turn);
+                        return;
+                    }
+                }
+            }
+
+            // Move towards nearest enemy (one step if possible)
+            bool rooted = state.Units[pid].Tags.Contains(Tags.Rooted);
+            if (rooted)
+                return;
+            var speed = GetInt(pid, Keys.Speed, 3);
+            var reachable = ReachableCells(pid, speed);
+            if (reachable.Count == 0) return;
+            var targetPos = ctx.GetUnitVar<Coord>(nearestId, Keys.Pos, default);
+            Coord best = default; int bestDist = int.MaxValue;
+            foreach (var p in reachable)
+            {
+                int dd = Math.Abs(p.X - targetPos.X) + Math.Abs(p.Y - targetPos.Y);
+                if (dd < bestDist) { bestDist = dd; best = p; }
+            }
+            if (!best.Equals(default(Coord)))
+            {
+                var se = new SkillExecutor();
+                var mpObj0 = ctx.GetUnitVar<object>(pid, Keys.Mp, 0);
+                double mp0 = mpObj0 is double dd0 ? dd0 : (mpObj0 is int ii0 ? ii0 : 0);
+                double moveCost = 0.5; if (mp0 < moveCost) return;
+                (state, var log) = se.Execute(state, new AtomicAction[] { new Move(pid, best), new ModifyUnitVar(pid, Keys.Mp, v => (v is double d ? d : Convert.ToDouble(v)) - moveCost) });
+                AppendDebugFor(pid, log.Messages);
+                BroadcastBoard(day, phase);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error: Boss AI turn execution failed for {pid}: {ex.GetType().Name} - {ex.Message}");
         }
     }
 

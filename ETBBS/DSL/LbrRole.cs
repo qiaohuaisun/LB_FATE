@@ -3,31 +3,79 @@ using System.Text;
 
 namespace ETBBS;
 
+/// <summary>
+/// Immutable definition of a character role/class loaded from an LBR file.
+/// Contains initial stats, tags, and skill definitions.
+/// </summary>
 public sealed class RoleDefinition
 {
+    /// <summary>Unique role identifier (e.g., "warrior", "mage").</summary>
     public string Id { get; init; } = string.Empty;
+
+    /// <summary>Display name for the role.</summary>
     public string Name { get; init; } = string.Empty;
+
+    /// <summary>Optional description text.</summary>
     public string Description { get; init; } = string.Empty;
+
+    /// <summary>Initial unit variables (e.g., hp, mp, atk).</summary>
     public ImmutableDictionary<string, object> Vars { get; init; } = ImmutableDictionary<string, object>.Empty;
+
+    /// <summary>Initial tags for units of this role.</summary>
     public ImmutableHashSet<string> Tags { get; init; } = ImmutableHashSet<string>.Empty;
+
+    /// <summary>Skills defined for this role.</summary>
     public ImmutableArray<RoleSkill> Skills { get; init; } = ImmutableArray<RoleSkill>.Empty;
 }
 
+/// <summary>
+/// Represents a single skill within a role definition.
+/// </summary>
 public sealed class RoleSkill
 {
+    /// <summary>Skill name/identifier.</summary>
     public string Name { get; init; } = string.Empty;
+
+    /// <summary>Original DSL script text.</summary>
     public string Script { get; init; } = string.Empty;
-    public Skill Compiled { get; init; } = null!; // compiled with globals-based options
+
+    /// <summary>Pre-compiled skill ready for execution.</summary>
+    public Skill Compiled { get; init; } = null!;
 }
 
+/// <summary>
+/// Loads role definitions from .lbr files using the LBR format.
+/// LBR Format:
+/// <code>
+/// role "Warrior" id "warrior" {
+///   description "A mighty melee fighter"
+///   vars { "hp" = 100 "atk" = 15 }
+///   tags { "melee" "tank" }
+///   skills {
+///     skill "Slash" { damage self 10; }
+///   }
+/// }
+/// </code>
+/// </summary>
 public static class LbrLoader
 {
+    /// <summary>
+    /// Loads a role definition from a file path.
+    /// </summary>
+    /// <exception cref="FormatException">Thrown if parsing fails.</exception>
     public static RoleDefinition LoadFromFile(string path)
         => Load(System.IO.File.ReadAllText(path));
 
+    /// <summary>
+    /// Loads all .lbr files from a directory.
+    /// </summary>
     public static IEnumerable<RoleDefinition> LoadFromDirectory(string dir)
         => System.IO.Directory.EnumerateFiles(dir, "*.lbr").Select(LoadFromFile);
 
+    /// <summary>
+    /// Parses a role definition from LBR format text.
+    /// </summary>
+    /// <exception cref="FormatException">Thrown if parsing fails.</exception>
     public static RoleDefinition Load(string text)
     {
         var p = new RoleParser(text);
@@ -276,8 +324,18 @@ internal sealed class RoleParser
     private Exception Error(string msg) => new FormatException($"LBR parse error at {_pos}: {msg}");
 }
 
+/// <summary>
+/// Factory for creating units from role definitions.
+/// </summary>
 public static class UnitFactory
 {
+    /// <summary>
+    /// Adds a new unit to the world state with initial stats/tags from a role.
+    /// </summary>
+    /// <param name="s">Current world state.</param>
+    /// <param name="id">Unique unit ID.</param>
+    /// <param name="role">Role definition to instantiate.</param>
+    /// <returns>Updated world state with the new unit.</returns>
     public static WorldState AddUnit(WorldState s, string id, RoleDefinition role)
     {
         return WorldStateOps.WithUnit(s, id, u => new UnitState(role.Vars, role.Tags));

@@ -1,0 +1,38 @@
+role "Beast of Ruin" id "boss_beast" {
+  description "\n兽之王（Beast）。极高生命，范围压制与形态强化。\n- 基础：高HP/回蓝，普攻射程2。\n- 技能：群体横扫（范围2）、毁灭咆哮（远程单体高伤），狂暴（临时无视护甲）。\n";
+
+  vars {
+    "hp" = 120; "max_hp" = 120; "mp" = 6.0; "max_mp" = 6.0;
+    "atk" = 9; "def" = 6; "matk" = 8; "mdef" = 6; "range" = 2; "speed" = 3;
+    "mp_regen_per_turn" = 0.5;
+  }
+
+  tags { "beast" }
+
+  skills {
+    skill "Basic Attack" {
+      range 2; targeting enemies;
+      deal physical 7 damage to target from caster;
+    }
+
+    # 群体横扫：以施法者为中心范围2内的敌人并行
+    skill "Mass Sweep" {
+      range 0; targeting self; cooldown 2; cost mp 1;
+      for each enemies in range 2 of caster in parallel do {
+        deal physical 6 damage to it from caster;
+      }
+    }
+
+    # 毁灭咆哮：远程高伤单体
+    skill "Ruin Roar" {
+      range 4; targeting enemies; cooldown 1; cost mp 1;
+      deal magic 9 damage to target from caster ignore resist 30%;
+    }
+
+    # 狂暴：临时无视护甲（阶段计时）
+    skill "Rage" {
+      range 0; targeting self; cooldown 3; cost mp 1;
+      set unit(caster) var "force_ignore_def_turns" = 2;
+    }
+  }
+}

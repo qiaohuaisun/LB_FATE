@@ -1,0 +1,53 @@
+role "Lawrence" id "rider_lawrence" {
+  description "\n劳伦斯（Lawrence）。机制：\n- 骑士式突击：一技能双段伤害，第二段无视 50% 护甲，并以自损生命换取爆发。\n- 群体压制：二技能伤害范围 2 内所有敌人，每命中自疗 1 点生命。\n- 决斗之誓：宝具使目标回满、施法者 3 回合不灭，双方获得决斗标签并提升回蓝（封印至第 3 回合）。\n";
+
+  vars {
+    "hp" = 30;
+    "max_hp" = 30;
+    "mp" = 5.0;
+    "max_mp" = 5.0;
+    "atk" = 8;
+    "def" = 4;
+    "mdef" = 5;
+  }
+
+  tags { "paladin" }
+
+  skills {
+    # 基础攻击（与 attack 一致）
+    skill "Basic Attack" {
+      range 1; targeting enemies;
+      chance 20% then { deal physical 5 damage to target from caster ignore defense 50% } else { deal physical 5 damage to target from caster };
+    }
+
+    # 一技能「贯穿长枪」：自身 -2HP/-0.5MP，双段物理伤害；第二段无视 50% 护甲
+    skill "Piercing Lance" {
+      range 2;
+      deal physical 6 damage to target from caster;
+      deal physical 6 damage to target from caster ignore defense 50%;
+      deal 2 damage to caster;
+      consume mp = 0.5;
+    }
+
+    # 二技能「瘟疫狂热」：-2.5MP，伤害范围 2 内所有敌人，每命中自疗 1 HP
+    skill "Plague Frenzy" {
+      range 2;
+      for each enemies in range 2 of caster in parallel do {
+        deal physical 5 damage to it from caster;
+        heal 1 to caster
+      };
+      consume mp = 2.5;
+    }
+
+    # 宝具「决斗裁决」：目标回满，施法者 3 回合不灭；双方获得决斗标签，并 +1 MP/回合（封印至第 3 回合）
+    skill "Duel Judgement" {
+      sealed_until day 3;
+      set unit(target) var "hp" = var "max_hp" of target;
+      add tag "duel" to caster;
+      add tag "duel" to target;
+      set unit(caster) var "undying_turns" = 3;
+      set unit(caster) var "mp_regen_per_turn" = 1;
+      set unit(target) var "mp_regen_per_turn" = 1;
+    }
+  }
+}

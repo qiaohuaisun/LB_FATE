@@ -31,6 +31,11 @@ partial class Game
     private readonly Dictionary<string, RoleDefinition> roleOf = new();
     private readonly ICooldownStore cooldowns = new InMemoryCooldownStore();
     private readonly string? rolesDirArg;
+    // Boss mode support
+    private readonly bool bossMode = false;
+    private readonly string bossId = "BOSS";
+    private BossAiConfig? bossAi = null;
+    private readonly Dictionary<string, int> phaseDamageTo = new();
     // 日志：public 面向所有玩家；private 面向各自玩家（仅在 debug 模式下追加内部执行细节）
     private readonly List<string> publicLog = new();
     private readonly Dictionary<string, List<string>> privateLog = new();
@@ -52,6 +57,14 @@ partial class Game
         playerIds = Enumerable.Range(1, count).Select(i => $"P{i}").ToArray();
         if (endpointMap is not null)
             foreach (var kv in endpointMap) endpoints[kv.Key] = kv.Value;
+        // Enable boss mode via environment variable LB_FATE_MODE=boss
+        try
+        {
+            var m = Environment.GetEnvironmentVariable("LB_FATE_MODE");
+            if (!string.IsNullOrWhiteSpace(m) && m.Equals("boss", StringComparison.OrdinalIgnoreCase))
+                bossMode = true;
+        }
+        catch { }
     }
 
     // --- Reconnection helpers ---
@@ -117,7 +130,14 @@ partial class Game
             events.Subscribe(EventTopics.UnitDamaged, o =>
             {
                 if (o is UnitDamagedEvent e)
+                {
                     ServerLog($"Damaged: {e.UnitId} -{e.Amount} HP {e.BeforeHp}->{e.AfterHp}");
+                    try
+                    {
+                        if (!phaseDamageTo.ContainsKey(e.UnitId)) phaseDamageTo[e.UnitId] = 0;
+                        phaseDamageTo[e.UnitId] += Math.Max(0, e.Amount);
+                    } catch { }
+                }
             });
             events.Subscribe(EventTopics.UnitMoved, o =>
             {

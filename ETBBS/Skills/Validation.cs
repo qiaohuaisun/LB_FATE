@@ -1,21 +1,39 @@
 namespace ETBBS;
 
+/// <summary>
+/// Targeting restrictions for skills.
+/// </summary>
 public enum TargetingMode
 {
+    /// <summary>Any unit can be targeted.</summary>
     Any,
+    /// <summary>Only enemy units can be targeted.</summary>
     EnemiesOnly,
+    /// <summary>Only ally units can be targeted.</summary>
     AlliesOnly,
+    /// <summary>Only the caster can target themselves.</summary>
     SelfOnly,
+    /// <summary>No unit targeting required.</summary>
     None
 }
 
+/// <summary>
+/// Distance calculation methods for range validation.
+/// </summary>
 public enum DistanceMetric
 {
+    /// <summary>Grid-based distance (|dx| + |dy|).</summary>
     Manhattan,
+    /// <summary>Chessboard distance (max(|dx|, |dy|)).</summary>
     Chebyshev,
+    /// <summary>Straight-line distance (sqrt(dx² + dy²)).</summary>
     Euclidean
 }
 
+/// <summary>
+/// Configuration for validating skill/action execution.
+/// Contains all context needed for range, team, MP, and cooldown checks.
+/// </summary>
 public sealed record ActionValidationConfig(
     string CasterId,
     string? TargetUnitId = null,
@@ -33,21 +51,45 @@ public sealed record ActionValidationConfig(
     bool RequireMp = true
 );
 
+/// <summary>
+/// Storage interface for skill cooldown tracking.
+/// Implementations can be in-memory, persistent, or distributed.
+/// </summary>
 public interface ICooldownStore
 {
+    /// <summary>
+    /// Gets the last turn when a unit used a specific skill.
+    /// </summary>
+    /// <returns>The turn number, or null if never used.</returns>
     int? GetLastUseTurn(string unitId, string skillName);
+
+    /// <summary>
+    /// Records that a unit used a skill on the specified turn.
+    /// </summary>
     void SetLastUseTurn(string unitId, string skillName, int turn);
 }
 
+/// <summary>
+/// Simple in-memory cooldown storage.
+/// Suitable for single-game sessions; data is not persisted.
+/// </summary>
 public sealed class InMemoryCooldownStore : ICooldownStore
 {
     private readonly Dictionary<(string unit, string skill), int> _data = new();
+
+    /// <inheritdoc />
     public int? GetLastUseTurn(string unitId, string skillName)
         => _data.TryGetValue((unitId, skillName), out var t) ? t : null;
+
+    /// <inheritdoc />
     public void SetLastUseTurn(string unitId, string skillName, int turn)
         => _data[(unitId, skillName)] = turn;
 }
 
+/// <summary>
+/// Factory for creating action validators with common game rules.
+/// Provides composable validation logic for MP, range, team, cooldown, etc.
+/// </summary>
 public static class ActionValidators
 {
     public static ActionValidator Compose(params ActionValidator[] validators)
@@ -78,6 +120,9 @@ public static class ActionValidators
         // Team rule
         if (cfg.Targeting != TargetingMode.Any && cfg.Targeting != TargetingMode.None)
             list.Add(CreateTeamValidator(cfg));
+
+        // Target must be targetable (generic)
+        list.Add(CreateTargetableValidator(cfg));
 
         // Cooldown
         if (cfg.CooldownTurns is int cd && cd > 0 && cooldownStore is not null)
@@ -250,6 +295,23 @@ public static class ActionValidators
 
             reason = null;
             return true;
+        };
+
+    public static ActionValidator CreateTargetableValidator(ActionValidationConfig cfg)
+        => (Context ctx, AtomicAction[] actions, out string? reason) =>
+        {
+            if (cfg.TargetUnitId is null)
+            {
+                reason = null; return true;
+            }
+            var tpos = ctx.GetUnitVar<object>(cfg.TargetUnitId, Keys.Pos, default(Coord)); // touch to ensure unit exists
+            // Untargetable while turns > 0
+            var turns = ctx.GetUnitVar<int>(cfg.TargetUnitId, Keys.UntargetableTurns, 0);
+            if (turns > 0)
+            {
+                reason = "Target is untargetable"; return false;
+            }
+            reason = null; return true;
         };
 
     public static ActionValidator CreateCooldownValidator(Skill skill, ActionValidationConfig cfg, ICooldownStore store)

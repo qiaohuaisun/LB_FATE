@@ -1,0 +1,110 @@
+{
+  "rules": [
+    // ===== 阶段判定规则（基于血量） =====
+    // 第一阶段 (100%-70%): 夜巡的护士 - 理性诊断与治疗
+    // 第二阶段 (70%-40%): 手术室的恶魔 - 强制控制与解剖
+    // 第三阶段 (40%-0%): 逆誓的天使 - 全力以赴的毁灭
+
+    // ===== 第一阶段：夜巡的护士 (hp > 70%) =====
+    // 开局立即施放逆行天罚，奠定战场基调
+    { "if": { "skill_ready": "逆行天罚", "hp_pct_lte": 1.0, "phase_in": [1] },
+      "skill": "逆行天罚",
+      "chance": 1.0 },
+
+    // 护士职责：定期巡视诊断（每个回合的phase 1/3/5）
+    { "if": { "skill_ready": "强制巡视", "phase_in": [1,3,5], "hp_pct_lte": 1.0 },
+      "skill": "强制巡视",
+      "chance": 0.95 },
+
+    // 标记最有威胁的目标（高HP）用提灯的凝视
+    { "if": { "skill_ready": "提灯的凝视", "distance_lte": 4, "hp_pct_lte": 1.0, "phase_in": [1,2,4] },
+      "skill": "提灯的凝视",
+      "target": { "type": "nearest_enemy", "order_var": "hp", "order_desc": true },
+      "chance": 0.7 },
+
+    // 对已诊断目标优先注射星水（符合"先诊断再处置"的医疗流程）
+    { "if": { "skill_ready": "星水注射", "distance_lte": 4, "hp_pct_lte": 1.0 },
+      "skill": "星水注射",
+      "target": { "type": "nearest_enemy", "prefer_tag": "diagnosed", "order_var": "hp", "order_desc": true },
+      "chance": 0.9 },
+
+    // 受到威胁时使用希波克拉底守护自保（hp < 85%）
+    { "if": { "skill_ready": "希波克拉底的守护", "hp_pct_lte": 0.85, "phase_in": [1,2,3,4,5] },
+      "skill": "希波克拉底的守护",
+      "chance": 0.8 },
+
+    // ===== 第二阶段：手术室的恶魔 (40% < hp ≤ 70%) =====
+    // 进入第二阶段，战术转变为强制控制
+
+    // 优先使用强制手术台控制敌人
+    { "if": { "skill_ready": "强制手术台", "hp_pct_lte": 0.7, "distance_lte": 4 },
+      "skill": "强制手术台",
+      "chance": 0.95 },
+
+    // 麻醉注射：当范围内有2+敌人时使用（沉默多个目标）
+    { "if": { "skill_ready": "麻醉注射", "hp_pct_lte": 0.7, "min_hits": 2, "distance_lte": 4 },
+      "skill": "麻醉注射",
+      "chance": 0.85 },
+
+    // 解剖刀舞：优先攻击手术台上的目标（stasis标签）
+    { "if": { "skill_ready": "解剖刀舞", "hp_pct_lte": 0.7, "distance_lte": 4 },
+      "target": { "type": "nearest_enemy", "prefer_tag": "stasis" },
+      "telegraph": true,
+      "telegraph_delay": 1,
+      "telegraph_message": "弗洛伦斯举起解剖刀，准备切开患者...",
+      "chance": 0.9 },
+
+    // 对高血量目标继续注射星水（维持压力）
+    { "if": { "skill_ready": "星水注射", "hp_pct_lte": 0.7, "distance_lte": 4 },
+      "skill": "星水注射",
+      "target": { "type": "nearest_enemy", "order_var": "hp", "order_desc": true },
+      "chance": 0.75 },
+
+    // ===== 第三阶段：逆誓的天使 (hp ≤ 40%) =====
+    // 进入绝望状态，全力攻击
+
+    // 再次施放逆行天罚（如果CD好了）
+    { "if": { "skill_ready": "逆行天罚", "hp_pct_lte": 0.4 },
+      "skill": "逆行天罚",
+      "chance": 1.0 },
+
+    // 激进的解剖刀舞（不再预警，直接释放）
+    { "if": { "skill_ready": "解剖刀舞", "hp_pct_lte": 0.4, "distance_lte": 4 },
+      "target": { "type": "nearest_enemy", "prefer_tag": "diagnosed" },
+      "skill": "解剖刀舞",
+      "chance": 0.95 },
+
+    // 疯狂注射星水（对任意敌人）
+    { "if": { "skill_ready": "星水注射", "hp_pct_lte": 0.4, "distance_lte": 4 },
+      "skill": "星水注射",
+      "target": { "type": "nearest_enemy", "order_var": "hp", "order_desc": true },
+      "chance": 0.9 },
+
+    // 强制手术台（尝试控制威胁）
+    { "if": { "skill_ready": "强制手术台", "hp_pct_lte": 0.4, "distance_lte": 4 },
+      "skill": "强制手术台",
+      "chance": 0.85 },
+
+    // 麻醉注射（降低敌方输出）
+    { "if": { "skill_ready": "麻醉注射", "hp_pct_lte": 0.4, "min_hits": 1, "distance_lte": 4 },
+      "skill": "麻醉注射",
+      "chance": 0.8 },
+
+    // 提灯凝视标记威胁目标
+    { "if": { "skill_ready": "提灯的凝视", "hp_pct_lte": 0.4, "distance_lte": 4 },
+      "skill": "提灯的凝视",
+      "target": { "type": "nearest_enemy", "order_var": "hp", "order_desc": true },
+      "chance": 0.7 },
+
+    // ===== 通用规则：位置管理 =====
+    // 低血量时撤退（仅在第一、二阶段；第三阶段不撤退，体现"天使形态"的决死）
+    { "if": { "hp_pct_lte": 0.25, "phase_in": [1,2,3,4,5] },
+      "action": "retreat",
+      "target": { "type": "approach", "to": "nearest_enemy" } },
+
+    // 保持在技能范围内（range 4）
+    { "action": "move_to",
+      "target": { "type": "approach", "to": "nearest_enemy", "stop_at_range_of": "星水注射" } }
+  ],
+  "fallback": "basic_attack"
+}

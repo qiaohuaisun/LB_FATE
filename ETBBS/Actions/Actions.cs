@@ -73,7 +73,15 @@ public sealed record RemoveUnitTag(string Id, string Tag) : AtomicAction
 public sealed record Damage(string TargetId, int Amount) : AtomicAction
 {
     public override Effect Compile() => state =>
-        WorldStateOps.WithUnit(state, TargetId, u =>
+    {
+        // Reverse damage globally -> treat as heal
+        if (state.Global.Vars.TryGetValue(Keys.ReverseDamageTurnsGlobal, out var rdt)
+            && (rdt is int ri && ri > 0 || rdt is long rl && rl > 0 || rdt is double rd && rd > 0))
+        {
+            return new Heal(TargetId, Math.Max(0, Amount)).Compile()(state);
+        }
+
+        return WorldStateOps.WithUnit(state, TargetId, u =>
         {
             // Guaranteed evasion also blocks generic damage once
             if (u.Vars.TryGetValue(Keys.EvadeCharges, out var ec) && ec is int ecc && ecc > 0)
@@ -112,12 +120,22 @@ public sealed record Damage(string TargetId, int Amount) : AtomicAction
                 nhp = Math.Min(maxHp, nhp + Math.Max(0, heal));
                 u = u with { Vars = u.Vars.SetItem(Keys.AutoHealBelowHalfUsed, true) };
             }
+            // On-damage heal (generic)
+            if (u.Vars.TryGetValue(Keys.OnDamageHealTurns, out var odtv) && odtv is int odt && odt > 0)
+            {
+                int heal = u.Vars.TryGetValue(Keys.OnDamageHealValue, out var odv) ? (odv is int oi ? oi : (odv is long ol ? (int)ol : (odv is double od ? (int)Math.Round(od) : 0))) : 0;
+                if (heal > 0)
+                {
+                    nhp = Math.Min(maxHp > 0 ? maxHp : int.MaxValue, nhp + heal);
+                }
+            }
             if (u.Vars.TryGetValue(Keys.UndyingTurns, out var ud) && ud is int turns && turns > 0)
             {
                 if (nhp <= 0) nhp = 1; // cannot die while undying
             }
             return u with { Vars = u.Vars.SetItem(Keys.Hp, nhp) };
         });
+    };
 
     public override ImmutableHashSet<string> ReadVars => ImmutableHashSet<string>.Empty.Add(UnitVarKey(TargetId, Keys.Hp));
     public override ImmutableHashSet<string> WriteVars => ImmutableHashSet<string>.Empty.Add(UnitVarKey(TargetId, Keys.Hp));

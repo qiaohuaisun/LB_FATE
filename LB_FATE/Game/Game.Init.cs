@@ -23,7 +23,7 @@ partial class Game
             var pid = playerIds[i];
             var ct = classes[i];
             classOf[pid] = ct;
-            teamOf[pid] = pid; // everyone is enemy to each other
+            teamOf[pid] = bossMode ? "T1" : pid; // boss mode: all players are allies
             symbolOf[pid] = symbols[i];
 
             var pos = RandomEmpty();
@@ -58,6 +58,53 @@ partial class Game
                 ));
             }
         }
+        // Inject Boss in boss mode
+        if (bossMode)
+        {
+            // Randomly choose one role with beast/grand hints (tag|class|id)
+            var all = registry.All().ToList();
+            var candidates = all.Where(r =>
+            {
+                // tags
+                bool tagHit = r.Tags.Any(t => t.Equals("beast", StringComparison.OrdinalIgnoreCase) || t.Equals("grand", StringComparison.OrdinalIgnoreCase));
+                // id/name
+                bool idHit = r.Id.Contains("beast", StringComparison.OrdinalIgnoreCase) || r.Id.Contains("grand", StringComparison.OrdinalIgnoreCase)
+                             || r.Name.Contains("Beast", StringComparison.OrdinalIgnoreCase) || r.Name.Contains("Grand", StringComparison.OrdinalIgnoreCase)
+                             || r.Name.Contains("冠位");
+                // class var
+                bool classHit = r.Vars.TryGetValue("class", out var cv) && cv is string cs &&
+                                (cs.Contains("beast", StringComparison.OrdinalIgnoreCase) || cs.Contains("grand", StringComparison.OrdinalIgnoreCase) || cs.Contains("冠位"));
+                return tagHit || idHit || classHit;
+            }).ToList();
+            if (candidates.Count == 0)
+            {
+                // fallback: prefer built-in boss_beast if present
+                var bb = all.FirstOrDefault(r => r.Id.Equals("boss_beast", StringComparison.OrdinalIgnoreCase));
+                if (bb is not null) candidates.Add(bb);
+            }
+            // If still none, fallback to any role with highest MaxHp
+            RoleDefinition? bossRole = candidates.Count > 0
+                ? candidates[rng.Next(candidates.Count)]
+                : all.OrderByDescending(r => r.Vars.TryGetValue(Keys.MaxHp, out var v) ? (v is int i ? i : (v is long l ? (int)l : (v is double d ? (int)Math.Round(d) : 0))) : 0).FirstOrDefault();
+            if (bossRole is not null)
+            {
+                var pos = new Coord(width / 2, height / 2);
+                if (Occupied(pos)) pos = RandomEmpty();
+                state = UnitFactory.AddUnit(state, bossId, bossRole);
+                classOf[bossId] = ClassType.Berserker; // visual only
+                roleOf[bossId] = bossRole;
+                teamOf[bossId] = "BOSS";
+                symbolOf[bossId] = 'B';
+                state = WorldStateOps.WithUnit(state, bossId, u => u with { Vars = u.Vars.SetItem(Keys.Pos, pos).SetItem("class", "Boss") });
+                // Ensure MaxMp present
+                var u0 = state.Units[bossId];
+                if (u0.Vars.TryGetValue(Keys.Mp, out var mp0) && !u0.Vars.ContainsKey(Keys.MaxMp))
+                    state = WorldStateOps.WithUnit(state, bossId, u => u with { Vars = u.Vars.SetItem(Keys.MaxMp, mp0) });
+                // Load AI config for boss
+                try { bossAi = BossAiLoader.TryLoad(rolesDirArg, bossRole); } catch { bossAi = null; }
+            }
+        }
+
         state = WorldStateOps.WithGlobal(state, g => g with { Vars = g.Vars.SetItem(DslRuntime.TeamsKey, teamOf) });
     }
 
@@ -126,4 +173,3 @@ partial class Game
         return list;
     }
 }
-

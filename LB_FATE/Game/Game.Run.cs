@@ -53,6 +53,40 @@ partial class Game
                 // Phase-based ticking: apply per-phase status/DoT/regen and advance global turn counter
                 var tsPhase = new TurnSystem();
                 (state, _) = tsPhase.AdvanceTurn(state, events);
+
+                // Surgery interrupt: if boss took enough damage this phase, release 'stasis' from allies
+                try
+                {
+                    int threshold = 0;
+                    // read threshold from global, else from boss's max_hp heuristic (20% of max, capped)
+                    if (state.Global.Vars.TryGetValue("surgery_interrupt_ratio", out var tr) && (tr is double dr || tr is int ir))
+                    {
+                        double ratio = tr is double ddr ? ddr : (tr is int iir ? iir : 0);
+                        ratio = Math.Clamp(ratio, 0.05, 1.0);
+                        if (state.Units.ContainsKey(bossId))
+                        {
+                            int maxHp = GetInt(bossId, Keys.MaxHp, 100);
+                            threshold = Math.Max(1, (int)Math.Round(maxHp * ratio));
+                        }
+                    }
+                    else if (state.Global.Vars.TryGetValue("surgery_interrupt_threshold", out var tv) && tv is int ti) threshold = ti;
+                    else if (state.Units.ContainsKey(bossId))
+                    {
+                        int maxHp = GetInt(bossId, Keys.MaxHp, 100);
+                        threshold = Math.Max(8, (int)Math.Round(maxHp * 0.2));
+                    }
+                    if (threshold > 0 && phaseDamageTo.TryGetValue(bossId, out var dealt) && dealt >= threshold)
+                    {
+                        var toRelease = state.Units.Where(kv => kv.Value.Tags.Contains("stasis")).Select(kv => kv.Key).ToList();
+                        foreach (var uid in toRelease)
+                        {
+                            state = WorldStateOps.WithUnit(state, uid, u => u with { Tags = u.Tags.Remove("stasis"), Vars = u.Vars.SetItem(Keys.CannotActTurns, 0).SetItem(Keys.UntargetableTurns, 0) });
+                        }
+                        AppendPublic(new[] { $"[手术中断] 对 Boss 的伤害达到阈值，已释放 {toRelease.Count} 名受术者。" });
+                    }
+                }
+                catch { }
+                finally { try { phaseDamageTo.Clear(); } catch { } }
             }
             // If game ended during phases, do not advance a new day
             if (Alive().Count <= 1)

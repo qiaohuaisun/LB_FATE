@@ -1,0 +1,85 @@
+role "Beast IV Candidate – Florence" id "beast_florence" {
+  description "\n提灯的兽·弗洛伦斯。以扭曲的慈悲行施必要之恶。\n战斗要点：\n- 逆行天罚：阶段性反转治疗/伤害。\n- 星水注射：对单体高压+感染（DoT/禁疗）。\n- 解剖刀舞：以施术者为中心的范围打击（常作为预警技能两阶段释放）。\n- 麻醉注射：范围内随机至多2名沉默。\n";
+
+  vars {
+    "hp" = 90; "max_hp" = 90; "mp" = 6.0; "max_mp" = 6.0;
+    "atk" = 9; "def" = 6; "matk" = 9; "mdef" = 6; "range" = 2; "speed" = 3;
+    "mp_regen_per_turn" = 0.5;
+  }
+
+  tags { "beast", "grand" }
+
+  skills {
+    # 基础普攻（以治疗反转为主轴时仍可作为动作基准）
+    skill "Basic Attack" {
+      range 2; targeting enemies;
+      deal magic 6 damage to target from caster ignore resist 20%;
+    }
+
+    # 宝具：夜莺之誓·逆行天罚 —— 全局治疗/伤害反转（按阶段扣）
+    skill "逆行天罚" {
+      range 0; targeting self; cooldown 5; cost mp 2;
+      set global var "reverse_heal_turns" = 3;
+    }
+
+    # 星水注射：单体高压+感染（DoT 与 禁疗）
+    skill "星水注射" {
+      range 4; targeting enemies; cooldown 3; cost mp 1;
+      deal magic 9 damage to target from caster ignore resist 30%;
+      set unit(target) var "burn_turns" = 2;
+      set unit(target) var "burn_per_turn" = 2;
+      set unit(target) var "no_heal_turns" = 2;
+    }
+
+    # 解剖刀舞：直线 AoE（与目标连线方向），长度4，半径1（常配合AI预警两阶段）
+    skill "解剖刀舞" {
+      range 4; targeting enemies; cooldown 2; cost mp 1;
+      line physical 6 to target length 4 radius 1;
+    }
+
+    # 强制手术台：随机送上手术台（不可被选中&无法行动），并附带持续伤害
+    skill "强制手术台" {
+      range 4; targeting self; cooldown 3; cost mp 1;
+      for each enemies of caster in range 4 of caster limit 1 do {
+        add tag "stasis" to it;
+        set unit(it) var "cannot_act_turns" = 3;
+        set unit(it) var "untargetable_turns" = 3;
+        set unit(it) var "burn_turns" = 3;
+        set unit(it) var "burn_per_turn" = 2;
+      }
+      set global var "surgery_interrupt_threshold" = 18;
+    }
+
+    # 希波克拉底的守护：被击时短期自疗
+    skill "希波克拉底的守护" {
+      range 0; targeting self; cooldown 3; cost mp 0;
+      set unit(caster) var "on_damage_heal_turns" = 2;
+      set unit(caster) var "on_damage_heal_value" = 3;
+    }
+
+    # 麻醉注射：范围内随机至多2名沉默（用 limit 2 近似随机）
+    skill "麻醉注射" {
+      range 4; targeting self; cooldown 3; cost mp 1;
+      for each enemies of caster in range 4 of caster limit 2 do {
+        add tag "silenced" to it;
+        set unit(it) var "silenced_turns" = 2;
+      }
+    }
+
+    # 提灯的凝视：标记目标（被标记者随后更易受创，简化为强行忽视部分防御）
+    skill "提灯的凝视" {
+      range 4; targeting enemies; cooldown 2; cost mp 0;
+      add tag "diagnosed" to target;
+      # 使用一回合的强行无视护甲来近似"伤害+50%"
+      set unit(caster) var "force_ignore_def_turns" = 1;
+    }
+
+    # 强制巡视：诊断最高血量目标（打上 diagnosed 标记，便于后续技能连携）
+    skill "强制巡视" {
+      range 5; targeting self; cooldown 3; cost mp 0;
+      for each enemies order by var "hp" desc limit 1 do {
+        add tag "diagnosed" to it;
+      }
+    }
+  }
+}

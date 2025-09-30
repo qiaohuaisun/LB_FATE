@@ -1,17 +1,36 @@
+using Microsoft.Extensions.Logging;
+
 namespace ETBBS;
 
+/// <summary>
+/// Manages turn-based game flow including status effects, regeneration, and DoT.
+/// </summary>
 public sealed class TurnSystem
 {
+    private readonly ILogger<TurnSystem> _logger;
+
+    public TurnSystem()
+    {
+        _logger = ETBBSLog.CreateLogger<TurnSystem>();
+    }
+
     public (WorldState, ExecutionLog) AdvanceTurn(WorldState state, EventBus? events = null)
     {
+        var turnTimer = System.Diagnostics.Stopwatch.StartNew();
         var log = new ExecutionLog(new List<string>());
-        events?.Publish(EventTopics.TurnStart, state.Global.Turn);
+        var oldTurn = state.Global.Turn;
+
+        _logger.LogInformation("=== Turn {Turn} Start === ({UnitCount} units active)", oldTurn, state.Units.Count);
+        events?.Publish(EventTopics.TurnStart, oldTurn);
 
         var cur = state;
         // increment global turn
         cur = WorldStateOps.WithGlobal(cur, g => g with { Turn = g.Turn + 1 });
+        var newTurn = cur.Global.Turn;
 
-        // Global toggles that tick down per day: reverse heal
+        _logger.LogDebug("Turn advanced: {OldTurn} -> {NewTurn}", oldTurn, newTurn);
+
+        // Global toggles that tick down per day: reverse heal / reverse damage
         if (cur.Global.Vars.TryGetValue(Keys.ReverseHealTurnsGlobal, out var rvt))
         {
             var turns = rvt is int i ? i : (rvt is long l ? (int)l : (rvt is double d ? (int)Math.Round(d) : 0));
@@ -22,6 +41,18 @@ public sealed class TurnSystem
                     cur = WorldStateOps.WithGlobal(cur, g => g with { Vars = g.Vars.SetItem(Keys.ReverseHealTurnsGlobal, nt) });
                 else
                     cur = WorldStateOps.WithGlobal(cur, g => g with { Vars = g.Vars.Remove(Keys.ReverseHealTurnsGlobal) });
+            }
+        }
+        if (cur.Global.Vars.TryGetValue(Keys.ReverseDamageTurnsGlobal, out var rvd))
+        {
+            var turns = rvd is int i ? i : (rvd is long l ? (int)l : (rvd is double d ? (int)Math.Round(d) : 0));
+            if (turns > 0)
+            {
+                var nt = turns - 1;
+                if (nt > 0)
+                    cur = WorldStateOps.WithGlobal(cur, g => g with { Vars = g.Vars.SetItem(Keys.ReverseDamageTurnsGlobal, nt) });
+                else
+                    cur = WorldStateOps.WithGlobal(cur, g => g with { Vars = g.Vars.Remove(Keys.ReverseDamageTurnsGlobal) });
             }
         }
 
@@ -50,6 +81,24 @@ public sealed class TurnSystem
                 cur = WorldStateOps.WithUnit(cur, id, u => u with { Vars = u.Vars.SetItem(Keys.StunnedTurns, ns), Tags = u.Tags.Add(Tags.Stunned) });
                 if (ns <= 0)
                     cur = WorldStateOps.WithUnit(cur, id, u => u with { Tags = u.Tags.Remove(Tags.Stunned) });
+            }
+            // untargetable tick
+            if (unit.Vars.TryGetValue(Keys.UntargetableTurns, out var utv) && utv is int utt && utt > 0)
+            {
+                var ns = utt - 1;
+                cur = WorldStateOps.WithUnit(cur, id, u => u with { Vars = u.Vars.SetItem(Keys.UntargetableTurns, ns) });
+            }
+            // cannot act tick
+            if (unit.Vars.TryGetValue(Keys.CannotActTurns, out var catv) && catv is int cat && cat > 0)
+            {
+                var ns = cat - 1;
+                cur = WorldStateOps.WithUnit(cur, id, u => u with { Vars = u.Vars.SetItem(Keys.CannotActTurns, ns) });
+            }
+            // on-damage heal duration tick
+            if (unit.Vars.TryGetValue(Keys.OnDamageHealTurns, out var odtv) && odtv is int odt && odt > 0)
+            {
+                var ns = odt - 1;
+                cur = WorldStateOps.WithUnit(cur, id, u => u with { Vars = u.Vars.SetItem(Keys.OnDamageHealTurns, ns) });
             }
             if (unit.Vars.TryGetValue(Keys.SilencedTurns, out var slv) && slv is int sl && sl > 0)
             {
@@ -238,6 +287,26 @@ public sealed class TurnSystem
                 log.Info($"Burn tick on {id}: -{dpt}");
             }
         }
+
+        turnTimer.Stop();
+
+        // Summary logging
+        int statusEffectsActive = 0;
+        int unitsWithDot = 0;
+        int unitsWithRegen = 0;
+
+        foreach (var (id, unit) in cur.Units)
+        {
+            if (unit.Vars.ContainsKey(Keys.StunnedTurns) || unit.Vars.ContainsKey(Keys.SilencedTurns) || unit.Vars.ContainsKey(Keys.RootedTurns))
+                statusEffectsActive++;
+            if (unit.Vars.ContainsKey(Keys.BleedTurns) || unit.Vars.ContainsKey(Keys.BurnTurns))
+                unitsWithDot++;
+            if (unit.Vars.ContainsKey(Keys.HpRegenPerTurn) || unit.Vars.ContainsKey(Keys.MpRegenPerTurn))
+                unitsWithRegen++;
+        }
+
+        _logger.LogInformation("=== Turn {Turn} End === Duration: {ElapsedMs}ms, Status: {StatusCount}, DoT: {DotCount}, Regen: {RegenCount}",
+            newTurn, turnTimer.Elapsed.TotalMilliseconds, statusEffectsActive, unitsWithDot, unitsWithRegen);
 
         events?.Publish(EventTopics.TurnEnd, cur.Global.Turn);
         return (cur, log);

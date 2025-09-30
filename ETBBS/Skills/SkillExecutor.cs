@@ -1,3 +1,5 @@
+using Microsoft.Extensions.Logging;
+
 namespace ETBBS;
 
 public delegate bool ActionValidator(Context ctx, AtomicAction[] actions, out string? reason);
@@ -9,8 +11,18 @@ public record ExecutionLog(List<string> Messages)
     public void Error(string msg) => Messages.Add($"ERROR: {msg}");
 }
 
+/// <summary>
+/// Executes atomic actions and skill plans with validation, conflict detection, and logging.
+/// </summary>
 public sealed class SkillExecutor
 {
+    private readonly ILogger<SkillExecutor> _logger;
+
+    public SkillExecutor()
+    {
+        _logger = ETBBSLog.CreateLogger<SkillExecutor>();
+    }
+
     public (WorldState, ExecutionLog) Execute(
         WorldState state,
         AtomicAction[] actions,
@@ -22,52 +34,95 @@ public sealed class SkillExecutor
         var log = new ExecutionLog(new List<string>());
         var ctx = new Context(state);
 
+        _logger.LogDebug("Executing {ActionCount} actions (Transactional: {Transactional}, ConflictHandling: {ConflictHandling})",
+            actions.Length, options.TransactionalBatch, options.ConflictHandling);
+
         if (validator != null && !validator(ctx, actions, out var reason))
         {
-            log.Warn($"Validation rejected actions: {reason ?? "unspecified"}.");
-            events?.Publish(EventTopics.ValidationFailed, new ValidationFailedEvent(reason ?? "unspecified", actions));
+            var validationReason = reason ?? "unspecified";
+            log.Warn($"Validation rejected actions: {validationReason}.");
+            _logger.LogWarning("Action validation failed: {Reason}. Actions: {Actions}",
+                validationReason, string.Join(", ", actions.Select(a => a.GetType().Name)));
+            events?.Publish(EventTopics.ValidationFailed, new ValidationFailedEvent(validationReason, actions));
             return (state, log);
         }
 
         // Simple conflict reporting (no reordering)
+        int conflictCount = 0;
         for (int i = 0; i < actions.Length; i++)
         {
             for (int j = i + 1; j < actions.Length; j++)
             {
                 if (!actions[i].IsCommutativeWith(actions[j]))
                 {
+                    conflictCount++;
                     var msg = $"Potential conflict between {actions[i].GetType().Name} and {actions[j].GetType().Name}.";
                     if (options.ConflictHandling == ConflictHandling.BlockOnConflict)
                     {
                         log.Error(msg);
+                        _logger.LogError("Conflict detected (blocking): Action[{I}]={Action1} vs Action[{J}]={Action2}",
+                            i, actions[i].GetType().Name, j, actions[j].GetType().Name);
                         events?.Publish(EventTopics.ConflictDetected, new ConflictDetectedEvent(i, j, actions[i], actions[j]));
                         return (state, log);
                     }
                     else
                     {
                         log.Warn(msg);
+                        _logger.LogWarning("Conflict detected (proceeding): Action[{I}]={Action1} vs Action[{J}]={Action2}",
+                            i, actions[i].GetType().Name, j, actions[j].GetType().Name);
                         events?.Publish(EventTopics.ConflictDetected, new ConflictDetectedEvent(i, j, actions[i], actions[j]));
                     }
                 }
             }
         }
 
+        if (conflictCount > 0)
+        {
+            _logger.LogInformation("Total conflicts detected: {ConflictCount}", conflictCount);
+        }
+
         if (!options.TransactionalBatch)
         {
             // Execute sequentially
             var cur = state;
-            foreach (var action in actions)
-            {
-                events?.Publish(EventTopics.ActionExecuting, new ActionExecutingEvent(new Context(cur), action));
-                var before = cur;
-                var eff = action.Compile();
-                cur = eff(cur);
-                events?.Publish(EventTopics.ActionExecuted, new ActionExecutedEvent(before, cur, action));
+            var executionTimer = System.Diagnostics.Stopwatch.StartNew();
 
-                // Specialized hooks
-                TryPublishSpecializedEvents(events, before, cur, action);
-                log.Info($"Executed {action}.");
+            for (int idx = 0; idx < actions.Length; idx++)
+            {
+                var action = actions[idx];
+                var actionTimer = System.Diagnostics.Stopwatch.StartNew();
+
+                events?.Publish(EventTopics.ActionExecuting, new ActionExecutingEvent(new Context(cur), action));
+                _logger.LogDebug("Executing action [{Index}/{Total}]: {ActionType}",
+                    idx + 1, actions.Length, action.GetType().Name);
+
+                var before = cur;
+                try
+                {
+                    var eff = action.Compile();
+                    cur = eff(cur);
+                    actionTimer.Stop();
+
+                    events?.Publish(EventTopics.ActionExecuted, new ActionExecutedEvent(before, cur, action));
+                    TryPublishSpecializedEvents(events, before, cur, action);
+
+                    log.Info($"Executed {action}.");
+                    _logger.LogDebug("Action completed: {ActionType} in {ElapsedMs}ms",
+                        action.GetType().Name, actionTimer.Elapsed.TotalMilliseconds);
+                }
+                catch (Exception ex)
+                {
+                    actionTimer.Stop();
+                    log.Error($"Failed to execute {action}: {ex.Message}");
+                    _logger.LogError(ex, "Action execution failed: {ActionType} after {ElapsedMs}ms",
+                        action.GetType().Name, actionTimer.Elapsed.TotalMilliseconds);
+                    throw new ActionExecutionException(action, "Action execution failed", ex);
+                }
             }
+
+            executionTimer.Stop();
+            _logger.LogInformation("Sequential execution completed: {ActionCount} actions in {TotalMs}ms",
+                actions.Length, executionTimer.Elapsed.TotalMilliseconds);
 
             return (cur, log);
         }
@@ -138,6 +193,9 @@ public sealed class SkillExecutor
         }
     }
 
+    /// <summary>
+    /// Executes a skill plan consisting of multiple batches of actions.
+    /// </summary>
     public (WorldState, ExecutionLog) ExecutePlan(
         WorldState state,
         IReadOnlyList<AtomicAction[]> plan,
@@ -145,16 +203,47 @@ public sealed class SkillExecutor
         EventBus? events = null,
         ExecutionOptions? options = null)
     {
+        var planTimer = System.Diagnostics.Stopwatch.StartNew();
+        _logger.LogInformation("Starting skill plan execution: {BatchCount} batches, {TotalActions} total actions",
+            plan.Count, plan.Sum(b => b.Length));
+
         var all = new ExecutionLog(new List<string>());
         var cur = state;
+
         for (int i = 0; i < plan.Count; i++)
         {
             var batch = plan[i];
+            var batchTimer = System.Diagnostics.Stopwatch.StartNew();
+
+            _logger.LogDebug("Executing batch [{Index}/{Total}]: {ActionCount} actions",
+                i + 1, plan.Count, batch.Length);
+
             events?.Publish(EventTopics.BatchStart, new BatchEvent(i));
-            (cur, var log) = Execute(cur, batch, validator, events, options);
-            all.Messages.AddRange(log.Messages);
+
+            try
+            {
+                (cur, var log) = Execute(cur, batch, validator, events, options);
+                all.Messages.AddRange(log.Messages);
+                batchTimer.Stop();
+
+                _logger.LogDebug("Batch completed: [{Index}/{Total}] in {ElapsedMs}ms",
+                    i + 1, plan.Count, batchTimer.Elapsed.TotalMilliseconds);
+            }
+            catch (Exception ex)
+            {
+                batchTimer.Stop();
+                _logger.LogError(ex, "Batch execution failed: [{Index}/{Total}] after {ElapsedMs}ms",
+                    i + 1, plan.Count, batchTimer.Elapsed.TotalMilliseconds);
+                throw;
+            }
+
             events?.Publish(EventTopics.BatchEnd, new BatchEvent(i));
         }
+
+        planTimer.Stop();
+        _logger.LogInformation("Skill plan execution completed: {BatchCount} batches in {TotalMs}ms",
+            plan.Count, planTimer.Elapsed.TotalMilliseconds);
+
         return (cur, all);
     }
 
