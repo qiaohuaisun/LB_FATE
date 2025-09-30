@@ -156,5 +156,124 @@ public class MoreCoverageTests
         Assert.Equal(1, (int)Convert.ToInt32(s.Units["E1"].Vars["mark"]));
         Assert.False(s.Units["E2"].Vars.ContainsKey("mark"));
     }
+
+    [Fact]
+    public void DashTowards_MovesUnit()
+    {
+        var s = EmptyWorld();
+        s = WithUnit(s, "C", new Dictionary<string, object> { [Keys.Pos] = new Coord(1, 1), [Keys.Speed] = 3 });
+        s = WithUnit(s, "T", new Dictionary<string, object> { [Keys.Pos] = new Coord(5, 1) });
+
+        var teams = new Dictionary<string, string> { ["C"] = "T1", ["T"] = "T2" };
+        s = WorldStateOps.WithGlobal(s, g => g with
+        {
+            Vars = g.Vars
+                .SetItem(DslRuntime.CasterKey, "C")
+                .SetItem(DslRuntime.TeamsKey, teams)
+                .SetItem(DslRuntime.TargetKey, "T")
+        });
+
+        var script = "dash towards target up to 3";
+        var skill = TextDsl.FromTextUsingGlobals("Dash", script);
+        var se = new SkillExecutor();
+        (s, _) = se.ExecutePlan(s, skill.BuildPlan(new Context(s)), validator: null);
+
+        var newPos = (Coord)s.Units["C"].Vars[Keys.Pos];
+        // Should have moved closer to target
+        Assert.True(newPos.X > 1 || newPos.Y != 1);
+    }
+
+    [Fact]
+    public void OrderBy_Var_Desc_SelectsHighestValue()
+    {
+        var s = EmptyWorld();
+        s = WithUnit(s, "C", new Dictionary<string, object> { [Keys.Pos] = new Coord(2, 2) });
+        s = WithUnit(s, "E1", new Dictionary<string, object> { [Keys.Pos] = new Coord(3, 2), [Keys.Hp] = 10 });
+        s = WithUnit(s, "E2", new Dictionary<string, object> { [Keys.Pos] = new Coord(4, 2), [Keys.Hp] = 30 });
+        s = WithUnit(s, "E3", new Dictionary<string, object> { [Keys.Pos] = new Coord(5, 2), [Keys.Hp] = 20 });
+
+        var teams = new Dictionary<string, string> { ["C"] = "T1", ["E1"] = "T2", ["E2"] = "T2", ["E3"] = "T2" };
+        s = WorldStateOps.WithGlobal(s, g => g with
+        {
+            Vars = g.Vars
+                .SetItem(DslRuntime.CasterKey, "C")
+                .SetItem(DslRuntime.TeamsKey, teams)
+        });
+
+        var script = "for each enemies in range 100 of caster order by var \"hp\" desc limit 1 do { add tag \"diagnosed\" to it }";
+        var skill = TextDsl.FromTextUsingGlobals("DiagnoseHighHP", script);
+        var se = new SkillExecutor();
+        (s, _) = se.ExecutePlan(s, skill.BuildPlan(new Context(s)), validator: null);
+
+        // Only E2 (highest HP) should have the tag
+        Assert.False(s.Units["E1"].Tags.Contains("diagnosed"));
+        Assert.True(s.Units["E2"].Tags.Contains("diagnosed"));
+        Assert.False(s.Units["E3"].Tags.Contains("diagnosed"));
+    }
+
+    [Fact]
+    public void ChanceCommand_SomeTimesExecutes()
+    {
+        var s = EmptyWorld();
+        s = WithUnit(s, "C", new Dictionary<string, object> { [Keys.Pos] = new Coord(1, 1) });
+        s = WorldStateOps.WithGlobal(s, g => g with { Vars = g.Vars.SetItem(DslRuntime.CasterKey, "C") });
+
+        var script = "chance 100% then { set global var \"hit\" = 1 } else { set global var \"miss\" = 1 }";
+        var skill = TextDsl.FromTextUsingGlobals("AlwaysHit", script);
+        var se = new SkillExecutor();
+        (s, _) = se.ExecutePlan(s, skill.BuildPlan(new Context(s)), validator: null);
+
+        // 100% chance should always execute 'then' branch
+        Assert.True(s.Global.Vars.ContainsKey("hit"));
+        Assert.False(s.Global.Vars.ContainsKey("miss"));
+
+        // Test 0% chance
+        s = WorldStateOps.WithGlobal(s, g => g with { Vars = g.Vars.Remove("hit").Remove("miss") });
+        var script2 = "chance 0% then { set global var \"hit\" = 1 } else { set global var \"miss\" = 1 }";
+        var skill2 = TextDsl.FromTextUsingGlobals("NeverHit", script2);
+        (s, _) = se.ExecutePlan(s, skill2.BuildPlan(new Context(s)), validator: null);
+
+        // 0% chance should always execute 'else' branch
+        Assert.False(s.Global.Vars.ContainsKey("hit"));
+        Assert.True(s.Global.Vars.ContainsKey("miss"));
+    }
+
+    [Fact]
+    public void TagCheck_InConditional_Works()
+    {
+        var s = EmptyWorld();
+        s = WithUnit(s, "C", new Dictionary<string, object> { [Keys.Pos] = new Coord(1, 1) });
+        s = WithUnit(s, "T", new Dictionary<string, object> { [Keys.Hp] = 30 }, new[] { "dragon" });
+
+        s = WorldStateOps.WithGlobal(s, g => g with
+        {
+            Vars = g.Vars
+                .SetItem(DslRuntime.CasterKey, "C")
+                .SetItem(DslRuntime.TargetKey, "T")
+        });
+
+        var script = "if target has tag \"dragon\" then { set global var \"is_dragon\" = 1 } else { set global var \"not_dragon\" = 1 }";
+        var skill = TextDsl.FromTextUsingGlobals("CheckDragon", script);
+        var se = new SkillExecutor();
+        (s, _) = se.ExecutePlan(s, skill.BuildPlan(new Context(s)), validator: null);
+
+        Assert.True(s.Global.Vars.ContainsKey("is_dragon"));
+        Assert.False(s.Global.Vars.ContainsKey("not_dragon"));
+    }
+
+    [Fact]
+    public void ConsumeMp_ReducesMp()
+    {
+        var s = EmptyWorld();
+        s = WithUnit(s, "C", new Dictionary<string, object> { [Keys.Mp] = 10.0, [Keys.Pos] = new Coord(1, 1) });
+        s = WorldStateOps.WithGlobal(s, g => g with { Vars = g.Vars.SetItem(DslRuntime.CasterKey, "C") });
+
+        var script = "consume mp = 2.5";
+        var skill = TextDsl.FromTextUsingGlobals("ConsumeMp", script);
+        var se = new SkillExecutor();
+        (s, _) = se.ExecutePlan(s, skill.BuildPlan(new Context(s)), validator: null);
+
+        Assert.Equal(7.5, (double)s.Units["C"].Vars[Keys.Mp]);
+    }
 }
 

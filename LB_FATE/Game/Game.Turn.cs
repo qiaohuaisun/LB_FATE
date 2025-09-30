@@ -25,7 +25,11 @@ partial class Game
             ctx = new Context(state);
             var speed = GetInt(pid, Keys.Speed, 3);
             var range = GetInt(pid, Keys.Range, 1);
-            // skip turn if cannot act
+            // skip turn if unit doesn't exist or cannot act
+            if (!state.Units.ContainsKey(pid))
+            {
+                break;
+            }
             if (GetInt(pid, Keys.CannotActTurns, 0) > 0)
             {
                 if (ep is not null) WriteLineTo(pid, "You are incapacitated and cannot act this phase.");
@@ -382,8 +386,12 @@ partial class Game
                 // No endpoint: if this is the AI boss, perform AI script (if any) or fallback heuristic; otherwise, end turn.
                 if (bossMode && pid == bossId)
                 {
+                    AppendPublic(new[] { $">>> Boss {pid} 的回合开始 <<<" });
+                    BroadcastBoard(day, phase);
                     bool done = TryExecuteBossAiScript(pid, phase, day);
                     if (!done) RunBossAiTurn(pid, phase, day);
+                    AppendPublic(new[] { $">>> Boss {pid} 的回合结束 <<<" });
+                    BroadcastBoard(day, phase);
                 }
                 break;
             }
@@ -547,9 +555,19 @@ partial class Game
                                 plan = s.Compiled.BuildPlan(new Context(state));
                             }
                             var se = new SkillExecutor();
+                            AppendPublic(new[] { $"[Telegraph] {msg} -> 已释放！" });
+
                             (state, var log) = se.ExecutePlan(state, plan, validator);
                             AppendDebugFor(pid, log.Messages);
-                            AppendPublic(new[] { $"[Telegraph] {msg} -> 已释放" });
+
+                            // 提取技能执行的关键日志
+                            var importantLogs = log.Messages.Where(m =>
+                                m.Contains("damage") || m.Contains("heal") || m.Contains("move") ||
+                                m.Contains("伤害") || m.Contains("治疗") || m.Contains("移动") ||
+                                m.Contains("HP") || m.Contains("MP") || m.Contains("死亡")
+                            ).Take(3);
+                            AppendPublic(importantLogs);
+
                             BroadcastBoard(day, phase);
                             cooldowns.SetLastUseTurn(pid, s.Name, state.Global.Turn);
                             return true;
@@ -831,8 +849,23 @@ partial class Game
         var validator = ActionValidators.ForSkillWithExtras(s.Compiled, cfg, cooldowns);
         var plan = s.Compiled.BuildPlan(new Context(state));
         var se = new SkillExecutor();
+
+        // 准备详细的行动描述
+        string targetDesc = tid is not null ? $"目标 {tid}" : (usePoint ? $"位置 {point}" : "无目标");
+        string actionMsg = $"Boss {pid} 使用技能 [{s.Name}] → {targetDesc}";
+        AppendPublic(new[] { actionMsg });
+
         (state, var log) = se.ExecutePlan(state, plan, validator);
         AppendDebugFor(pid, log.Messages);
+
+        // 将技能执行的关键日志提升到公共日志
+        var importantLogs = log.Messages.Where(m =>
+            m.Contains("damage") || m.Contains("heal") || m.Contains("move") ||
+            m.Contains("伤害") || m.Contains("治疗") || m.Contains("移动") ||
+            m.Contains("HP") || m.Contains("MP") || m.Contains("死亡")
+        ).Take(3);
+        AppendPublic(importantLogs);
+
         BroadcastBoard(day, phase);
         cooldowns.SetLastUseTurn(pid, s.Name, state.Global.Turn);
         return true;
@@ -866,6 +899,9 @@ partial class Game
         double mp0 = mpObj0 is double dd0 ? dd0 : (mpObj0 is int ii0 ? ii0 : 0);
         double moveCost = 0.5; if (mp0 < moveCost) return false;
         var se = new SkillExecutor();
+        var curPos = ctx.GetUnitVar<Coord>(pid, Keys.Pos, default);
+        AppendPublic(new[] { $"Boss {pid} 向敌人移动: {curPos} → {best}" });
+
         (state, var log) = se.Execute(state, new AtomicAction[] { new Move(pid, best), new ModifyUnitVar(pid, Keys.Mp, v => (v is double d ? d : Convert.ToDouble(v)) - moveCost) });
         AppendDebugFor(pid, log.Messages);
         BroadcastBoard(day, phase);
@@ -892,6 +928,8 @@ partial class Game
         double mp0 = mpObj0 is double dd0 ? dd0 : (mpObj0 is int ii0 ? ii0 : 0);
         double moveCost = 0.5; if (mp0 < moveCost) return false;
         var se = new SkillExecutor();
+        AppendPublic(new[] { $"Boss {pid} 撤退: {myPos} → {best} (远离 {nearestId})" });
+
         (state, var log) = se.Execute(state, new AtomicAction[] { new Move(pid, best), new ModifyUnitVar(pid, Keys.Mp, v => (v is double d ? d : Convert.ToDouble(v)) - moveCost) });
         AppendDebugFor(pid, log.Messages);
         BroadcastBoard(day, phase);
@@ -924,8 +962,16 @@ partial class Game
         var mpObj = ctx.GetUnitVar<object>(pid, Keys.Mp, 0);
         double mp = mpObj is double dd ? dd : (mpObj is int i2 ? i2 : 0);
         double cost = 0.5; if (mp < cost) return false;
+
+        AppendPublic(new[] { $"Boss {pid} 普通攻击 → 目标 {nearestId}" });
+
         (state, var log) = se2.ExecutePlan(state, basic.Compiled.BuildPlan(new Context(state)), validator2);
         AppendDebugFor(pid, log.Messages);
+
+        // 提取伤害日志到公共日志
+        var damageLogs = log.Messages.Where(m => m.Contains("damage") || m.Contains("伤害") || m.Contains("HP")).Take(2);
+        AppendPublic(damageLogs);
+
         (state, var log2) = se2.Execute(state, new AtomicAction[] { new ModifyUnitVar(pid, Keys.Mp, v => (v is double d0 ? d0 : Convert.ToDouble(v)) - cost) });
         AppendDebugFor(pid, log2.Messages);
         BroadcastBoard(day, phase);
@@ -989,8 +1035,18 @@ partial class Game
                         if (validator(new Context(state), batch, out var _))
                         {
                             var se = new SkillExecutor();
+                            AppendPublic(new[] { $"Boss {pid} 使用技能 [{s.Name}] → 目标 {nearestId}" });
+
                             (state, var log) = se.ExecutePlan(state, plan, validator);
                             AppendDebugFor(pid, log.Messages);
+
+                            // 提取关键日志到公共日志
+                            var importantLogs = log.Messages.Where(m =>
+                                m.Contains("damage") || m.Contains("heal") || m.Contains("伤害") ||
+                                m.Contains("治疗") || m.Contains("HP") || m.Contains("死亡")
+                            ).Take(3);
+                            AppendPublic(importantLogs);
+
                             BroadcastBoard(day, phase);
                             cooldowns.SetLastUseTurn(pid, s.Name, state.Global.Turn);
                             return;
@@ -1035,8 +1091,16 @@ partial class Game
                         var mpObj = ctx.GetUnitVar<object>(pid, Keys.Mp, 0);
                         double mp = mpObj is double dd ? dd : (mpObj is int i2 ? i2 : 0);
                         double cost = 0.5; if (mp < cost) return;
+
+                        AppendPublic(new[] { $"Boss {pid} 普通攻击 → 目标 {nearestId}" });
+
                         (state, var log) = se2.ExecutePlan(state, basic.Compiled.BuildPlan(new Context(state)), validator2);
                         AppendDebugFor(pid, log.Messages);
+
+                        // 提取伤害日志
+                        var damageLogs = log.Messages.Where(m => m.Contains("damage") || m.Contains("伤害") || m.Contains("HP")).Take(2);
+                        AppendPublic(damageLogs);
+
                         (state, var log2) = se2.Execute(state, new AtomicAction[] { new ModifyUnitVar(pid, Keys.Mp, v => (v is double d0 ? d0 : Convert.ToDouble(v)) - cost) });
                         AppendDebugFor(pid, log2.Messages);
                         BroadcastBoard(day, phase);
@@ -1066,6 +1130,10 @@ partial class Game
                 var mpObj0 = ctx.GetUnitVar<object>(pid, Keys.Mp, 0);
                 double mp0 = mpObj0 is double dd0 ? dd0 : (mpObj0 is int ii0 ? ii0 : 0);
                 double moveCost = 0.5; if (mp0 < moveCost) return;
+
+                var curPos = ctx.GetUnitVar<Coord>(pid, Keys.Pos, default);
+                AppendPublic(new[] { $"Boss {pid} 向敌人移动: {curPos} → {best}" });
+
                 (state, var log) = se.Execute(state, new AtomicAction[] { new Move(pid, best), new ModifyUnitVar(pid, Keys.Mp, v => (v is double d ? d : Convert.ToDouble(v)) - moveCost) });
                 AppendDebugFor(pid, log.Messages);
                 BroadcastBoard(day, phase);
@@ -1079,7 +1147,7 @@ partial class Game
 
     private int GetInt(string id, string key, int def = 0)
     {
-        var u = state.Units[id];
+        if (!state.Units.TryGetValue(id, out var u)) return def;
         if (u.Vars.TryGetValue(key, out var v))
         {
             if (v is int i) return i;
