@@ -34,6 +34,7 @@ partial class Game
     // Boss mode support
     private readonly bool bossMode = false;
     private readonly string bossId = "BOSS";
+    private string bossName = "BOSS";
     private BossAiConfig? bossAi = null;
     private readonly Dictionary<string, int> phaseDamageTo = new();
     // 日志：public 面向所有玩家；private 面向各自玩家（仅在 debug 模式下追加内部执行细节）

@@ -275,5 +275,377 @@ public class MoreCoverageTests
 
         Assert.Equal(7.5, (double)s.Units["C"].Vars[Keys.Mp]);
     }
+
+    // Exception tests
+    [Fact]
+    public void ETBBSException_CanBeCreated()
+    {
+        var ex1 = new ETBBSException();
+        Assert.NotNull(ex1);
+
+        var ex2 = new ETBBSException("test message");
+        Assert.Equal("test message", ex2.Message);
+
+        var inner = new Exception("inner");
+        var ex3 = new ETBBSException("test", inner);
+        Assert.Equal("test", ex3.Message);
+        Assert.Same(inner, ex3.InnerException);
+    }
+
+    [Fact]
+    public void SkillValidationException_HasProperties()
+    {
+        var ex = new SkillValidationException("fireball", "out of range");
+        Assert.Equal("fireball", ex.SkillName);
+        Assert.Equal("out of range", ex.Reason);
+        Assert.Contains("fireball", ex.Message);
+        Assert.Contains("out of range", ex.Message);
+    }
+
+    [Fact]
+    public void DslParseException_CanBeCreated()
+    {
+        var ex1 = new DslParseException("syntax error");
+        Assert.Contains("syntax error", ex1.Message);
+        Assert.Null(ex1.Line);
+        Assert.Null(ex1.Column);
+
+        var ex2 = new DslParseException("unexpected token", 5, 12);
+        Assert.Equal(5, ex2.Line);
+        Assert.Equal(12, ex2.Column);
+        Assert.Contains("line 5", ex2.Message);
+        Assert.Contains("column 12", ex2.Message);
+    }
+
+    [Fact]
+    public void RoleLoadException_HasProperties()
+    {
+        var ex1 = new RoleLoadException("mage", "file not found");
+        Assert.Equal("mage", ex1.RoleId);
+        Assert.Contains("mage", ex1.Message);
+        Assert.Contains("file not found", ex1.Message);
+
+        var inner = new Exception("io error");
+        var ex2 = new RoleLoadException("warrior", "parse failed", inner);
+        Assert.Equal("warrior", ex2.RoleId);
+        Assert.Same(inner, ex2.InnerException);
+    }
+
+    [Fact]
+    public void StateCorruptionException_CanBeCreated()
+    {
+        var ex1 = new StateCorruptionException("state corrupted");
+        Assert.Contains("state corrupted", ex1.Message);
+
+        var inner = new Exception("corruption");
+        var ex2 = new StateCorruptionException("invalid state", inner);
+        Assert.Same(inner, ex2.InnerException);
+    }
+
+    [Fact]
+    public void NetworkException_CanBeCreated()
+    {
+        var ex1 = new NetworkException("connection lost");
+        Assert.Contains("connection lost", ex1.Message);
+
+        var inner = new Exception("timeout");
+        var ex2 = new NetworkException("send failed", inner);
+        Assert.Same(inner, ex2.InnerException);
+    }
+
+    [Fact]
+    public void ActionExecutionException_CanBeCreated()
+    {
+        var ex1 = new ActionExecutionException("execution failed");
+        Assert.Contains("execution failed", ex1.Message);
+        Assert.Null(ex1.Action);
+
+        var action = new Move("U1", new Coord(1, 1));
+        var ex2 = new ActionExecutionException(action, "move blocked");
+        Assert.Same(action, ex2.Action);
+        Assert.Contains("Move", ex2.Message);
+
+        var inner = new Exception("collision");
+        var ex3 = new ActionExecutionException(action, "collision detected", inner);
+        Assert.Same(action, ex3.Action);
+        Assert.Same(inner, ex3.InnerException);
+    }
+
+    // Context tests
+    [Fact]
+    public void Context_GetUnitVar_ReturnsDefaultWhenMissing()
+    {
+        var s = EmptyWorld();
+        s = WithUnit(s, "U1", new Dictionary<string, object> { ["x"] = 42 });
+        var ctx = new Context(s);
+
+        Assert.Equal(42, ctx.GetUnitVar<int>("U1", "x", 0));
+        Assert.Equal(0, ctx.GetUnitVar<int>("U1", "y", 0));
+        Assert.Equal(99, ctx.GetUnitVar<int>("U2", "x", 99));
+    }
+
+    [Fact]
+    public void Context_TryGetUnitVar_WorksCorrectly()
+    {
+        var s = EmptyWorld();
+        s = WithUnit(s, "U1", new Dictionary<string, object> { ["name"] = "Alice" });
+        var ctx = new Context(s);
+
+        Assert.True(ctx.TryGetUnitVar<string>("U1", "name", out var name));
+        Assert.Equal("Alice", name);
+
+        Assert.False(ctx.TryGetUnitVar<string>("U1", "missing", out var missing));
+        Assert.Null(missing);
+
+        Assert.False(ctx.TryGetUnitVar<string>("U2", "name", out var noUnit));
+    }
+
+    [Fact]
+    public void Context_GetTileVar_HandlesOutOfBounds()
+    {
+        var s = EmptyWorld(3, 3);
+        s = WorldStateOps.WithTile(s, new Coord(1, 1), t => t with { Vars = t.Vars.SetItem("hazard", true) });
+        var ctx = new Context(s);
+
+        Assert.True(ctx.GetTileVar<bool>(new Coord(1, 1), "hazard", false));
+        Assert.False(ctx.GetTileVar<bool>(new Coord(1, 1), "missing", false));
+        Assert.False(ctx.GetTileVar<bool>(new Coord(-1, 0), "hazard", false));
+        Assert.False(ctx.GetTileVar<bool>(new Coord(5, 5), "hazard", false));
+    }
+
+    [Fact]
+    public void Context_TryGetTileVar_WorksCorrectly()
+    {
+        var s = EmptyWorld(3, 3);
+        s = WorldStateOps.WithTile(s, new Coord(1, 1), t => t with { Vars = t.Vars.SetItem("cost", 5) });
+        var ctx = new Context(s);
+
+        Assert.True(ctx.TryGetTileVar<int>(new Coord(1, 1), "cost", out var cost));
+        Assert.Equal(5, cost);
+
+        Assert.False(ctx.TryGetTileVar<int>(new Coord(1, 1), "missing", out var missing));
+        Assert.False(ctx.TryGetTileVar<int>(new Coord(-1, 0), "cost", out var oob));
+    }
+
+    [Fact]
+    public void Context_HasTileTag_ChecksBounds()
+    {
+        var s = EmptyWorld(3, 3);
+        s = WorldStateOps.WithTile(s, new Coord(1, 1), t => t with { Tags = t.Tags.Add("lava") });
+        var ctx = new Context(s);
+
+        Assert.True(ctx.HasTileTag(new Coord(1, 1), "lava"));
+        Assert.False(ctx.HasTileTag(new Coord(0, 0), "lava"));
+        Assert.False(ctx.HasTileTag(new Coord(-1, 0), "lava"));
+        Assert.False(ctx.HasTileTag(new Coord(10, 10), "lava"));
+    }
+
+    [Fact]
+    public void Context_GlobalVar_Methods()
+    {
+        var s = EmptyWorld();
+        s = WorldStateOps.WithGlobal(s, g => g with { Vars = g.Vars.SetItem("round", 3) });
+        var ctx = new Context(s);
+
+        Assert.Equal(3, ctx.GetGlobalVar<int>("round", 0));
+        Assert.Equal(0, ctx.GetGlobalVar<int>("missing", 0));
+
+        Assert.True(ctx.TryGetGlobalVar<int>("round", out var round));
+        Assert.Equal(3, round);
+        Assert.False(ctx.TryGetGlobalVar<int>("missing", out var missing));
+    }
+
+    [Fact]
+    public void Context_HasGlobalTag_Works()
+    {
+        var s = EmptyWorld();
+        s = WorldStateOps.WithGlobal(s, g => g with { Tags = g.Tags.Add("night") });
+        var ctx = new Context(s);
+
+        Assert.True(ctx.HasGlobalTag("night"));
+        Assert.False(ctx.HasGlobalTag("day"));
+    }
+
+    [Fact]
+    public void Context_TryGetUnitPos_Works()
+    {
+        var s = EmptyWorld();
+        s = WithUnit(s, "U1", new Dictionary<string, object> { [Keys.Pos] = new Coord(3, 4) });
+        var ctx = new Context(s);
+
+        Assert.True(ctx.TryGetUnitPos("U1", out var pos));
+        Assert.Equal(new Coord(3, 4), pos);
+
+        Assert.False(ctx.TryGetUnitPos("U2", out var noPos));
+    }
+
+    [Fact]
+    public void Context_GetUnitPosOrDefault_Works()
+    {
+        var s = EmptyWorld();
+        s = WithUnit(s, "U1", new Dictionary<string, object> { [Keys.Pos] = new Coord(2, 3) });
+        var ctx = new Context(s);
+
+        Assert.Equal(new Coord(2, 3), ctx.GetUnitPosOrDefault("U1"));
+        Assert.Equal(default(Coord), ctx.GetUnitPosOrDefault("U2"));
+        Assert.Equal(new Coord(5, 5), ctx.GetUnitPosOrDefault("U2", new Coord(5, 5)));
+    }
+
+    // Selection tests
+    [Fact]
+    public void Selection_ById_ReturnsSpecifiedId()
+    {
+        var s = EmptyWorld();
+        var ctx = new Context(s);
+        var selector = Selection.ById("target123");
+        Assert.Equal("target123", selector(ctx));
+    }
+
+    [Fact]
+    public void Selection_UnitsWithTag_FiltersCorrectly()
+    {
+        var s = EmptyWorld();
+        s = WithUnit(s, "U1", new Dictionary<string, object>(), new[] { "poisoned" });
+        s = WithUnit(s, "U2", new Dictionary<string, object>(), new[] { "stunned" });
+        s = WithUnit(s, "U3", new Dictionary<string, object>(), new[] { "poisoned" });
+        var ctx = new Context(s);
+
+        var selector = Selection.UnitsWithTag("poisoned");
+        var result = selector(ctx).ToList();
+        Assert.Equal(2, result.Count);
+        Assert.Contains("U1", result);
+        Assert.Contains("U3", result);
+    }
+
+    [Fact]
+    public void Selection_Allies_FiltersCorrectly()
+    {
+        var s = EmptyWorld();
+        s = WithUnit(s, "A1", new Dictionary<string, object>());
+        s = WithUnit(s, "A2", new Dictionary<string, object>());
+        s = WithUnit(s, "E1", new Dictionary<string, object>());
+        var teams = new Dictionary<string, string> { ["A1"] = "team1", ["A2"] = "team1", ["E1"] = "team2" };
+        var ctx = new Context(s);
+
+        var selector = Selection.Allies("A1", teams);
+        var result = selector(ctx).ToList();
+        Assert.Equal(2, result.Count);
+        Assert.Contains("A1", result);
+        Assert.Contains("A2", result);
+    }
+
+    [Fact]
+    public void Selection_Enemies_FiltersCorrectly()
+    {
+        var s = EmptyWorld();
+        s = WithUnit(s, "A1", new Dictionary<string, object>());
+        s = WithUnit(s, "E1", new Dictionary<string, object>());
+        s = WithUnit(s, "E2", new Dictionary<string, object>());
+        var teams = new Dictionary<string, string> { ["A1"] = "team1", ["E1"] = "team2", ["E2"] = "team2" };
+        var ctx = new Context(s);
+
+        var selector = Selection.Enemies("A1", teams);
+        var result = selector(ctx).ToList();
+        Assert.Equal(2, result.Count);
+        Assert.Contains("E1", result);
+        Assert.Contains("E2", result);
+    }
+
+    [Fact]
+    public void Selection_WithinRange_Manhattan()
+    {
+        var s = EmptyWorld();
+        s = WithUnit(s, "C", new Dictionary<string, object> { [Keys.Pos] = new Coord(2, 2) });
+        s = WithUnit(s, "U1", new Dictionary<string, object> { [Keys.Pos] = new Coord(3, 2) }); // d=1
+        s = WithUnit(s, "U2", new Dictionary<string, object> { [Keys.Pos] = new Coord(2, 4) }); // d=2
+        s = WithUnit(s, "U3", new Dictionary<string, object> { [Keys.Pos] = new Coord(5, 5) }); // d=6
+        var ctx = new Context(s);
+
+        var selector = Selection.WithinRange("C", 2, DistanceMetric.Manhattan);
+        var result = selector(ctx).ToList();
+        Assert.Equal(2, result.Count);
+        Assert.Contains("U1", result);
+        Assert.Contains("U2", result);
+    }
+
+    [Fact]
+    public void Selection_EnemiesWithinRange_Works()
+    {
+        var s = EmptyWorld();
+        s = WithUnit(s, "C", new Dictionary<string, object> { [Keys.Pos] = new Coord(2, 2) });
+        s = WithUnit(s, "A", new Dictionary<string, object> { [Keys.Pos] = new Coord(3, 2) }); // ally, close
+        s = WithUnit(s, "E1", new Dictionary<string, object> { [Keys.Pos] = new Coord(2, 3) }); // enemy, close
+        s = WithUnit(s, "E2", new Dictionary<string, object> { [Keys.Pos] = new Coord(5, 5) }); // enemy, far
+        var teams = new Dictionary<string, string> { ["C"] = "t1", ["A"] = "t1", ["E1"] = "t2", ["E2"] = "t2" };
+        var ctx = new Context(s);
+
+        var selector = Selection.EnemiesWithinRange("C", teams, 2);
+        var result = selector(ctx).ToList();
+        Assert.Single(result);
+        Assert.Contains("E1", result);
+    }
+
+    [Fact]
+    public void Selection_SortByNearestTo_Works()
+    {
+        var s = EmptyWorld();
+        s = WithUnit(s, "C", new Dictionary<string, object> { [Keys.Pos] = new Coord(2, 2) });
+        s = WithUnit(s, "U1", new Dictionary<string, object> { [Keys.Pos] = new Coord(5, 5) }); // d=6
+        s = WithUnit(s, "U2", new Dictionary<string, object> { [Keys.Pos] = new Coord(3, 2) }); // d=1
+        s = WithUnit(s, "U3", new Dictionary<string, object> { [Keys.Pos] = new Coord(2, 4) }); // d=2
+        var ctx = new Context(s);
+
+        var selector = Selection.SortByNearestTo("C");
+        var result = selector(ctx).ToList();
+        Assert.Equal("U2", result[0]);
+        Assert.Equal("U3", result[1]);
+        Assert.Equal("U1", result[2]);
+    }
+
+    [Fact]
+    public void Selection_OrderByUnitVarInt_Ascending()
+    {
+        var s = EmptyWorld();
+        s = WithUnit(s, "U1", new Dictionary<string, object> { [Keys.Hp] = 30 });
+        s = WithUnit(s, "U2", new Dictionary<string, object> { [Keys.Hp] = 10 });
+        s = WithUnit(s, "U3", new Dictionary<string, object> { [Keys.Hp] = 20 });
+        var ctx = new Context(s);
+
+        var selector = Selection.OrderByUnitVarInt(Keys.Hp, ascending: true);
+        var result = selector(ctx).ToList();
+        Assert.Equal("U2", result[0]);
+        Assert.Equal("U3", result[1]);
+        Assert.Equal("U1", result[2]);
+    }
+
+    [Fact]
+    public void Selection_OrderByUnitVarInt_Descending()
+    {
+        var s = EmptyWorld();
+        s = WithUnit(s, "U1", new Dictionary<string, object> { [Keys.Hp] = 30 });
+        s = WithUnit(s, "U2", new Dictionary<string, object> { [Keys.Hp] = 10 });
+        s = WithUnit(s, "U3", new Dictionary<string, object> { [Keys.Hp] = 20 });
+        var ctx = new Context(s);
+
+        var selector = Selection.OrderByUnitVarInt(Keys.Hp, ascending: false);
+        var result = selector(ctx).ToList();
+        Assert.Equal("U1", result[0]);
+        Assert.Equal("U3", result[1]);
+        Assert.Equal("U2", result[2]);
+    }
+
+    [Fact]
+    public void Selection_LowestHp_Works()
+    {
+        var s = EmptyWorld();
+        s = WithUnit(s, "U1", new Dictionary<string, object> { [Keys.Hp] = 30 });
+        s = WithUnit(s, "U2", new Dictionary<string, object> { [Keys.Hp] = 5 });
+        s = WithUnit(s, "U3", new Dictionary<string, object> { [Keys.Hp] = 20 });
+        var ctx = new Context(s);
+
+        var selector = Selection.LowestHp();
+        var result = selector(ctx).ToList();
+        Assert.Equal("U2", result[0]);
+    }
 }
 

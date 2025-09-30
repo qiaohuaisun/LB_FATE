@@ -52,16 +52,6 @@ partial class Game
                 if (string.IsNullOrWhiteSpace(line)) continue;
                 var parts = line.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
                 var cmd = parts[0].ToLowerInvariant();
-                bool restricted = (phase is >= 2 and <= 4);
-                if (restricted)
-                {
-                    bool allowed = cmd is "move" or "m" or "pass" or "p" or "help" or "h" or "info" or "i" or "skills" or "s" or "hint" or "hm";
-                    if (!allowed)
-                    {
-                        WriteLineTo(pid, "Phases 2-4: allowed commands are move/pass/skills/info/help/hint move.");
-                        continue;
-                    }
-                }
 
                 if (cmd is "help" or "h")
                 {
@@ -73,7 +63,7 @@ partial class Game
                     WriteLineTo(pid, "hint move|hm     : highlight reachable tiles");
                     WriteLineTo(pid, "pass | p         : end your turn");
                     WriteLineTo(pid, "Costs           : Move 0.5 MP; Attack 0.5 MP");
-                    WriteLineTo(pid, "Phases          : 1 & 5 all commands; 2-4 move/pass/skills/info/help/hint");
+                    WriteLineTo(pid, "Note            : Each player acts once per phase.");
                     continue;
                 }
                 if (cmd is "info" or "i")
@@ -218,6 +208,43 @@ partial class Game
                             else if (argLower == "left") { dir = "left"; point = new Coord(Math.Max(0, casterPos.X - steps), casterPos.Y); }
                             else if (argLower == "right") { dir = "right"; point = new Coord(Math.Min(width - 1, casterPos.X + steps), casterPos.Y); }
                             hasPointArg = true;
+
+                            // For skills that need a unit target (not tile-based), find the nearest unit in that direction
+                            string skillTargeting = skill.Compiled.Extras.TryGetValue("targeting", out var skillTgtObj) && skillTgtObj is string sts ? sts : "any";
+                            if (skillTargeting != "tile" && skill.Compiled.Metadata.Range > 0)
+                            {
+                                // Find nearest unit in the direction
+                                string? nearestInDir = null;
+                                int bestDist = int.MaxValue;
+                                foreach (var (uid, u) in state.Units)
+                                {
+                                    if (uid == pid) continue;
+                                    if (GetInt(uid, Keys.Hp, 0) <= 0) continue;
+                                    var uPos = ctx.GetUnitVar<Coord>(uid, Keys.Pos, default);
+                                    // Check if unit is in the specified direction
+                                    bool inDirection = argLower switch
+                                    {
+                                        "up" => uPos.X == casterPos.X && uPos.Y < casterPos.Y,
+                                        "down" => uPos.X == casterPos.X && uPos.Y > casterPos.Y,
+                                        "left" => uPos.Y == casterPos.Y && uPos.X < casterPos.X,
+                                        "right" => uPos.Y == casterPos.Y && uPos.X > casterPos.X,
+                                        _ => false
+                                    };
+                                    if (inDirection)
+                                    {
+                                        int dist = Math.Abs(uPos.X - casterPos.X) + Math.Abs(uPos.Y - casterPos.Y);
+                                        if (dist < bestDist)
+                                        {
+                                            bestDist = dist;
+                                            nearestInDir = uid;
+                                        }
+                                    }
+                                }
+                                if (nearestInDir != null)
+                                {
+                                    tid = nearestInDir;
+                                }
+                            }
                         }
                         else if (state.Units.ContainsKey(argUpper))
                         {
@@ -231,6 +258,23 @@ partial class Game
                             WriteLineTo(pid, "Invalid target.");
                             continue;
                         }
+                    }
+
+                    // Check if skill requires a target but none was provided
+                    string targeting = skill.Compiled.Extras.TryGetValue("targeting", out var tgtObj) && tgtObj is string ts ? ts : "any";
+                    int skillRange = skill.Compiled.Metadata.Range;
+
+                    // For range 0 skills with targeting "self", auto-target self if no arguments provided
+                    if (skillRange == 0 && targeting == "self" && string.IsNullOrEmpty(tid) && !hasPointArg)
+                    {
+                        tid = pid;
+                    }
+
+                    // Skills with range > 0 and targeting != self/tile require a target or direction
+                    if (targeting != "self" && targeting != "tile" && skillRange > 0 && string.IsNullOrEmpty(tid) && !hasPointArg)
+                    {
+                        WriteLineTo(pid, $"Skill '{skill.Name}' requires a target. Usage: use {idx} <target|x y|up|down|left|right>");
+                        continue;
                     }
                     state = WorldStateOps.WithGlobal(state, g => g with
                     {
@@ -386,11 +430,13 @@ partial class Game
                 // No endpoint: if this is the AI boss, perform AI script (if any) or fallback heuristic; otherwise, end turn.
                 if (bossMode && pid == bossId)
                 {
-                    AppendPublic(new[] { $">>> Boss {pid} 的回合开始 <<<" });
+                    // Broadcast turn start banner (not added to log to avoid duplication)
+                    BroadcastBanner("", "╔═══════════════════════════════════════════════════════════════╗", $"║  ⚔️  【{bossName}】的回合开始  ⚔️  ", "╚═══════════════════════════════════════════════════════════════╝", "");
                     BroadcastBoard(day, phase);
                     bool done = TryExecuteBossAiScript(pid, phase, day);
                     if (!done) RunBossAiTurn(pid, phase, day);
-                    AppendPublic(new[] { $">>> Boss {pid} 的回合结束 <<<" });
+                    // Broadcast turn end banner
+                    BroadcastBanner("", "╔═══════════════════════════════════════════════════════════════╗", $"║  ⚔️  【{bossName}】的回合结束  ⚔️  ", "╚═══════════════════════════════════════════════════════════════╝", "");
                     BroadcastBoard(day, phase);
                 }
                 break;
@@ -555,18 +601,10 @@ partial class Game
                                 plan = s.Compiled.BuildPlan(new Context(state));
                             }
                             var se = new SkillExecutor();
-                            AppendPublic(new[] { $"[Telegraph] {msg} -> 已释放！" });
+                            AppendPublic(new[] { $"⚡ {msg} -> 已释放" });
 
                             (state, var log) = se.ExecutePlan(state, plan, validator);
                             AppendDebugFor(pid, log.Messages);
-
-                            // 提取技能执行的关键日志
-                            var importantLogs = log.Messages.Where(m =>
-                                m.Contains("damage") || m.Contains("heal") || m.Contains("move") ||
-                                m.Contains("伤害") || m.Contains("治疗") || m.Contains("移动") ||
-                                m.Contains("HP") || m.Contains("MP") || m.Contains("死亡")
-                            ).Take(3);
-                            AppendPublic(importantLogs);
 
                             BroadcastBoard(day, phase);
                             cooldowns.SetLastUseTurn(pid, s.Name, state.Global.Turn);
@@ -820,7 +858,7 @@ partial class Game
                 msg
             });
             state = WorldStateOps.WithGlobal(state, g => g with { Vars = g.Vars.SetItem("boss_telegraph", payload).SetItem("boss_telegraph_msg", msg) });
-            AppendPublic(new[] { $"[Telegraph] {msg}" });
+            AppendPublic(new[] { $"⚠️  {msg}" });
             BroadcastBoard(day, phase);
             return true;
         }
@@ -850,21 +888,11 @@ partial class Game
         var plan = s.Compiled.BuildPlan(new Context(state));
         var se = new SkillExecutor();
 
-        // 准备详细的行动描述
-        string targetDesc = tid is not null ? $"目标 {tid}" : (usePoint ? $"位置 {point}" : "无目标");
-        string actionMsg = $"Boss {pid} 使用技能 [{s.Name}] → {targetDesc}";
-        AppendPublic(new[] { actionMsg });
+        string targetDesc = tid is not null ? tid : (usePoint ? $"{point}" : "无目标");
+        AppendPublic(new[] { $"【{bossName}】{s.Name} → {targetDesc}" });
 
         (state, var log) = se.ExecutePlan(state, plan, validator);
         AppendDebugFor(pid, log.Messages);
-
-        // 将技能执行的关键日志提升到公共日志
-        var importantLogs = log.Messages.Where(m =>
-            m.Contains("damage") || m.Contains("heal") || m.Contains("move") ||
-            m.Contains("伤害") || m.Contains("治疗") || m.Contains("移动") ||
-            m.Contains("HP") || m.Contains("MP") || m.Contains("死亡")
-        ).Take(3);
-        AppendPublic(importantLogs);
 
         BroadcastBoard(day, phase);
         cooldowns.SetLastUseTurn(pid, s.Name, state.Global.Turn);
@@ -900,7 +928,7 @@ partial class Game
         double moveCost = 0.5; if (mp0 < moveCost) return false;
         var se = new SkillExecutor();
         var curPos = ctx.GetUnitVar<Coord>(pid, Keys.Pos, default);
-        AppendPublic(new[] { $"Boss {pid} 向敌人移动: {curPos} → {best}" });
+        AppendPublic(new[] { $"【{bossName}】移动 {curPos} → {best}" });
 
         (state, var log) = se.Execute(state, new AtomicAction[] { new Move(pid, best), new ModifyUnitVar(pid, Keys.Mp, v => (v is double d ? d : Convert.ToDouble(v)) - moveCost) });
         AppendDebugFor(pid, log.Messages);
@@ -928,7 +956,7 @@ partial class Game
         double mp0 = mpObj0 is double dd0 ? dd0 : (mpObj0 is int ii0 ? ii0 : 0);
         double moveCost = 0.5; if (mp0 < moveCost) return false;
         var se = new SkillExecutor();
-        AppendPublic(new[] { $"Boss {pid} 撤退: {myPos} → {best} (远离 {nearestId})" });
+        AppendPublic(new[] { $"【{bossName}】撤退 {myPos} → {best}" });
 
         (state, var log) = se.Execute(state, new AtomicAction[] { new Move(pid, best), new ModifyUnitVar(pid, Keys.Mp, v => (v is double d ? d : Convert.ToDouble(v)) - moveCost) });
         AppendDebugFor(pid, log.Messages);
@@ -963,14 +991,10 @@ partial class Game
         double mp = mpObj is double dd ? dd : (mpObj is int i2 ? i2 : 0);
         double cost = 0.5; if (mp < cost) return false;
 
-        AppendPublic(new[] { $"Boss {pid} 普通攻击 → 目标 {nearestId}" });
+        AppendPublic(new[] { $"【{bossName}】攻击 → {nearestId}" });
 
         (state, var log) = se2.ExecutePlan(state, basic.Compiled.BuildPlan(new Context(state)), validator2);
         AppendDebugFor(pid, log.Messages);
-
-        // 提取伤害日志到公共日志
-        var damageLogs = log.Messages.Where(m => m.Contains("damage") || m.Contains("伤害") || m.Contains("HP")).Take(2);
-        AppendPublic(damageLogs);
 
         (state, var log2) = se2.Execute(state, new AtomicAction[] { new ModifyUnitVar(pid, Keys.Mp, v => (v is double d0 ? d0 : Convert.ToDouble(v)) - cost) });
         AppendDebugFor(pid, log2.Messages);
@@ -1035,17 +1059,10 @@ partial class Game
                         if (validator(new Context(state), batch, out var _))
                         {
                             var se = new SkillExecutor();
-                            AppendPublic(new[] { $"Boss {pid} 使用技能 [{s.Name}] → 目标 {nearestId}" });
+                            AppendPublic(new[] { $"【{bossName}】{s.Name} → {nearestId}" });
 
                             (state, var log) = se.ExecutePlan(state, plan, validator);
                             AppendDebugFor(pid, log.Messages);
-
-                            // 提取关键日志到公共日志
-                            var importantLogs = log.Messages.Where(m =>
-                                m.Contains("damage") || m.Contains("heal") || m.Contains("伤害") ||
-                                m.Contains("治疗") || m.Contains("HP") || m.Contains("死亡")
-                            ).Take(3);
-                            AppendPublic(importantLogs);
 
                             BroadcastBoard(day, phase);
                             cooldowns.SetLastUseTurn(pid, s.Name, state.Global.Turn);
@@ -1092,14 +1109,10 @@ partial class Game
                         double mp = mpObj is double dd ? dd : (mpObj is int i2 ? i2 : 0);
                         double cost = 0.5; if (mp < cost) return;
 
-                        AppendPublic(new[] { $"Boss {pid} 普通攻击 → 目标 {nearestId}" });
+                        AppendPublic(new[] { $"【{bossName}】攻击 → {nearestId}" });
 
                         (state, var log) = se2.ExecutePlan(state, basic.Compiled.BuildPlan(new Context(state)), validator2);
                         AppendDebugFor(pid, log.Messages);
-
-                        // 提取伤害日志
-                        var damageLogs = log.Messages.Where(m => m.Contains("damage") || m.Contains("伤害") || m.Contains("HP")).Take(2);
-                        AppendPublic(damageLogs);
 
                         (state, var log2) = se2.Execute(state, new AtomicAction[] { new ModifyUnitVar(pid, Keys.Mp, v => (v is double d0 ? d0 : Convert.ToDouble(v)) - cost) });
                         AppendDebugFor(pid, log2.Messages);
@@ -1132,7 +1145,7 @@ partial class Game
                 double moveCost = 0.5; if (mp0 < moveCost) return;
 
                 var curPos = ctx.GetUnitVar<Coord>(pid, Keys.Pos, default);
-                AppendPublic(new[] { $"Boss {pid} 向敌人移动: {curPos} → {best}" });
+                AppendPublic(new[] { $"【{bossName}】移动 {curPos} → {best}" });
 
                 (state, var log) = se.Execute(state, new AtomicAction[] { new Move(pid, best), new ModifyUnitVar(pid, Keys.Mp, v => (v is double d ? d : Convert.ToDouble(v)) - moveCost) });
                 AppendDebugFor(pid, log.Messages);

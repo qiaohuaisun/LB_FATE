@@ -2,7 +2,11 @@
   "permissions": {
     "allow": [
       "Bash(python3:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(dotnet tool install:*)",
+      "Bash(dotnet test)",
+      "Bash(dotnet build)",
+      "Bash(dotnet test:*)"
     ],
     "deny": [],
     "ask": []

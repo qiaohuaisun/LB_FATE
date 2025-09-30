@@ -95,6 +95,7 @@ partial class Game
                 roleOf[bossId] = bossRole;
                 teamOf[bossId] = "BOSS";
                 symbolOf[bossId] = 'B';
+                bossName = bossRole.Name; // Store boss name for display
                 state = WorldStateOps.WithUnit(state, bossId, u => u with { Vars = u.Vars.SetItem(Keys.Pos, pos).SetItem("class", "Boss") });
                 // Ensure MaxMp present
                 var u0 = state.Units[bossId];
