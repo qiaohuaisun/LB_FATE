@@ -31,41 +31,37 @@ public sealed class TurnSystem
         _logger.LogDebug("Turn advanced: {OldTurn} -> {NewTurn}", oldTurn, newTurn);
 
         // Global toggles that tick down per day: reverse heal / reverse damage
-        if (cur.Global.Vars.TryGetValue(Keys.ReverseHealTurnsGlobal, out var rvt))
+        int reverseHealTurns = TypeConversion.GetIntFrom(cur.Global.Vars, Keys.ReverseHealTurnsGlobal);
+        if (reverseHealTurns > 0)
         {
-            var turns = rvt is int i ? i : (rvt is long l ? (int)l : (rvt is double d ? (int)Math.Round(d) : 0));
-            if (turns > 0)
-            {
-                var nt = turns - 1;
-                if (nt > 0)
-                    cur = WorldStateOps.WithGlobal(cur, g => g with { Vars = g.Vars.SetItem(Keys.ReverseHealTurnsGlobal, nt) });
-                else
-                    cur = WorldStateOps.WithGlobal(cur, g => g with { Vars = g.Vars.Remove(Keys.ReverseHealTurnsGlobal) });
-            }
+            var newTurns = reverseHealTurns - 1;
+            if (newTurns > 0)
+                cur = WorldStateOps.WithGlobal(cur, g => g with { Vars = g.Vars.SetItem(Keys.ReverseHealTurnsGlobal, newTurns) });
+            else
+                cur = WorldStateOps.WithGlobal(cur, g => g with { Vars = g.Vars.Remove(Keys.ReverseHealTurnsGlobal) });
         }
-        if (cur.Global.Vars.TryGetValue(Keys.ReverseDamageTurnsGlobal, out var rvd))
+
+        int reverseDamageTurns = TypeConversion.GetIntFrom(cur.Global.Vars, Keys.ReverseDamageTurnsGlobal);
+        if (reverseDamageTurns > 0)
         {
-            var turns = rvd is int i ? i : (rvd is long l ? (int)l : (rvd is double d ? (int)Math.Round(d) : 0));
-            if (turns > 0)
-            {
-                var nt = turns - 1;
-                if (nt > 0)
-                    cur = WorldStateOps.WithGlobal(cur, g => g with { Vars = g.Vars.SetItem(Keys.ReverseDamageTurnsGlobal, nt) });
-                else
-                    cur = WorldStateOps.WithGlobal(cur, g => g with { Vars = g.Vars.Remove(Keys.ReverseDamageTurnsGlobal) });
-            }
+            var newTurns = reverseDamageTurns - 1;
+            if (newTurns > 0)
+                cur = WorldStateOps.WithGlobal(cur, g => g with { Vars = g.Vars.SetItem(Keys.ReverseDamageTurnsGlobal, newTurns) });
+            else
+                cur = WorldStateOps.WithGlobal(cur, g => g with { Vars = g.Vars.Remove(Keys.ReverseDamageTurnsGlobal) });
         }
 
         // per-unit maintenance
         foreach (var (id, unit) in state.Units)
         {
             // undying tick
-            if (unit.Vars.TryGetValue(Keys.UndyingTurns, out var uv) && uv is int turns && turns > 0)
+            int undyingTurns = unit.GetIntVar(Keys.UndyingTurns);
+            if (undyingTurns > 0)
             {
-                var newTurns = turns - 1;
+                var newTurns = undyingTurns - 1;
                 cur = WorldStateOps.WithUnit(cur, id, u => u with { Vars = u.Vars.SetItem(Keys.UndyingTurns, newTurns) });
                 events?.Publish(EventTopics.UndyingTick, new { unit = id, remaining = newTurns });
-                log.Info($"Undying tick for {id}: {turns} -> {newTurns}");
+                log.Info($"Undying tick for {id}: {undyingTurns} -> {newTurns}");
                 if (newTurns <= 0)
                 {
                     // optional: remove Undying tag if present
@@ -75,70 +71,87 @@ public sealed class TurnSystem
             }
 
             // status ticks: stunned/silenced/rooted
-            if (unit.Vars.TryGetValue(Keys.StunnedTurns, out var stv) && stv is int st && st > 0)
+            int stunnedTurns = unit.GetIntVar(Keys.StunnedTurns);
+            if (stunnedTurns > 0)
             {
-                var ns = st - 1;
-                cur = WorldStateOps.WithUnit(cur, id, u => u with { Vars = u.Vars.SetItem(Keys.StunnedTurns, ns), Tags = u.Tags.Add(Tags.Stunned) });
-                if (ns <= 0)
+                var newTurns = stunnedTurns - 1;
+                cur = WorldStateOps.WithUnit(cur, id, u => u with { Vars = u.Vars.SetItem(Keys.StunnedTurns, newTurns), Tags = u.Tags.Add(Tags.Stunned) });
+                if (newTurns <= 0)
                     cur = WorldStateOps.WithUnit(cur, id, u => u with { Tags = u.Tags.Remove(Tags.Stunned) });
             }
+
             // untargetable tick
-            if (unit.Vars.TryGetValue(Keys.UntargetableTurns, out var utv) && utv is int utt && utt > 0)
+            int untargetableTurns = unit.GetIntVar(Keys.UntargetableTurns);
+            if (untargetableTurns > 0)
             {
-                var ns = utt - 1;
-                cur = WorldStateOps.WithUnit(cur, id, u => u with { Vars = u.Vars.SetItem(Keys.UntargetableTurns, ns) });
+                var newTurns = untargetableTurns - 1;
+                cur = WorldStateOps.WithUnit(cur, id, u => u with { Vars = u.Vars.SetItem(Keys.UntargetableTurns, newTurns) });
             }
+
             // cannot act tick
-            if (unit.Vars.TryGetValue(Keys.CannotActTurns, out var catv) && catv is int cat && cat > 0)
+            int cannotActTurns = unit.GetIntVar(Keys.CannotActTurns);
+            if (cannotActTurns > 0)
             {
-                var ns = cat - 1;
-                cur = WorldStateOps.WithUnit(cur, id, u => u with { Vars = u.Vars.SetItem(Keys.CannotActTurns, ns) });
+                var newTurns = cannotActTurns - 1;
+                cur = WorldStateOps.WithUnit(cur, id, u => u with { Vars = u.Vars.SetItem(Keys.CannotActTurns, newTurns) });
             }
+
             // on-damage heal duration tick
-            if (unit.Vars.TryGetValue(Keys.OnDamageHealTurns, out var odtv) && odtv is int odt && odt > 0)
+            int onDamageHealTurns = unit.GetIntVar(Keys.OnDamageHealTurns);
+            if (onDamageHealTurns > 0)
             {
-                var ns = odt - 1;
-                cur = WorldStateOps.WithUnit(cur, id, u => u with { Vars = u.Vars.SetItem(Keys.OnDamageHealTurns, ns) });
+                var newTurns = onDamageHealTurns - 1;
+                cur = WorldStateOps.WithUnit(cur, id, u => u with { Vars = u.Vars.SetItem(Keys.OnDamageHealTurns, newTurns) });
             }
-            if (unit.Vars.TryGetValue(Keys.SilencedTurns, out var slv) && slv is int sl && sl > 0)
+
+            int silencedTurns = unit.GetIntVar(Keys.SilencedTurns);
+            if (silencedTurns > 0)
             {
-                var ns = sl - 1;
-                cur = WorldStateOps.WithUnit(cur, id, u => u with { Vars = u.Vars.SetItem(Keys.SilencedTurns, ns), Tags = u.Tags.Add(Tags.Silenced) });
-                if (ns <= 0)
+                var newTurns = silencedTurns - 1;
+                cur = WorldStateOps.WithUnit(cur, id, u => u with { Vars = u.Vars.SetItem(Keys.SilencedTurns, newTurns), Tags = u.Tags.Add(Tags.Silenced) });
+                if (newTurns <= 0)
                     cur = WorldStateOps.WithUnit(cur, id, u => u with { Tags = u.Tags.Remove(Tags.Silenced) });
             }
-            if (unit.Vars.TryGetValue(Keys.RootedTurns, out var rtv) && rtv is int rt && rt > 0)
+
+            int rootedTurns = unit.GetIntVar(Keys.RootedTurns);
+            if (rootedTurns > 0)
             {
-                var ns = rt - 1;
-                cur = WorldStateOps.WithUnit(cur, id, u => u with { Vars = u.Vars.SetItem(Keys.RootedTurns, ns), Tags = u.Tags.Add(Tags.Rooted) });
-                if (ns <= 0)
+                var newTurns = rootedTurns - 1;
+                cur = WorldStateOps.WithUnit(cur, id, u => u with { Vars = u.Vars.SetItem(Keys.RootedTurns, newTurns), Tags = u.Tags.Add(Tags.Rooted) });
+                if (newTurns <= 0)
                     cur = WorldStateOps.WithUnit(cur, id, u => u with { Tags = u.Tags.Remove(Tags.Rooted) });
             }
+
             // status immunity tick
-            if (unit.Vars.TryGetValue(Keys.StatusImmuneTurns, out var imv) && imv is int im && im > 0)
+            int statusImmuneTurns = unit.GetIntVar(Keys.StatusImmuneTurns);
+            if (statusImmuneTurns > 0)
             {
-                var ns = im - 1;
-                cur = WorldStateOps.WithUnit(cur, id, u => u with { Vars = u.Vars.SetItem(Keys.StatusImmuneTurns, ns) });
+                var newTurns = statusImmuneTurns - 1;
+                cur = WorldStateOps.WithUnit(cur, id, u => u with { Vars = u.Vars.SetItem(Keys.StatusImmuneTurns, newTurns) });
             }
 
             // no heal tick
-            if (unit.Vars.TryGetValue(Keys.NoHealTurns, out var nht) && nht is int nhti && nhti > 0)
+            int noHealTurns = unit.GetIntVar(Keys.NoHealTurns);
+            if (noHealTurns > 0)
             {
-                var ns = nhti - 1;
-                cur = WorldStateOps.WithUnit(cur, id, u => u with { Vars = u.Vars.SetItem(Keys.NoHealTurns, ns) });
+                var newTurns = noHealTurns - 1;
+                cur = WorldStateOps.WithUnit(cur, id, u => u with { Vars = u.Vars.SetItem(Keys.NoHealTurns, newTurns) });
             }
 
             // Timed evasion bonus tick
-            if (unit.Vars.TryGetValue(Keys.TempEvasionBonusTurns, out var ebv) && ebv is int ebt && ebt > 0)
+            int evasionBonusTurns = unit.GetIntVar(Keys.TempEvasionBonusTurns);
+            if (evasionBonusTurns > 0)
             {
-                var ns = ebt - 1;
-                cur = WorldStateOps.WithUnit(cur, id, u => u with { Vars = u.Vars.SetItem(Keys.TempEvasionBonusTurns, ns) });
+                var newTurns = evasionBonusTurns - 1;
+                cur = WorldStateOps.WithUnit(cur, id, u => u with { Vars = u.Vars.SetItem(Keys.TempEvasionBonusTurns, newTurns) });
             }
+
             // Force ignore defense tick
-            if (unit.Vars.TryGetValue(Keys.ForceIgnoreDefTurns, out var fiv) && fiv is int fit && fit > 0)
+            int ignoreDefTurns = unit.GetIntVar(Keys.ForceIgnoreDefTurns);
+            if (ignoreDefTurns > 0)
             {
-                var ns = fit - 1;
-                cur = WorldStateOps.WithUnit(cur, id, u => u with { Vars = u.Vars.SetItem(Keys.ForceIgnoreDefTurns, ns) });
+                var newTurns = ignoreDefTurns - 1;
+                cur = WorldStateOps.WithUnit(cur, id, u => u with { Vars = u.Vars.SetItem(Keys.ForceIgnoreDefTurns, newTurns) });
             }
 
             // mp regen
@@ -179,22 +192,17 @@ public sealed class TurnSystem
             }
 
             // hp regen (new)
-            if (unit.Vars.TryGetValue(Keys.HpRegenPerTurn, out var hrv))
+            double hpRegen = unit.GetDoubleVar(Keys.HpRegenPerTurn);
+            if (hpRegen != 0.0)
             {
-                double hregen = hrv switch { int i => i, double d => d, float f => f, long l => l, _ => 0.0 };
-                if (hregen != 0.0)
+                cur = WorldStateOps.WithUnit(cur, id, u =>
                 {
-                    cur = WorldStateOps.WithUnit(cur, id, u =>
-                    {
-                        var hp = 0;
-                        if (u.Vars.TryGetValue(Keys.Hp, out var hv))
-                            hp = hv switch { int i => i, long l => (int)l, double d => (int)Math.Round(d), _ => 0 };
-                        int maxHp = u.Vars.TryGetValue(Keys.MaxHp, out var mhv) ? (mhv is int mi ? mi : (mhv is long ml ? (int)ml : (mhv is double md ? (int)Math.Round(md) : 0))) : int.MaxValue;
-                        var nhp = Math.Min(maxHp, hp + (int)Math.Round(hregen));
-                        return u with { Vars = u.Vars.SetItem(Keys.Hp, nhp) };
-                    });
-                    log.Info($"HP regen for {id}: +{hregen}");
-                }
+                    int hp = u.GetIntVar(Keys.Hp);
+                    int maxHp = u.GetIntVar(Keys.MaxHp, int.MaxValue);
+                    int newHp = Math.Min(maxHp, hp + (int)Math.Round(hpRegen));
+                    return u with { Vars = u.Vars.SetItem(Keys.Hp, newHp) };
+                });
+                log.Info($"HP regen for {id}: +{hpRegen}");
             }
 
             // magic resist per-turn increment is handled via generic per_turn_add:resist_magic
@@ -234,7 +242,7 @@ public sealed class TurnSystem
                         }
                         if (targetKey.StartsWith("resist_"))
                         {
-                            newVal = Math.Clamp(newVal, 0.0, 1.0);
+                            newVal = Math.Clamp(newVal, GameConstants.MinResistanceCap, GameConstants.MaxResistanceCap);
                         }
                         object outVal;
                         if (oldObj is int or long || targetKey == Keys.Hp)
@@ -249,42 +257,36 @@ public sealed class TurnSystem
             }
 
             // bleed/burn damage over time per day (tick once per AdvanceTurn)
-            if (unit.Vars.TryGetValue(Keys.BleedTurns, out var btv) && btv is int bt && bt > 0)
+            int bleedTurns = unit.GetIntVar(Keys.BleedTurns);
+            if (bleedTurns > 0)
             {
-                var dpt = 1;
-                if (unit.Vars.TryGetValue(Keys.BleedPerTurn, out var bpv))
-                    dpt = bpv switch { int i => i, long l => (int)l, double d => (int)Math.Round(d), _ => 1 };
+                int damagePerTurn = unit.GetIntVar(Keys.BleedPerTurn, GameConstants.DefaultBleedDamagePerTurn);
                 cur = WorldStateOps.WithUnit(cur, id, u =>
                 {
-                    var hp = 0;
-                    if (u.Vars.TryGetValue(Keys.Hp, out var hv))
-                        hp = hv switch { int i => i, long l => (int)l, double d => (int)Math.Round(d), _ => 0 };
-                    var nhp = Math.Max(0, hp - Math.Max(0, dpt));
-                    var nv = u.Vars.SetItem(Keys.BleedTurns, bt - 1).SetItem(Keys.Hp, nhp);
-                    if (bt - 1 <= 0) nv = nv.Remove(Keys.BleedPerTurn);
-                    return u with { Vars = nv, Tags = (bt - 1 <= 0) ? u.Tags.Remove(Tags.Bleeding) : u.Tags };
+                    int hp = u.GetIntVar(Keys.Hp);
+                    int newHp = Math.Max(0, hp - Math.Max(0, damagePerTurn));
+                    var newVars = u.Vars.SetItem(Keys.BleedTurns, bleedTurns - 1).SetItem(Keys.Hp, newHp);
+                    if (bleedTurns - 1 <= 0) newVars = newVars.Remove(Keys.BleedPerTurn);
+                    return u with { Vars = newVars, Tags = (bleedTurns - 1 <= 0) ? u.Tags.Remove(Tags.Bleeding) : u.Tags };
                 });
-                events?.Publish(EventTopics.ActionExecuted, new ActionExecutedEvent(state, cur, new Damage(id, dpt)));
-                log.Info($"Bleed tick on {id}: -{dpt}");
+                events?.Publish(EventTopics.ActionExecuted, new ActionExecutedEvent(state, cur, new Damage(id, damagePerTurn)));
+                log.Info($"Bleed tick on {id}: -{damagePerTurn}");
             }
 
-            if (unit.Vars.TryGetValue(Keys.BurnTurns, out var ftv) && ftv is int ft && ft > 0)
+            int burnTurns = unit.GetIntVar(Keys.BurnTurns);
+            if (burnTurns > 0)
             {
-                var dpt = 1;
-                if (unit.Vars.TryGetValue(Keys.BurnPerTurn, out var fpv))
-                    dpt = fpv switch { int i => i, long l => (int)l, double d => (int)Math.Round(d), _ => 1 };
+                int damagePerTurn = unit.GetIntVar(Keys.BurnPerTurn, GameConstants.DefaultBurnDamagePerTurn);
                 cur = WorldStateOps.WithUnit(cur, id, u =>
                 {
-                    var hp = 0;
-                    if (u.Vars.TryGetValue(Keys.Hp, out var hv))
-                        hp = hv switch { int i => i, long l => (int)l, double d => (int)Math.Round(d), _ => 0 };
-                    var nhp = Math.Max(0, hp - Math.Max(0, dpt));
-                    var nv = u.Vars.SetItem(Keys.BurnTurns, ft - 1).SetItem(Keys.Hp, nhp);
-                    if (ft - 1 <= 0) nv = nv.Remove(Keys.BurnPerTurn);
-                    return u with { Vars = nv, Tags = (ft - 1 <= 0) ? u.Tags.Remove(Tags.Burning) : u.Tags };
+                    int hp = u.GetIntVar(Keys.Hp);
+                    int newHp = Math.Max(0, hp - Math.Max(0, damagePerTurn));
+                    var newVars = u.Vars.SetItem(Keys.BurnTurns, burnTurns - 1).SetItem(Keys.Hp, newHp);
+                    if (burnTurns - 1 <= 0) newVars = newVars.Remove(Keys.BurnPerTurn);
+                    return u with { Vars = newVars, Tags = (burnTurns - 1 <= 0) ? u.Tags.Remove(Tags.Burning) : u.Tags };
                 });
-                events?.Publish(EventTopics.ActionExecuted, new ActionExecutedEvent(state, cur, new Damage(id, dpt)));
-                log.Info($"Burn tick on {id}: -{dpt}");
+                events?.Publish(EventTopics.ActionExecuted, new ActionExecutedEvent(state, cur, new Damage(id, damagePerTurn)));
+                log.Info($"Burn tick on {id}: -{damagePerTurn}");
             }
         }
 

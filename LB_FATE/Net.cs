@@ -3,7 +3,9 @@ using System.Net.Sockets;
 using System.Text;
 using System.Linq;
 
-interface IPlayerEndpoint : IDisposable
+namespace LB_FATE;
+
+public interface IPlayerEndpoint : IDisposable
 {
     string Id { get; }
     void SendLine(string text);
@@ -11,12 +13,27 @@ interface IPlayerEndpoint : IDisposable
     bool IsAlive { get; }
 }
 
-class ConsoleEndpoint : IPlayerEndpoint
+public class ConsoleEndpoint : IPlayerEndpoint
 {
     public string Id { get; }
+    private Func<string?>? _autoCompleteReader = null;
+
     public ConsoleEndpoint(string id) { Id = id; }
+
+    public void SetAutoCompleteReader(Func<string?> reader)
+    {
+        _autoCompleteReader = reader;
+    }
+
     public void SendLine(string text) { Console.WriteLine(text); }
-    public string? ReadLine() { return Console.ReadLine(); }
+
+    public string? ReadLine()
+    {
+        if (_autoCompleteReader is not null)
+            return _autoCompleteReader();
+        return Console.ReadLine();
+    }
+
     public bool IsAlive => true;
     public void Dispose() { }
 }
@@ -190,7 +207,7 @@ static class NetClient
                     if (line == "PROMPT")
                     {
                         Console.Write("> ");
-                        var cmd = Console.ReadLine() ?? string.Empty;
+                        var cmd = InputReader.ReadLineWithCompletion(new ClientAutoCompleteAdapter()) ?? string.Empty;
                         try { writer.WriteLine(cmd); } catch { Console.WriteLine("发送失败，连接已断开。"); break; }
                         continue;
                     }

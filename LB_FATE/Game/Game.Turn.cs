@@ -12,6 +12,13 @@ partial class Game
         // speed/range/rooted/silenced will be recomputed dynamically each loop
         IPlayerEndpoint? ep = endpoints.TryGetValue(pid, out var ept) ? ept : null;
 
+        // Enable auto-completion for ConsoleEndpoint
+        if (ep is ConsoleEndpoint consoleEp)
+        {
+            var autoComplete = new AutoComplete(this, pid);
+            consoleEp.SetAutoCompleteReader(() => InputReader.ReadLineWithCompletion(autoComplete));
+        }
+
         while (true)
         {
             // 若连接已关闭：移除并广播离线
@@ -55,15 +62,16 @@ partial class Game
 
                 if (cmd is "help" or "h")
                 {
-                    WriteLineTo(pid, "move x y | m x y : move to a reachable tile (clear path ≤ speed, cost: 0.5 MP)");
-                    WriteLineTo(pid, "attack P# | a P# : attack target (cost: 0.5 MP; LBR Basic Attack if exists)");
+                    WriteLineTo(pid, $"move x y | m x y : move to a reachable tile (clear path ≤ speed, cost: {GameConstants.MovementCost} MP)");
+                    WriteLineTo(pid, $"attack P# | a P# : attack target (cost: {GameConstants.BasicAttackCost} MP; LBR Basic Attack if exists)");
                     WriteLineTo(pid, "skills | s       : list available skills");
                     WriteLineTo(pid, "info | i         : show role description");
                     WriteLineTo(pid, "use n P# | u n P#: cast skill #n (target optional by targeting)");
                     WriteLineTo(pid, "hint move|hm     : highlight reachable tiles");
                     WriteLineTo(pid, "pass | p         : end your turn");
-                    WriteLineTo(pid, "Costs           : Move 0.5 MP; Attack 0.5 MP");
+                    WriteLineTo(pid, $"Costs           : Move {GameConstants.MovementCost} MP; Attack {GameConstants.BasicAttackCost} MP");
                     WriteLineTo(pid, "Note            : Each player acts once per phase.");
+                    WriteLineTo(pid, "Tip             : Press TAB for auto-completion");
                     continue;
                 }
                 if (cmd is "info" or "i")
@@ -115,10 +123,10 @@ partial class Game
                     // Path must be reachable within speed without passing through occupied tiles
                     var reachable = ReachableCells(pid, speed);
                     if (!reachable.Contains(dest)) { WriteLineTo(pid, "Destination not reachable (blocked path or too far)."); continue; }
-                    // MP cost for moving: fixed 0.5 per move
+                    // MP cost for moving
                     var mpObj0 = ctx.GetUnitVar<object>(pid, Keys.Mp, 0);
                     double mp0 = mpObj0 is double dd0 ? dd0 : (mpObj0 is int ii0 ? ii0 : 0);
-                    double moveCost = 0.5;
+                    double moveCost = GameConstants.MovementCost;
                     if (mp0 < moveCost) { WriteLineTo(pid, $"Not enough MP to move ({moveCost:0.##} required)."); continue; }
                     // Validator to re-assert path reachability during execution
                     ActionValidator pathValidator = (Context _, AtomicAction[] __, out string? reason) =>
@@ -383,10 +391,10 @@ partial class Game
                         );
                         var validator2 = ActionValidators.ForSkillWithExtras(basic.Compiled, cfg2, cooldowns);
                         var se2 = new SkillExecutor();
-                        // 普攻统一消耗 0.5 MP
+                        // 普攻统一消耗 MP
                         var mpObjB = ctx.GetUnitVar<object>(pid, Keys.Mp, 0);
                         double mpB = mpObjB is double ddb ? ddb : (mpObjB is int ib ? ib : 0);
-                        double basicCost = 0.5;
+                        double basicCost = GameConstants.BasicAttackCost;
                         if (mpB < basicCost) { WriteLineTo(pid, "Not enough MP."); continue; }
                         int repeats = (d <= twinRange && extraStrikes > 1) ? extraStrikes : 1;
                         for (int i = 0; i < repeats; i++)
@@ -406,10 +414,10 @@ partial class Game
                     {
                         if (d > range) { WriteLineTo(pid, $"Target out of range ({range})."); continue; }
                         var actions = new List<AtomicAction>();
-                        // 普攻统一消耗：所有阶职 0.5 MP
+                        // 普攻统一消耗：所有阶职 MP
                         var mpObj = ctx.GetUnitVar<object>(pid, Keys.Mp, 0);
                         double mp = mpObj is double dd ? dd : (mpObj is int i2 ? i2 : 0);
-                        double cost = 0.5;
+                        double cost = GameConstants.BasicAttackCost;
                         if (mp < cost) { WriteLineTo(pid, "Not enough MP."); continue; }
                         actions.Add(new ModifyUnitVar(pid, Keys.Mp, v => (v is double d0 ? d0 : Convert.ToDouble(v)) - cost));
                         var power = 5;
@@ -925,7 +933,7 @@ partial class Game
         if (best.Equals(default(Coord))) return false;
         var mpObj0 = ctx.GetUnitVar<object>(pid, Keys.Mp, 0);
         double mp0 = mpObj0 is double dd0 ? dd0 : (mpObj0 is int ii0 ? ii0 : 0);
-        double moveCost = 0.5; if (mp0 < moveCost) return false;
+        double moveCost = GameConstants.MovementCost; if (mp0 < moveCost) return false;
         var se = new SkillExecutor();
         var curPos = ctx.GetUnitVar<Coord>(pid, Keys.Pos, default);
         AppendPublic(new[] { $"【{bossName}】移动 {curPos} → {best}" });
@@ -954,7 +962,7 @@ partial class Game
         if (best.Equals(myPos)) return false;
         var mpObj0 = ctx.GetUnitVar<object>(pid, Keys.Mp, 0);
         double mp0 = mpObj0 is double dd0 ? dd0 : (mpObj0 is int ii0 ? ii0 : 0);
-        double moveCost = 0.5; if (mp0 < moveCost) return false;
+        double moveCost = GameConstants.MovementCost; if (mp0 < moveCost) return false;
         var se = new SkillExecutor();
         AppendPublic(new[] { $"【{bossName}】撤退 {myPos} → {best}" });
 
@@ -989,7 +997,7 @@ partial class Game
         var se2 = new SkillExecutor();
         var mpObj = ctx.GetUnitVar<object>(pid, Keys.Mp, 0);
         double mp = mpObj is double dd ? dd : (mpObj is int i2 ? i2 : 0);
-        double cost = 0.5; if (mp < cost) return false;
+        double cost = GameConstants.BasicAttackCost; if (mp < cost) return false;
 
         AppendPublic(new[] { $"【{bossName}】攻击 → {nearestId}" });
 
@@ -1107,7 +1115,7 @@ partial class Game
                         // attack costs 0.5 MP like client
                         var mpObj = ctx.GetUnitVar<object>(pid, Keys.Mp, 0);
                         double mp = mpObj is double dd ? dd : (mpObj is int i2 ? i2 : 0);
-                        double cost = 0.5; if (mp < cost) return;
+                        double cost = GameConstants.BasicAttackCost; if (mp < cost) return;
 
                         AppendPublic(new[] { $"【{bossName}】攻击 → {nearestId}" });
 
@@ -1142,7 +1150,7 @@ partial class Game
                 var se = new SkillExecutor();
                 var mpObj0 = ctx.GetUnitVar<object>(pid, Keys.Mp, 0);
                 double mp0 = mpObj0 is double dd0 ? dd0 : (mpObj0 is int ii0 ? ii0 : 0);
-                double moveCost = 0.5; if (mp0 < moveCost) return;
+                double moveCost = GameConstants.MovementCost; if (mp0 < moveCost) return;
 
                 var curPos = ctx.GetUnitVar<Coord>(pid, Keys.Pos, default);
                 AppendPublic(new[] { $"【{bossName}】移动 {curPos} → {best}" });

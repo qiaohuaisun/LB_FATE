@@ -15,6 +15,165 @@ public class MoreCoverageTests
         return WorldStateOps.WithUnit(s, id, _ => new UnitState(imVars, imTags));
     }
 
+    // --- New tests for improved coverage ---
+
+    [Fact]
+    public void ModifyGlobalVar_Works()
+    {
+        var s = EmptyWorld();
+        s = WorldStateOps.WithGlobal(s, g => g with { Vars = g.Vars.SetItem("counter", 10) });
+        var action = new ModifyGlobalVar("counter", v => (int)v + 5);
+        var se = new SkillExecutor();
+        (s, _) = se.Execute(s, new[] { action });
+        Assert.Equal(15, (int)s.Global.Vars["counter"]);
+    }
+
+    [Fact]
+    public void RemoveGlobalVar_Works()
+    {
+        var s = EmptyWorld();
+        s = WorldStateOps.WithGlobal(s, g => g with { Vars = g.Vars.SetItem("temp", 123) });
+        var action = new RemoveGlobalVar("temp");
+        var se = new SkillExecutor();
+        (s, _) = se.Execute(s, new[] { action });
+        Assert.False(s.Global.Vars.ContainsKey("temp"));
+    }
+
+    [Fact]
+    public void RemoveTileVar_Works()
+    {
+        var s = EmptyWorld();
+        var pos = new Coord(2, 2);
+        s = WorldStateOps.WithTile(s, pos, t => t with { Vars = t.Vars.SetItem("marker", "X") });
+        var action = new RemoveTileVar(pos, "marker");
+        var se = new SkillExecutor();
+        (s, _) = se.Execute(s, new[] { action });
+        Assert.False(s.Tiles[pos.X, pos.Y].Vars.ContainsKey("marker"));
+    }
+
+    [Fact]
+    public void RemoveUnitVar_Works()
+    {
+        var s = EmptyWorld();
+        s = WithUnit(s, "U1", new Dictionary<string, object> { ["temp_buff"] = 5 });
+        var action = new RemoveUnitVar("U1", "temp_buff");
+        var se = new SkillExecutor();
+        (s, _) = se.Execute(s, new[] { action });
+        Assert.False(s.Units["U1"].Vars.ContainsKey("temp_buff"));
+    }
+
+    [Fact]
+    public void RoleRegistry_All_Works()
+    {
+        var registry = new RoleRegistry();
+        // Initially empty
+        Assert.Empty(registry.All());
+    }
+
+    [Fact]
+    public void Coord_GetHashCode_Works()
+    {
+        var c1 = new Coord(5, 3);
+        var c2 = new Coord(5, 3);
+        var c3 = new Coord(3, 5);
+
+        Assert.Equal(c1.GetHashCode(), c2.GetHashCode());
+        Assert.NotEqual(c1.GetHashCode(), c3.GetHashCode());
+    }
+
+    [Fact]
+    public void PhysicalDamage_WithIgnoreDefense()
+    {
+        var s = EmptyWorld();
+        s = WithUnit(s, "A", new Dictionary<string, object> { [Keys.Atk] = 10, [Keys.Pos] = new Coord(1, 1) });
+        s = WithUnit(s, "T", new Dictionary<string, object> {
+            [Keys.Hp] = 100,
+            [Keys.MaxHp] = 100,
+            [Keys.Def] = 5,
+            [Keys.Pos] = new Coord(2, 2)
+        });
+
+        var action = new PhysicalDamage("A", "T", 20, IgnoreDefenseRatio: 0.5);
+        var se = new SkillExecutor();
+        (s, _) = se.Execute(s, new[] { action });
+
+        Assert.True(s.Units["T"].Vars.TryGetValue(Keys.Hp, out var hp));
+        Assert.True((int)hp < 100); // Damage was dealt
+    }
+
+    [Fact]
+    public void Heal_CannotExceedMaxHp()
+    {
+        var s = EmptyWorld();
+        s = WithUnit(s, "H", new Dictionary<string, object> {
+            [Keys.Hp] = 80,
+            [Keys.MaxHp] = 100,
+            [Keys.Pos] = new Coord(1, 1)
+        });
+
+        var action = new Heal("H", 50); // Try to heal 50, but max is 100
+        var se = new SkillExecutor();
+        (s, _) = se.Execute(s, new[] { action });
+
+        Assert.Equal(100, (int)s.Units["H"].Vars[Keys.Hp]); // Clamped to max
+    }
+
+    [Fact]
+    public void MagicDamage_Works()
+    {
+        var s = EmptyWorld();
+        s = WithUnit(s, "C", new Dictionary<string, object> { [Keys.Atk] = 15, [Keys.Pos] = new Coord(1, 1) });
+        s = WithUnit(s, "T", new Dictionary<string, object> {
+            [Keys.Hp] = 100,
+            [Keys.MaxHp] = 100,
+            [Keys.Def] = 3,
+            [Keys.Pos] = new Coord(2, 2)
+        });
+
+        var action = new MagicDamage("C", "T", 10, 1.0);
+        var se = new SkillExecutor();
+        (s, _) = se.Execute(s, new[] { action });
+
+        Assert.True((int)s.Units["T"].Vars[Keys.Hp] < 100);
+    }
+
+    [Fact]
+    public void WorldStateOps_WithGlobal_Works()
+    {
+        var s = EmptyWorld();
+        s = WorldStateOps.WithGlobal(s, g => g with { Vars = g.Vars.SetItem("test", 42) });
+        Assert.Equal(42, s.Global.Vars["test"]);
+    }
+
+    [Fact]
+    public void Context_GetGlobalVar_Works()
+    {
+        var s = EmptyWorld();
+        s = WorldStateOps.WithGlobal(s, g => g with { Vars = g.Vars.SetItem("counter", 100) });
+        var ctx = new Context(s);
+        Assert.Equal(100, ctx.GetGlobalVar<int>("counter", 0));
+        Assert.Equal(0, ctx.GetGlobalVar<int>("nonexistent", 0));
+    }
+
+    [Fact]
+    public void Damage_WithTrue_IsAlwaysTrue()
+    {
+        var s = EmptyWorld();
+        s = WithUnit(s, "A", new Dictionary<string, object> { [Keys.Atk] = 10, [Keys.Pos] = new Coord(1, 1) });
+        s = WithUnit(s, "T", new Dictionary<string, object> {
+            [Keys.Hp] = 100,
+            [Keys.MaxHp] = 100,
+            [Keys.Def] = 5,
+            [Keys.Pos] = new Coord(2, 2)
+        });
+
+        var action = new Damage("T", 5);
+        var se = new SkillExecutor();
+        (s, _) = se.Execute(s, new[] { action });
+
+        Assert.Equal(95, (int)s.Units["T"].Vars[Keys.Hp]);
+    }
+
     [Fact]
     public void Validator_SealedUntil_Day_Phase_Works()
     {
@@ -646,6 +805,634 @@ public class MoreCoverageTests
         var selector = Selection.LowestHp();
         var result = selector(ctx).ToList();
         Assert.Equal("U2", result[0]);
+    }
+
+    // Additional RoleRegistry and SkillRegistry tests
+    [Fact]
+    public void RoleRegistry_AddOrUpdate_Works()
+    {
+        var registry = new RoleRegistry();
+        var role = new RoleDefinition
+        {
+            Id = "test_hero",
+            Name = "Test Hero",
+            Description = "A test hero",
+            Vars = new Dictionary<string, object>().ToImmutableDictionary(),
+            Tags = Array.Empty<string>().ToImmutableHashSet(),
+            Skills = Array.Empty<RoleSkill>().ToImmutableArray()
+        };
+
+        registry.AddOrUpdate(role);
+        Assert.True(registry.TryGet("test_hero", out var retrieved));
+        Assert.Equal("Test Hero", retrieved?.Name);
+    }
+
+    [Fact]
+    public void RoleRegistry_AddOrUpdate_ThrowsOnEmptyId()
+    {
+        var registry = new RoleRegistry();
+        var role = new RoleDefinition
+        {
+            Id = "",
+            Name = "Invalid",
+            Description = "",
+            Vars = new Dictionary<string, object>().ToImmutableDictionary(),
+            Tags = Array.Empty<string>().ToImmutableHashSet(),
+            Skills = Array.Empty<RoleSkill>().ToImmutableArray()
+        };
+
+        Assert.Throws<ArgumentException>(() => registry.AddOrUpdate(role));
+    }
+
+    [Fact]
+    public void RoleRegistry_Get_ThrowsWhenNotFound()
+    {
+        var registry = new RoleRegistry();
+        Assert.Throws<KeyNotFoundException>(() => registry.Get("nonexistent"));
+    }
+
+    [Fact]
+    public void RoleRegistry_Get_ReturnsRole()
+    {
+        var registry = new RoleRegistry();
+        var role = new RoleDefinition
+        {
+            Id = "warrior",
+            Name = "Warrior",
+            Description = "",
+            Vars = new Dictionary<string, object>().ToImmutableDictionary(),
+            Tags = Array.Empty<string>().ToImmutableHashSet(),
+            Skills = Array.Empty<RoleSkill>().ToImmutableArray()
+        };
+        registry.AddOrUpdate(role);
+
+        var retrieved = registry.Get("warrior");
+        Assert.Equal("Warrior", retrieved.Name);
+    }
+
+    [Fact]
+    public void RoleRegistry_Clear_Works()
+    {
+        var registry = new RoleRegistry();
+        var role = new RoleDefinition
+        {
+            Id = "temp",
+            Name = "Temp",
+            Description = "",
+            Vars = new Dictionary<string, object>().ToImmutableDictionary(),
+            Tags = Array.Empty<string>().ToImmutableHashSet(),
+            Skills = Array.Empty<RoleSkill>().ToImmutableArray()
+        };
+        registry.AddOrUpdate(role);
+        registry.Clear();
+
+        Assert.Empty(registry.All());
+    }
+
+    [Fact]
+    public void RoleRegistry_Ids_ReturnsAllIds()
+    {
+        var registry = new RoleRegistry();
+        registry.AddOrUpdate(new RoleDefinition
+        {
+            Id = "hero1",
+            Name = "Hero 1",
+            Description = "",
+            Vars = new Dictionary<string, object>().ToImmutableDictionary(),
+            Tags = Array.Empty<string>().ToImmutableHashSet(),
+            Skills = Array.Empty<RoleSkill>().ToImmutableArray()
+        });
+        registry.AddOrUpdate(new RoleDefinition
+        {
+            Id = "hero2",
+            Name = "Hero 2",
+            Description = "",
+            Vars = new Dictionary<string, object>().ToImmutableDictionary(),
+            Tags = Array.Empty<string>().ToImmutableHashSet(),
+            Skills = Array.Empty<RoleSkill>().ToImmutableArray()
+        });
+
+        var ids = registry.Ids().ToList();
+        Assert.Contains("hero1", ids);
+        Assert.Contains("hero2", ids);
+        Assert.Equal(2, ids.Count);
+    }
+
+    [Fact]
+    public void RoleRegistry_AllSkills_ReturnsSkillPairs()
+    {
+        var registry = new RoleRegistry();
+        var fireball = TextDsl.FromTextUsingGlobals("Fireball", "set global var \"test1\" = 1");
+        var iceLance = TextDsl.FromTextUsingGlobals("Ice Lance", "set global var \"test2\" = 2");
+
+        registry.AddOrUpdate(new RoleDefinition
+        {
+            Id = "mage",
+            Name = "Mage",
+            Description = "",
+            Vars = new Dictionary<string, object>().ToImmutableDictionary(),
+            Tags = Array.Empty<string>().ToImmutableHashSet(),
+            Skills = new[]
+            {
+                new RoleSkill { Name = "Fireball", Script = "", Compiled = fireball },
+                new RoleSkill { Name = "Ice Lance", Script = "", Compiled = iceLance }
+            }.ToImmutableArray()
+        });
+
+        var skills = registry.AllSkills().ToList();
+        Assert.Contains(("mage", "Fireball"), skills);
+        Assert.Contains(("mage", "Ice Lance"), skills);
+    }
+
+    [Fact]
+    public void SkillRegistry_Register_And_TryGetSkill_Works()
+    {
+        var registry = new SkillRegistry();
+        var skill = TextDsl.FromTextUsingGlobals("TestSkill", "set global var \"test\" = 1");
+
+        registry.Register(skill);
+        Assert.True(registry.TryGetSkill("TestSkill", out var retrieved));
+        Assert.Equal("TestSkill", retrieved?.Metadata.Name);
+    }
+
+    [Fact]
+    public void SkillRegistry_TryGetSkill_ReturnsFalseWhenNotFound()
+    {
+        var registry = new SkillRegistry();
+        Assert.False(registry.TryGetSkill("nonexistent", out _));
+    }
+
+    [Fact]
+    public void SkillRegistry_All_ReturnsAllSkills()
+    {
+        var registry = new SkillRegistry();
+        var skill1 = TextDsl.FromTextUsingGlobals("Skill1", "set global var \"a\" = 1");
+        var skill2 = TextDsl.FromTextUsingGlobals("Skill2", "set global var \"b\" = 2");
+
+        registry.Register(skill1);
+        registry.Register(skill2);
+
+        var all = registry.All().ToList();
+        Assert.Equal(2, all.Count);
+        Assert.Contains(all, s => s.Name == "Skill1");
+        Assert.Contains(all, s => s.Name == "Skill2");
+    }
+
+    [Fact]
+    public void EventBus_Unsubscribe_Works()
+    {
+        var bus = new EventBus();
+        int callCount = 0;
+        Action<object?> handler = obj => callCount++;
+
+        var subscription = bus.Subscribe("test_event", handler);
+        bus.Publish("test_event", new object());
+        Assert.Equal(1, callCount);
+
+        subscription.Dispose();
+        bus.Publish("test_event", new object());
+        Assert.Equal(1, callCount); // Should not increment
+    }
+
+    [Fact]
+    public void EventBus_MultipleSubscribers_Works()
+    {
+        var bus = new EventBus();
+        int callCount1 = 0;
+        int callCount2 = 0;
+
+        bus.Subscribe("event", obj => callCount1++);
+        bus.Subscribe("event", obj => callCount2++);
+
+        bus.Publish("event", new object());
+
+        Assert.Equal(1, callCount1);
+        Assert.Equal(1, callCount2);
+    }
+
+    [Fact]
+    public void DashTowards_MovesTowardsTarget()
+    {
+        var s = EmptyWorld(10, 10);
+        s = WithUnit(s, "U", new Dictionary<string, object> { [Keys.Pos] = new Coord(1, 1) });
+        s = WithUnit(s, "T", new Dictionary<string, object> { [Keys.Pos] = new Coord(5, 5) });
+
+        var action = new DashTowards("U", "T", 3);
+        var se = new SkillExecutor();
+        (s, _) = se.Execute(s, new[] { action });
+
+        var newPos = (Coord)s.Units["U"].Vars[Keys.Pos];
+        // Should be closer to target
+        Assert.True(newPos.X > 1 || newPos.Y > 1);
+    }
+
+    [Fact]
+    public void Coord_Equals_Works()
+    {
+        var c1 = new Coord(3, 4);
+        var c2 = new Coord(3, 4);
+        var c3 = new Coord(4, 3);
+
+        Assert.True(c1.Equals(c2));
+        Assert.False(c1.Equals(c3));
+        Assert.True(c1 == c2);
+        Assert.False(c1 == c3);
+    }
+
+    [Fact]
+    public void Coord_ToString_Works()
+    {
+        var c = new Coord(5, 7);
+        var str = c.ToString();
+        Assert.Contains("5", str);
+        Assert.Contains("7", str);
+    }
+
+    [Fact]
+    public void AddGlobalTag_Works()
+    {
+        var s = EmptyWorld();
+        var action = new AddGlobalTag("apocalypse");
+        var se = new SkillExecutor();
+        (s, _) = se.Execute(s, new[] { action });
+
+        Assert.True(s.Global.Tags.Contains("apocalypse"));
+    }
+
+    [Fact]
+    public void AddTileTag_Works()
+    {
+        var s = EmptyWorld();
+        var pos = new Coord(3, 3);
+        var action = new AddTileTag(pos, "fire");
+        var se = new SkillExecutor();
+        (s, _) = se.Execute(s, new[] { action });
+
+        Assert.True(s.Tiles[pos.X, pos.Y].Tags.Contains("fire"));
+    }
+
+    [Fact]
+    public void AddUnitTag_Works()
+    {
+        var s = EmptyWorld();
+        s = WithUnit(s, "U1", new Dictionary<string, object>());
+        var action = new AddUnitTag("U1", "blessed");
+        var se = new SkillExecutor();
+        (s, _) = se.Execute(s, new[] { action });
+
+        Assert.True(s.Units["U1"].Tags.Contains("blessed"));
+    }
+
+    [Fact]
+    public void SetGlobalVar_Works()
+    {
+        var s = EmptyWorld();
+        var action = new SetGlobalVar("day", 5);
+        var se = new SkillExecutor();
+        (s, _) = se.Execute(s, new[] { action });
+
+        Assert.Equal(5, s.Global.Vars["day"]);
+    }
+
+    [Fact]
+    public void SetTileVar_Works()
+    {
+        var s = EmptyWorld();
+        var pos = new Coord(2, 2);
+        var action = new SetTileVar(pos, "elevation", 100);
+        var se = new SkillExecutor();
+        (s, _) = se.Execute(s, new[] { action });
+
+        Assert.Equal(100, s.Tiles[pos.X, pos.Y].Vars["elevation"]);
+    }
+
+    [Fact]
+    public void SetUnitVar_Works()
+    {
+        var s = EmptyWorld();
+        s = WithUnit(s, "U1", new Dictionary<string, object>());
+        var action = new SetUnitVar("U1", "buff_duration", 3);
+        var se = new SkillExecutor();
+        (s, _) = se.Execute(s, new[] { action });
+
+        Assert.Equal(3, s.Units["U1"].Vars["buff_duration"]);
+    }
+
+    // === More coverage tests for low coverage classes ===
+
+    [Fact]
+    public void Coord_ImplicitConversion_FromTuple()
+    {
+        Coord c = (5, 10);
+        Assert.Equal(5, c.X);
+        Assert.Equal(10, c.Y);
+    }
+
+    [Fact]
+    public void Coord_ToString_ReturnsCorrectFormat()
+    {
+        var c = new Coord(3, 7);
+        Assert.Equal("(3,7)", c.ToString());
+    }
+
+    [Fact]
+    public void Damage_WithReverseDamage_HealsInstead()
+    {
+        var s = EmptyWorld();
+        s = WithUnit(s, "U", new Dictionary<string, object>
+        {
+            [Keys.Hp] = 50,
+            [Keys.MaxHp] = 100
+        });
+        // Enable reverse damage globally
+        s = WorldStateOps.WithGlobal(s, g => g with { Vars = g.Vars.SetItem(Keys.ReverseDamageTurnsGlobal, 1) });
+
+        var action = new Damage("U", 10);
+        var se = new SkillExecutor();
+        (s, _) = se.Execute(s, new[] { action });
+
+        // Damage should heal instead
+        Assert.Equal(60, (int)s.Units["U"].Vars[Keys.Hp]);
+    }
+
+    [Fact]
+    public void Damage_ClampsToMaxHp()
+    {
+        var s = EmptyWorld();
+        s = WithUnit(s, "U", new Dictionary<string, object>
+        {
+            [Keys.Hp] = 90,
+            [Keys.MaxHp] = 100
+        });
+        s = WorldStateOps.WithGlobal(s, g => g with { Vars = g.Vars.SetItem(Keys.ReverseDamageTurnsGlobal, 1) });
+
+        var action = new Damage("U", 20); // Would heal 20, but max is 100
+        var se = new SkillExecutor();
+        (s, _) = se.Execute(s, new[] { action });
+
+        Assert.Equal(100, (int)s.Units["U"].Vars[Keys.Hp]);
+    }
+
+    [Fact]
+    public void MagicDamage_WithResistance_ReducesDamage()
+    {
+        var s = EmptyWorld();
+        s = WithUnit(s, "A", new Dictionary<string, object>
+        {
+            [Keys.MAtk] = 20,
+            [Keys.Pos] = new Coord(1, 1)
+        });
+        s = WithUnit(s, "T", new Dictionary<string, object>
+        {
+            [Keys.Hp] = 100,
+            [Keys.MaxHp] = 100,
+            [Keys.MDef] = 10,
+            ["resist_magic"] = 0.5, // 50% resistance
+            [Keys.Pos] = new Coord(2, 2)
+        });
+
+        var action = new MagicDamage("A", "T", 20, 0.0);
+        var se = new SkillExecutor();
+        (s, _) = se.Execute(s, new[] { action });
+
+        // Damage should be reduced by resistance
+        var hp = (int)s.Units["T"].Vars[Keys.Hp];
+        Assert.True(hp > 80 && hp < 100); // Some damage reduction
+    }
+
+    [Fact]
+    public void MagicDamage_WithIgnoreRatio_IgnoresDefense()
+    {
+        var s = EmptyWorld();
+        s = WithUnit(s, "A", new Dictionary<string, object>
+        {
+            [Keys.MAtk] = 20,
+            [Keys.Pos] = new Coord(1, 1)
+        });
+        s = WithUnit(s, "T", new Dictionary<string, object>
+        {
+            [Keys.Hp] = 100,
+            [Keys.MaxHp] = 100,
+            [Keys.MDef] = 20,
+            [Keys.Pos] = new Coord(2, 2)
+        });
+
+        var action = new MagicDamage("A", "T", 30, 1.0); // 100% ignore defense
+        var se = new SkillExecutor();
+        (s, _) = se.Execute(s, new[] { action });
+
+        var hp = (int)s.Units["T"].Vars[Keys.Hp];
+        Assert.True(hp < 75); // More damage due to ignoring defense
+    }
+
+    [Fact]
+    public void TurnSystem_AdvanceTurn_IncrementsTurn()
+    {
+        var s = EmptyWorld();
+        var ts = new TurnSystem();
+
+        (s, _) = ts.AdvanceTurn(s);
+
+        Assert.Equal(1, s.Global.Turn);
+    }
+
+    [Fact]
+    public void TurnSystem_UndyingTick_DecrementsCounter()
+    {
+        var s = EmptyWorld();
+        s = WithUnit(s, "U", new Dictionary<string, object>
+        {
+            [Keys.UndyingTurns] = 3,
+            [Keys.Hp] = 50
+        });
+        s = WorldStateOps.WithUnit(s, "U", u => u with { Tags = u.Tags.Add(Tags.Undying) });
+
+        var ts = new TurnSystem();
+        (s, _) = ts.AdvanceTurn(s);
+
+        Assert.Equal(2, (int)s.Units["U"].Vars[Keys.UndyingTurns]);
+        Assert.True(s.Units["U"].Tags.Contains(Tags.Undying));
+    }
+
+    [Fact]
+    public void TurnSystem_UndyingExpires_RemovesTag()
+    {
+        var s = EmptyWorld();
+        s = WithUnit(s, "U", new Dictionary<string, object>
+        {
+            [Keys.UndyingTurns] = 1,
+            [Keys.Hp] = 50
+        });
+        s = WorldStateOps.WithUnit(s, "U", u => u with { Tags = u.Tags.Add(Tags.Undying) });
+
+        var ts = new TurnSystem();
+        (s, _) = ts.AdvanceTurn(s);
+
+        Assert.False(s.Units["U"].Tags.Contains(Tags.Undying));
+    }
+
+    [Fact]
+    public void TurnSystem_StunnedTick_DecrementsAndAddsTag()
+    {
+        var s = EmptyWorld();
+        s = WithUnit(s, "U", new Dictionary<string, object>
+        {
+            [Keys.StunnedTurns] = 2,
+            [Keys.Hp] = 50
+        });
+
+        var ts = new TurnSystem();
+        (s, _) = ts.AdvanceTurn(s);
+
+        Assert.Equal(1, (int)s.Units["U"].Vars[Keys.StunnedTurns]);
+        Assert.True(s.Units["U"].Tags.Contains(Tags.Stunned));
+    }
+
+    [Fact]
+    public void TurnSystem_BleedDamage_AppliesPerTurn()
+    {
+        var s = EmptyWorld();
+        s = WithUnit(s, "U", new Dictionary<string, object>
+        {
+            [Keys.Hp] = 100,
+            [Keys.BleedTurns] = 2,
+            [Keys.BleedPerTurn] = 5
+        });
+        s = WorldStateOps.WithUnit(s, "U", u => u with { Tags = u.Tags.Add(Tags.Bleeding) });
+
+        var ts = new TurnSystem();
+        (s, _) = ts.AdvanceTurn(s);
+
+        Assert.Equal(95, (int)s.Units["U"].Vars[Keys.Hp]);
+        Assert.Equal(1, (int)s.Units["U"].Vars[Keys.BleedTurns]);
+    }
+
+    [Fact]
+    public void TurnSystem_BurnDamage_AppliesPerTurn()
+    {
+        var s = EmptyWorld();
+        s = WithUnit(s, "U", new Dictionary<string, object>
+        {
+            [Keys.Hp] = 100,
+            [Keys.BurnTurns] = 3,
+            [Keys.BurnPerTurn] = 3
+        });
+        s = WorldStateOps.WithUnit(s, "U", u => u with { Tags = u.Tags.Add(Tags.Burning) });
+
+        var ts = new TurnSystem();
+        (s, _) = ts.AdvanceTurn(s);
+
+        Assert.Equal(97, (int)s.Units["U"].Vars[Keys.Hp]);
+        Assert.Equal(2, (int)s.Units["U"].Vars[Keys.BurnTurns]);
+    }
+
+    [Fact]
+    public void TurnSystem_MpRegen_RestoresMp()
+    {
+        var s = EmptyWorld();
+        s = WithUnit(s, "U", new Dictionary<string, object>
+        {
+            [Keys.Mp] = 50,
+            [Keys.MaxMp] = 100,
+            [Keys.MpRegenPerTurn] = 10
+        });
+
+        var ts = new TurnSystem();
+        (s, _) = ts.AdvanceTurn(s);
+
+        Assert.Equal(60, (int)s.Units["U"].Vars[Keys.Mp]);
+    }
+
+    [Fact]
+    public void TurnSystem_HpRegen_RestoresHp()
+    {
+        var s = EmptyWorld();
+        s = WithUnit(s, "U", new Dictionary<string, object>
+        {
+            [Keys.Hp] = 50,
+            [Keys.MaxHp] = 100,
+            [Keys.HpRegenPerTurn] = 5
+        });
+
+        var ts = new TurnSystem();
+        (s, _) = ts.AdvanceTurn(s);
+
+        Assert.Equal(55, (int)s.Units["U"].Vars[Keys.Hp]);
+    }
+
+    [Fact]
+    public void TurnSystem_RegenClampsToMax()
+    {
+        var s = EmptyWorld();
+        s = WithUnit(s, "U", new Dictionary<string, object>
+        {
+            [Keys.Mp] = 95,
+            [Keys.MaxMp] = 100,
+            [Keys.MpRegenPerTurn] = 10
+        });
+
+        var ts = new TurnSystem();
+        (s, _) = ts.AdvanceTurn(s);
+
+        Assert.Equal(100, (int)s.Units["U"].Vars[Keys.Mp]);
+    }
+
+    [Fact]
+    public void TurnSystem_ReverseHealTurns_DecrementsGlobally()
+    {
+        var s = EmptyWorld();
+        s = WorldStateOps.WithGlobal(s, g => g with { Vars = g.Vars.SetItem(Keys.ReverseHealTurnsGlobal, 3) });
+
+        var ts = new TurnSystem();
+        (s, _) = ts.AdvanceTurn(s);
+
+        Assert.Equal(2, (int)s.Global.Vars[Keys.ReverseHealTurnsGlobal]);
+    }
+
+    [Fact]
+    public void TurnSystem_ReverseHealExpires_RemovesVar()
+    {
+        var s = EmptyWorld();
+        s = WorldStateOps.WithGlobal(s, g => g with { Vars = g.Vars.SetItem(Keys.ReverseHealTurnsGlobal, 1) });
+
+        var ts = new TurnSystem();
+        (s, _) = ts.AdvanceTurn(s);
+
+        Assert.False(s.Global.Vars.ContainsKey(Keys.ReverseHealTurnsGlobal));
+    }
+
+    [Fact]
+    public void TurnSystem_PerTurnAdd_IncreasesVariable()
+    {
+        var s = EmptyWorld();
+        s = WithUnit(s, "U", new Dictionary<string, object>
+        {
+            ["resist_magic"] = 0.1,
+            ["per_turn_add:resist_magic"] = 0.05
+        });
+
+        var ts = new TurnSystem();
+        (s, _) = ts.AdvanceTurn(s);
+
+        var resist = (double)s.Units["U"].Vars["resist_magic"];
+        Assert.True(Math.Abs(resist - 0.15) < 0.001);
+    }
+
+    [Fact]
+    public void TurnSystem_PerTurnAdd_ClampsResistance()
+    {
+        var s = EmptyWorld();
+        s = WithUnit(s, "U", new Dictionary<string, object>
+        {
+            ["resist_magic"] = 0.95,
+            ["per_turn_add:resist_magic"] = 0.1
+        });
+
+        var ts = new TurnSystem();
+        (s, _) = ts.AdvanceTurn(s);
+
+        var resist = (double)s.Units["U"].Vars["resist_magic"];
+        Assert.True(resist <= 1.0); // Should be clamped to max 1.0
     }
 }
 

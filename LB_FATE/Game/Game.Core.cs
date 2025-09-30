@@ -2,10 +2,10 @@ using ETBBS;
 
 namespace LB_FATE;
 
-partial class Game
+public partial class Game
 {
-    private int width = 15;
-    private int height = 9;
+    private int width = 25;
+    private int height = 15;
     private readonly Random rng = new();
     private readonly Dictionary<string, string> teamOf = new();
     private readonly Dictionary<string, ClassType> classOf = new();
@@ -69,7 +69,17 @@ partial class Game
     }
 
     // --- Reconnection helpers ---
-    public bool HasEndpoint(string pid) => endpoints.ContainsKey(pid);
+    public bool HasEndpoint(string pid)
+    {
+        if (!endpoints.TryGetValue(pid, out var ep)) return false;
+        // Check if endpoint is still alive
+        if (!ep.IsAlive)
+        {
+            endpoints.Remove(pid);
+            return false;
+        }
+        return true;
+    }
 
     public void AttachEndpoint(string pid, IPlayerEndpoint ep)
     {
@@ -87,6 +97,11 @@ partial class Game
         }
         catch { }
     }
+
+    // --- Public accessors for AutoComplete ---
+    public WorldState GetState() => state;
+    public int GetIntPublic(string id, string key, int def = 0) => GetInt(id, key, def);
+    public RoleDefinition? GetRoleOf(string pid) => roleOf.TryGetValue(pid, out var r) ? r : null;
 
     // --- Server-side logging helpers ---
     private void ServerLog(string msg)

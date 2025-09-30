@@ -45,7 +45,7 @@ class Program
         string hostName = "127.0.0.1";
         int port = 35500;
         int players = 7;
-        int mapW = 15, mapH = 9;
+        int mapW = 25, mapH = 15;
         string mode = Environment.GetEnvironmentVariable("LB_FATE_MODE") ?? "";
         for (int i = 0; i < args.Length; i++)
         {

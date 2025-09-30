@@ -142,6 +142,7 @@ partial class Game
         lines.Add($"{AnsiColor.Green}Commands:{AnsiColor.Reset} move x y | attack P# | skills | use <n> [P#|x y|up|down|left|right] | info | hint move | pass | help | quit");
         lines.Add($"{AnsiColor.Yellow}Costs   :{AnsiColor.Reset} Move 0.5 MP; Attack 0.5 MP");
         lines.Add($"{AnsiColor.Dim}Note    : Each player acts once per phase.{AnsiColor.Reset}");
+        lines.Add($"{AnsiColor.Dim}Tip     : Press TAB for auto-completion (commands, targets, directions).{AnsiColor.Reset}");
         // Recent logs: 合并公共日志 + 当前观者的私有日志（仅 debug 写入）
         var mergedLogs = new List<string>();
         mergedLogs.AddRange(publicLog);
