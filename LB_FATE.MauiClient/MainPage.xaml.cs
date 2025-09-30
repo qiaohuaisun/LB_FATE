@@ -532,6 +532,33 @@ public partial class MainPage : ContentPage
         OnSendClicked(sender, e);
     }
 
+    private async void OnSmartActionClicked(object? sender, EventArgs e)
+    {
+        if (sender is not Button btn) return;
+        var action = btn.CommandParameter?.ToString();
+
+        SmartInputPage.InputMode mode = action switch
+        {
+            "move" => SmartInputPage.InputMode.Move,
+            "attack" => SmartInputPage.InputMode.Attack,
+            "skill" => SmartInputPage.InputMode.Skill,
+            "goto" => SmartInputPage.InputMode.GoTo,
+            _ => SmartInputPage.InputMode.Move
+        };
+
+        var smartInputPage = new SmartInputPage(mode, ExecuteSmartCommand, _players);
+        await Navigation.PushModalAsync(smartInputPage);
+    }
+
+    private void ExecuteSmartCommand(string command)
+    {
+        MainThread.BeginInvokeOnMainThread(() =>
+        {
+            CmdEntry.Text = command;
+            OnSendClicked(null, EventArgs.Empty);
+        });
+    }
+
     private void OnClearLogsClicked(object? sender, EventArgs e)
     {
         MainThread.BeginInvokeOnMainThread(() => { _logItems.Clear(); _allLogs.Clear(); });

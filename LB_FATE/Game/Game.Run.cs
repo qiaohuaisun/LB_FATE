@@ -49,13 +49,16 @@ partial class Game
                     if (Alive().Count <= 1) break;
                 }
                 if (Alive().Count <= 1) break;
+
+                // Phase-based ticking: apply per-phase status/DoT/regen and advance global turn counter
+                var tsPhase = new TurnSystem();
+                (state, _) = tsPhase.AdvanceTurn(state, events);
             }
             // If game ended during phases, do not advance a new day
             if (Alive().Count <= 1)
                 break;
 
-            var ts = new TurnSystem();
-            (state, _) = ts.AdvanceTurn(state, events);
+            // Move to next day (no additional per-day ticking; already applied per phase)
             day++;
         }
         var aliveNow = Alive();

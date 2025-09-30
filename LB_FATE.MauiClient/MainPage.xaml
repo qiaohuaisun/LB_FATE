@@ -146,9 +146,23 @@
                     </Border>
                 </HorizontalStackLayout>
             </ScrollView>
-            <!-- Command entry + send -->
-            <Entry Grid.Row="1" Grid.Column="0" x:Name="CmdEntry" Placeholder="Type command after PROMPT..." Completed="OnSendCompleted" />
-            <Button Grid.Row="1" Grid.Column="1" x:Name="SendBtn" Text="Send" Clicked="OnSendClicked" Style="{StaticResource PrimaryButton}" />
+            <!-- Enhanced command input with smart assist -->
+            <Grid Grid.Row="1" Grid.ColumnSpan="2" RowDefinitions="Auto,Auto" RowSpacing="8">
+                <!-- Quick action buttons -->
+                <ScrollView Grid.Row="0" Orientation="Horizontal">
+                    <HorizontalStackLayout Spacing="8">
+                        <Button Text="🚶 Move" Style="{StaticResource ChipButton}" Clicked="OnSmartActionClicked" CommandParameter="move" />
+                        <Button Text="⚔️ Attack" Style="{StaticResource ChipButton}" Clicked="OnSmartActionClicked" CommandParameter="attack" />
+                        <Button Text="✨ Skill" Style="{StaticResource ChipButton}" Clicked="OnSmartActionClicked" CommandParameter="skill" />
+                        <Button Text="📍 Go To" Style="{StaticResource ChipButton}" Clicked="OnSmartActionClicked" CommandParameter="goto" />
+                    </HorizontalStackLayout>
+                </ScrollView>
+                <!-- Command entry + send -->
+                <Grid Grid.Row="1" ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                    <Entry x:Name="CmdEntry" Placeholder="Type command or use quick actions above..." Completed="OnSendCompleted" />
+                    <Button Grid.Column="1" x:Name="SendBtn" Text="Send" Clicked="OnSendClicked" Style="{StaticResource PrimaryButton}" />
+                </Grid>
+            </Grid>
         </Grid>
     </Border>
     </Grid>

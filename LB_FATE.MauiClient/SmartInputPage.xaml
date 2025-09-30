@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="LB_FATE.MauiClient.SmartInputPage"
+             Title="Smart Input">
+
+    <ScrollView BackgroundColor="{StaticResource ColorBackground}">
+        <VerticalStackLayout Padding="20" Spacing="20">
+
+            <!-- Action Type Header -->
+            <Border Style="{StaticResource FeatureCard}">
+                <VerticalStackLayout Spacing="8">
+                    <Label x:Name="ActionTitle" Text="Move Command" FontAttributes="Bold" FontSize="20" TextColor="White" HorizontalOptions="Center" />
+                    <Label x:Name="ActionDescription" Text="Select destination coordinates" FontSize="14" TextColor="White" HorizontalOptions="Center" />
+                </VerticalStackLayout>
+            </Border>
+
+            <!-- Coordinate Selector (for Move/Attack to position) -->
+            <Border x:Name="CoordinateSection" Style="{StaticResource CardBorder}">
+                <VerticalStackLayout Spacing="16">
+                    <Label Text="Select Coordinates" FontAttributes="Bold" FontSize="16" />
+                    <Grid ColumnDefinitions="*,*" ColumnSpacing="16">
+                        <VerticalStackLayout>
+                            <Label Text="X Coordinate" FontSize="14" TextColor="{StaticResource ColorMuted}" />
+                            <Border Style="{StaticResource StatusChip}" BackgroundColor="#F8FAFC">
+                                <Stepper x:Name="XStepper" Minimum="0" Maximum="14" Value="0" ValueChanged="OnCoordinateChanged" />
+                            </Border>
+                            <Label x:Name="XValueLabel" Text="0" HorizontalOptions="Center" FontAttributes="Bold" TextColor="{StaticResource ColorPrimary}" />
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Grid.Column="1">
+                            <Label Text="Y Coordinate" FontSize="14" TextColor="{StaticResource ColorMuted}" />
+                            <Border Style="{StaticResource StatusChip}" BackgroundColor="#F8FAFC">
+                                <Stepper x:Name="YStepper" Minimum="0" Maximum="8" Value="0" ValueChanged="OnCoordinateChanged" />
+                            </Border>
+                            <Label x:Name="YValueLabel" Text="0" HorizontalOptions="Center" FontAttributes="Bold" TextColor="{StaticResource ColorPrimary}" />
+                        </VerticalStackLayout>
+                    </Grid>
+                    <Label x:Name="CoordinatePreview" Text="Target: (0, 0)" HorizontalOptions="Center" FontAttributes="Bold" />
+                </VerticalStackLayout>
+            </Border>
+
+            <!-- Player Selector (for Attack/Skill targeting) -->
+            <Border x:Name="PlayerSection" Style="{StaticResource CardBorder}" IsVisible="False">
+                <VerticalStackLayout Spacing="16">
+                    <Label Text="Select Target Player" FontAttributes="Bold" FontSize="16" />
+                    <CollectionView x:Name="PlayerSelector" SelectionMode="Single" SelectionChanged="OnPlayerSelectionChanged">
+                        <CollectionView.ItemsLayout>
+                            <LinearItemsLayout Orientation="Vertical" ItemSpacing="8" />
+                        </CollectionView.ItemsLayout>
+                        <CollectionView.ItemTemplate>
+                            <DataTemplate>
+                                <Border Style="{StaticResource ListItemBorder}">
+                                    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12" Padding="12">
+                                        <Border WidthRequest="32" HeightRequest="32" BackgroundColor="{Binding Color}" StrokeThickness="0">
+                                            <Border.StrokeShape>
+                                                <RoundRectangle CornerRadius="16" />
+                                            </Border.StrokeShape>
+                                            <Label Text="{Binding Symbol}" HorizontalTextAlignment="Center" VerticalTextAlignment="Center" TextColor="White" FontAttributes="Bold" />
+                                        </Border>
+                                        <VerticalStackLayout Grid.Column="1" VerticalOptions="Center" Spacing="2">
+                                            <Label Text="{Binding Id}" FontAttributes="Bold" FontSize="16" />
+                                            <Label Text="{Binding Class}" TextColor="{StaticResource ColorMuted}" FontSize="13" />
+                                        </VerticalStackLayout>
+                                        <Label Grid.Column="2" Text="{Binding HpText}" TextColor="{Binding HpTextColor}" FontAttributes="Bold" VerticalOptions="Center" />
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </CollectionView.ItemTemplate>
+                    </CollectionView>
+                </VerticalStackLayout>
+            </Border>
+
+            <!-- Direction Selector (for relative movement) -->
+            <Border x:Name="DirectionSection" Style="{StaticResource CardBorder}" IsVisible="False">
+                <VerticalStackLayout Spacing="16">
+                    <Label Text="Select Direction" FontAttributes="Bold" FontSize="16" />
+                    <Grid RowDefinitions="*,*,*" ColumnDefinitions="*,*,*" RowSpacing="8" ColumnSpacing="8">
+                        <Button Grid.Row="0" Grid.Column="1" Text="⬆️ Up" Style="{StaticResource ChipButton}" Clicked="OnDirectionClicked" CommandParameter="up" />
+                        <Button Grid.Row="1" Grid.Column="0" Text="⬅️ Left" Style="{StaticResource ChipButton}" Clicked="OnDirectionClicked" CommandParameter="left" />
+                        <Button Grid.Row="1" Grid.Column="2" Text="➡️ Right" Style="{StaticResource ChipButton}" Clicked="OnDirectionClicked" CommandParameter="right" />
+                        <Button Grid.Row="2" Grid.Column="1" Text="⬇️ Down" Style="{StaticResource ChipButton}" Clicked="OnDirectionClicked" CommandParameter="down" />
+                    </Grid>
+                    <Label x:Name="DirectionPreview" Text="Direction: None" HorizontalOptions="Center" FontAttributes="Bold" />
+                </VerticalStackLayout>
+            </Border>
+
+            <!-- Skill Selector -->
+            <Border x:Name="SkillSection" Style="{StaticResource CardBorder}" IsVisible="False">
+                <VerticalStackLayout Spacing="16">
+                    <Label Text="Select Skill" FontAttributes="Bold" FontSize="16" />
+                    <Entry x:Name="SkillNumberEntry" Placeholder="Enter skill number (1, 2, 3...)" Keyboard="Numeric" TextChanged="OnSkillNumberChanged" />
+                    <Label x:Name="SkillPreview" Text="Skill: None selected" HorizontalOptions="Center" FontAttributes="Bold" />
+                </VerticalStackLayout>
+            </Border>
+
+            <!-- Command Preview -->
+            <Border Style="{StaticResource CardBorder}">
+                <VerticalStackLayout Spacing="12">
+                    <Label Text="Command Preview" FontAttributes="Bold" FontSize="16" />
+                    <Border BackgroundColor="#F1F5F9" StrokeThickness="1" Stroke="{StaticResource ColorBorder}" Padding="12">
+                        <Border.StrokeShape>
+                            <RoundRectangle CornerRadius="8" />
+                        </Border.StrokeShape>
+                        <Label x:Name="CommandPreview" Text="No command generated" FontFamily="Courier New" FontSize="14" />
+                    </Border>
+                </VerticalStackLayout>
+            </Border>
+
+            <!-- Action Buttons -->
+            <Grid ColumnDefinitions="*,*" ColumnSpacing="16">
+                <Button Text="Cancel" Style="{StaticResource FlatButton}" Clicked="OnCancelClicked" />
+                <Button Grid.Column="1" Text="Execute" Style="{StaticResource PrimaryButton}" Clicked="OnExecuteClicked" />
+            </Grid>
+
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>

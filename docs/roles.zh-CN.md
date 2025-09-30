@@ -1,5 +1,11 @@
 # 角色数值与机制总览（LB_FATE）
 
+重要说明：本示例对战（LB_FATE）中的“持续时间/每回合数值”，按“阶段（phase）”为单位结算。
+
+- 每个游戏日（day）包含 5 个阶段，持续效果在每个阶段结束时结算一次并将计时减 1。
+- 适用范围：`*_turns`（如 `undying_turns / stunned_turns / silenced_turns / rooted_turns / no_heal_turns` 等）、DoT（`bleed_turns / burn_turns`）与每回合资源（`mp_regen_per_turn / hp_regen_per_turn`）。
+- 解封条件如 `sealed_until day X [phase Y]` 仍以“天/阶段”判定，未改变。
+
 说明：本文件汇总 `roles/` 下示例角色的基础数值、被动/机制与技能要点，便于查阅与对比。术语与变量名遵循引擎约定；技能元信息如未在脚本中显式声明则标注为“未声明”。
 
 —
@@ -91,7 +97,7 @@
   - Basic Attack（range 1, enemies）：20% 概率物理 5（忽视 50% 护甲），否则物理 5
   - Piercing Lance（range 2）：两段物理 6（第二段忽视 50% 护甲）；自损 HP 2；`consume mp = 0.5`
   - Plague Frenzy（range 2）：以自身为中心范围 2 内敌人并行物理 5；每命中一次自疗 1；`consume mp = 2.5`
-  - Duel Judgement（sealed_until 3）：目标回满 HP；双方获得 `duel`；施法者 `undying_turns = 3`；双方 `mp_regen_per_turn = 1`
+  - Duel Judgement（sealed_until 3）：目标回满 HP；双方获得 `duel`；施法者 `undying_turns = 3`（以阶段为单位）；双方 `mp_regen_per_turn = 1`（按阶段回蓝）
 
 —
 
