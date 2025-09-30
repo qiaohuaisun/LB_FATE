@@ -8,7 +8,11 @@
       "Bash(dir:*)",
       "Bash(find:*)",
       "Bash(dotnet new:*)",
-      "Bash(dotnet sln:*)"
+      "Bash(dotnet sln:*)",
+      "Bash(timeout:*)",
+      "Bash(exit 0)",
+      "Bash(dotnet run:*)",
+      "Bash(fc:*)"
     ],
     "deny": [],
     "ask": []

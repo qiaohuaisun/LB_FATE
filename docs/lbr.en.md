@@ -67,7 +67,11 @@ role "<Name>" id "<id>" {
 ## Selectors and Conditions
 
 - Selectors:
-  - `enemies|allies [of <unit>] [in range <R> of <unit|point>] [with tag "<tag>"] [with var "<key>" OP <int>] [limit <N>]`
+  - `enemies|allies of <unit> [in range <R> of <unit|point>] [with tag "<tag>"] [with var "<key>" OP <int>] [order by var "<key>" asc|desc] [limit <N>]`
+    - **Note**: `of <unit>` is **required** (typically `of caster` or `of target`)
+    - `in range <R> of <unit>` specifies range filtering
+    - `order by var "<key>" asc|desc` for sorting (**must come after `in range`**)
+    - `limit <N>` limits the result count
   - `units with tag "<tag>"` / `units with var "<key>" OP <int>`
   - `nearest|farthest [N] enemies|allies of <unit|point>`
 - Conditions:
@@ -93,3 +97,62 @@ role "<Name>" id "<id>" {
 - Engine validates skills: MP requirement, range/targeting, cooldown, sealed‑until.
 - Turn system (outside of skills) applies per‑turn updates: counters decay, undying/end, regen,
   DoT (`bleed`/`burn`), generic `per_turn_add:<key>` with clamping.
+
+## Common Syntax Errors
+
+### Error 1: Missing `of` clause in `for each`
+
+**Incorrect:**
+```lbr
+for each enemies in range 2 of caster do { ... }
+```
+
+**Error message:**
+```
+DSL parse error at X: keyword 'do' expected
+```
+
+**Correct:**
+```lbr
+for each enemies of caster in range 2 of caster do { ... }
+```
+
+**Explanation:** The `of <unit>` clause is **required** and must immediately follow `enemies`/`allies`.
+
+### Error 2: `order by` must come after `in range`
+
+**Incorrect:**
+```lbr
+for each enemies of caster order by var "hp" desc in range 100 of caster do { ... }
+```
+
+**Error message:**
+```
+DSL parse error at X: keyword 'do' expected
+```
+
+**Correct:**
+```lbr
+for each enemies of caster in range 100 of caster order by var "hp" desc do { ... }
+```
+
+**Explanation:** Parser requires clause order: `of <unit>` → `in range` → `order by` → `limit` → `do`
+
+### Error 3: `in parallel` placement
+
+**Correct:**
+```lbr
+for each enemies of caster in range 2 of caster in parallel do { ... }
+```
+
+**Explanation:** The `in parallel` modifier must come after all filtering clauses, before `do`.
+
+### Using the Validator Tool
+
+Before running the game, validate syntax using:
+
+```bash
+dotnet run --project ETBBS.LbrValidator -- roles -v
+```
+
+See `ETBBS.LbrValidator/README.md` for details.

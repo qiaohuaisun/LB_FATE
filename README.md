@@ -39,6 +39,12 @@ extension and example role scripts.
   - Interactive game board with mouse controls
   - Real-time unit status and combat log
   - See `LB_FATE.AvaloniaClient/README.md` for details
+- `ETBBS.LbrValidator/` — Command-line LBR syntax validator
+  - Batch validation of `.lbr` files
+  - Recursive directory scanning
+  - Detailed error reporting and statistics
+  - CI/CD integration support
+  - See `ETBBS.LbrValidator/README.md` for details
 - `roles/` — Example `.lbr` roles and skills
 - `docs/` — DSL docs (Chinese), plus this README references
 - `vscode-extension/` — VS Code extension sources and packaged `.vsix`
@@ -219,10 +225,29 @@ Phases 1 & 5: all commands; Phases 2-4: move/pass/skills/info/help/hint.
 
 See `docs/lbr.zh-CN.md` for the full guide.
 
-## VS Code Extension
+## LBR Validator Tool
 
-- Install `vscode-extension/etbbs-lbr-tools-*.vsix` in VS Code.
-- Features: syntax, snippets, completions, hovers, folding, symbols, basic diagnostics, formatter.
+Validate `.lbr` file syntax before runtime:
+
+```bash
+# Validate all .lbr files in roles/ directory
+dotnet run --project ETBBS.LbrValidator -- roles -v
+
+# Recursive scan with details
+dotnet run --project ETBBS.LbrValidator -- roles -r -d
+
+# Quiet mode (summary only)
+dotnet run --project ETBBS.LbrValidator -- roles -q
+```
+
+**Features**:
+- Batch validation of multiple files
+- Recursive directory scanning
+- Detailed error reporting with line numbers
+- Statistics and colored output
+- Exit codes for CI/CD integration (0 = success, 1 = errors)
+
+See `ETBBS.LbrValidator/README.md` for complete documentation.
 
 ## Launcher Scripts
 

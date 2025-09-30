@@ -114,7 +114,11 @@ role "<名称>" id "<id>" {
 ## 5. 选择器与条件
 
 - 选择器：
-  - `enemies|allies [of <unit>] [in range <R> of <unit>] [with tag "<tag>"] [with var "<key>" OP <int>] [limit <N>]`
+  - `enemies|allies of <unit> [in range <R> of <unit>] [with tag "<tag>"] [with var "<key>" OP <int>] [order by var "<key>" asc|desc] [limit <N>]`
+    - **注意**：`of <unit>` 是**必需的**（通常是 `of caster` 或 `of target`）
+    - `in range <R> of <unit>` 指定范围筛选
+    - `order by var "<key>" asc|desc` 用于排序（**必须在 `in range` 之后**）
+    - `limit <N>` 限制数量
   - `units with tag "<tag>"` / `units with var "<key>" OP <int>`
   - `nearest|farthest [N] enemies|allies of <unit>`
 - 条件：
@@ -150,7 +154,7 @@ skill "强袭冲锋" {
   dash towards target up to 3;
   deal physical 8 damage to target from caster;
   if caster has tag "windrealm" then {
-    for each enemies in range 1 of target in parallel do {
+    for each enemies of caster in range 1 of target in parallel do {
       deal physical 4 damage to it from caster
     }
   };
@@ -200,5 +204,64 @@ skill "终结一击" {
   - 简单加减在运行时按 double 计算；若两侧均为整数且结果为整数，最终写回为 int。
 - 注释在哪里可用？
   - 现在在 LBR 各段与技能脚本中均可使用 `#`、`//`、`/*...*/` 注释。
+
+## 11. 常见语法错误
+
+### 错误 1：`for each` 缺少 `of` 子句
+
+**错误示例：**
+```lbr
+for each enemies in range 2 of caster do { ... }
+```
+
+**错误信息：**
+```
+DSL parse error at X: keyword 'do' expected
+```
+
+**正确写法：**
+```lbr
+for each enemies of caster in range 2 of caster do { ... }
+```
+
+**说明：** `of <unit>` 子句是**必需的**，必须紧跟在 `enemies`/`allies` 后面。
+
+### 错误 2：`order by` 必须在 `in range` 之后
+
+**错误示例：**
+```lbr
+for each enemies of caster order by var "hp" desc in range 100 of caster do { ... }
+```
+
+**错误信息：**
+```
+DSL parse error at X: keyword 'do' expected
+```
+
+**正确写法：**
+```lbr
+for each enemies of caster in range 100 of caster order by var "hp" desc do { ... }
+```
+
+**说明：** 解析器要求子句顺序为：`of <unit>` → `in range` → `order by` → `limit` → `do`
+
+### 错误 3：`in parallel` 位置错误
+
+**正确写法：**
+```lbr
+for each enemies of caster in range 2 of caster in parallel do { ... }
+```
+
+**说明：** `in parallel` 修饰符必须在所有筛选条件之后、`do` 之前。
+
+### 使用验证工具
+
+在运行游戏前，可使用验证工具检查语法：
+
+```bash
+dotnet run --project ETBBS.LbrValidator -- roles -v
+```
+
+详见 `ETBBS.LbrValidator/README.md`。
 
 —— 完 ——

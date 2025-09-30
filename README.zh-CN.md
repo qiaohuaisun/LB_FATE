@@ -30,6 +30,12 @@
   - 支持鼠标操控的交互式游戏棋盘
   - 实时单位状态和战斗日志
   - 详见 `LB_FATE.AvaloniaClient/README.md`
+- `ETBBS.LbrValidator/` → 命令行 LBR 语法验证工具
+  - 批量验证 `.lbr` 文件
+  - 递归目录扫描
+  - 详细错误报告和统计信息
+  - 支持 CI/CD 集成
+  - 详见 `ETBBS.LbrValidator/README.md`
 - `roles/` → 示例 `.lbr` 角色与技能
 - `vscode-extension/` → VS Code 扩展源码与打包脚本
 - `publish/win-x64/` → Windows 预构建二进制与辅助脚本
@@ -198,10 +204,29 @@ dotnet run --project LB_FATE/LB_FATE.csproj -- --client 127.0.0.1:35500 --verbos
 
 更多语法示例可参考英文 `README.md` 或 `docs/` 下相关文档（若存在）。
 
-## VS Code 扩展
+## LBR 验证工具
 
-- 在 VS Code 中安装 `vscode-extension/etbbs-lbr-tools-*.vsix`。
-- 功能：语法、代码片段、补全、Hover、折叠、文档符号、基础诊断、格式化。
+在运行时之前验证 `.lbr` 文件语法：
+
+```bash
+# 验证 roles/ 目录下的所有 .lbr 文件
+dotnet run --project ETBBS.LbrValidator -- roles -v
+
+# 递归扫描并显示详细信息
+dotnet run --project ETBBS.LbrValidator -- roles -r -d
+
+# 安静模式（仅摘要）
+dotnet run --project ETBBS.LbrValidator -- roles -q
+```
+
+**功能特性**：
+- 批量验证多个文件
+- 递归目录扫描
+- 详细的错误报告（含行号）
+- 统计信息和彩色输出
+- 支持 CI/CD 集成（退出码：0 = 成功，1 = 错误）
+
+完整文档请参阅 `ETBBS.LbrValidator/README.md`。
 
 ## Windows 运行
 
