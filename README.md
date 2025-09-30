@@ -1,293 +1,507 @@
 # ETBBS + LB_FATE
 
-Language: English | 中文见 README.zh-CN.md
+[![.NET](https://img.shields.io/badge/.NET-8.0-512BD4)](https://dotnet.microsoft.com/)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE.txt)
 
-Enhanced Turn‑Based Behavior System (ETBBS) and a sample console game (LB_FATE).
+**Language**: English | [中文](README.zh-CN.md)
 
-This repository contains a reusable .NET 8 core for grid/turn‑based games and a
-playable sample that demonstrates the system end‑to‑end, plus a VS Code
-extension and example role scripts.
+A reusable .NET 8 framework for grid-based turn-based strategy games, featuring an immutable state engine, text-based skill DSL, and a playable sample game with GUI client.
 
-## Overview
+---
 
-- Core library `ETBBS` implements immutable world state, atomic actions,
-  skill composition/execution, an events bus, and a text DSL (LBR) for defining
-  roles and skills.
-- Sample game `LB_FATE` runs a 2D grid, loads `.lbr` roles, and supports local
-  and TCP multiplayer. Entry point is `LB_FATE/Program.Main.cs`.
-- **Avalonia GUI Client** `LB_FATE.AvaloniaClient` provides a modern cross-platform
-  graphical interface with interactive game board, real-time unit status, and mouse controls.
-- VS Code extension under `vscode-extension/` adds syntax highlighting,
-  snippets, completions, formatting, and basic diagnostics for `.lbr` files.
+## 📋 Table of Contents
 
-## Repo Structure
+- [Features](#-features)
+- [Quick Start](#-quick-start)
+- [Architecture](#-architecture)
+- [Repository Structure](#-repository-structure)
+- [Getting Started](#-getting-started)
+  - [Prerequisites](#prerequisites)
+  - [Building](#building)
+  - [Running the Game](#running-the-game)
+- [Clients](#-clients)
+  - [Avalonia GUI Client](#avalonia-gui-client-recommended)
+  - [Console Client](#console-client)
+- [Development Tools](#-development-tools)
+  - [LBR Validator](#lbr-validator)
+  - [VS Code Extension](#vs-code-extension)
+- [Game Modes](#-game-modes)
+- [LBR DSL](#-lbr-dsl-roles--skills)
+- [Configuration](#-configuration)
+- [Documentation](#-documentation)
+- [License](#-license)
 
-- `ETBBS/` — Core library
-  - State/keys/context: `Core/*.cs`
-  - Atomic actions: `Actions/*.cs`
-  - Skills/execution/validation: `Skills/*.cs`
-  - DSL for roles/skills: `DSL/*.cs`
-  - Systems: turn advancement, replay, events: `Systems/*.cs`
-- `LB_FATE/` — Sample console game (local or host/client)
-  - Entry: `Program.Main.cs`
-  - Game loop/UI: `Game/*.cs`
-  - Networking: `Net.cs`
-  - Domain model: `Domain.cs`
-- `LB_FATE.AvaloniaClient/` — Cross-platform GUI client
-  - Modern Avalonia UI interface
-  - MVVM architecture
-  - Interactive game board with mouse controls
-  - Real-time unit status and combat log
-  - See `LB_FATE.AvaloniaClient/README.md` for details
-- `ETBBS.LbrValidator/` — Command-line LBR syntax validator
-  - Batch validation of `.lbr` files
-  - Recursive directory scanning
-  - Detailed error reporting and statistics
-  - CI/CD integration support
-  - See `ETBBS.LbrValidator/README.md` for details
-- `roles/` — Example `.lbr` roles and skills
-- `docs/` — DSL docs (Chinese), plus this README references
-- `vscode-extension/` — VS Code extension sources and packaged `.vsix`
-- `publish/win-x64/` — Prebuilt Windows binaries and helper scripts
+---
 
-## Build
+## ✨ Features
 
-- Requirements: .NET SDK 8.0+
-- Build solution:
-  - `dotnet build ETBBS.sln -c Release`
+### Core Framework (ETBBS)
+- **Immutable World State**: Predictable, testable game logic with atomic actions
+- **Text-based Skill DSL**: Define roles and skills using `.lbr` files
+- **Event Bus System**: Reactive game events and state changes
+- **Turn-based Execution**: Phase-based turn system with validation
+- **Flexible Targeting**: Support for single-target, AoE, line attacks, and selectors
 
-## Run (Sample Game)
+### Sample Game (LB_FATE)
+- **2D Grid Combat**: Tactical turn-based combat on customizable grids
+- **TCP Multiplayer**: Host/client architecture for network play
+- **Boss Mode**: Cooperative 7v1 with AI-controlled boss using script-based decision trees
+- **Free-for-All Mode**: Traditional battle royale
+- **Modern GUI**: Cross-platform Avalonia UI with mouse controls
+- **Traditional Console**: Text-based interface for terminal enthusiasts
+
+### Developer Experience
+- **Syntax Validator**: CLI tool to validate `.lbr` files before runtime
+- **VS Code Extension**: Syntax highlighting, completions, snippets, and diagnostics
+- **Comprehensive Logging**: Multiple log levels with performance tracking
+- **Hot-reloadable Roles**: Load custom roles from directories
+
+---
+
+## 🚀 Quick Start
+
+### GUI Client (Recommended)
+
+1. **Start the server**:
+   ```bash
+   cd publish
+   runServer.cmd  # Windows
+   # Or: dotnet run --project LB_FATE -- --host --players 4
+   ```
+
+2. **Launch the GUI client**:
+   ```bash
+   dotnet run --project LB_FATE.AvaloniaClient
+   ```
+
+3. **Connect and play**:
+   - Enter server address (e.g., `127.0.0.1:35500`)
+   - Use mouse to control units (left-click to move, right-click to attack)
+
+### Console Client
+
+```bash
+# Local single-player (simulates 7 AI players)
+dotnet run --project LB_FATE
+
+# Host multiplayer server
+dotnet run --project LB_FATE -- --host --players 4 --port 35500
+
+# Connect as client
+dotnet run --project LB_FATE -- --client 127.0.0.1:35500
+```
+
+---
+
+## 🏗 Architecture
+
+```
+┌──────────────────────────────────────────────────────┐
+│                   LB_FATE (Game)                     │
+│  ┌────────────┐  ┌────────────┐  ┌────────────┐    │
+│  │ Console UI │  │ Avalonia   │  │  TCP Net   │    │
+│  │            │  │ GUI Client │  │ Host/Client│    │
+│  └──────┬─────┘  └──────┬─────┘  └──────┬─────┘    │
+│         └────────────────┴────────────────┘          │
+└───────────────────┬──────────────────────────────────┘
+                    │
+┌───────────────────▼──────────────────────────────────┐
+│              ETBBS Core Library                      │
+│  ┌─────────┐  ┌──────────┐  ┌──────────┐           │
+│  │  World  │  │ Actions  │  │  Skills  │           │
+│  │  State  │◄─┤ (Atomic) │◄─┤   DSL    │           │
+│  └────┬────┘  └──────────┘  └──────────┘           │
+│       │                                              │
+│  ┌────▼────┐  ┌──────────┐  ┌──────────┐           │
+│  │  Turn   │  │  Events  │  │LBR Parser│           │
+│  │ System  │  │   Bus    │  │          │           │
+│  └─────────┘  └──────────┘  └──────────┘           │
+└──────────────────────────────────────────────────────┘
+```
+
+**Key Concepts**:
+- **Immutable State**: Every action produces a new world state
+- **Atomic Actions**: Composable, validated actions (damage, heal, move, etc.)
+- **Skill Scripts**: Text-based DSL compiled to action sequences
+- **Event-Driven**: State changes emit events for UI/logging
+
+---
+
+## 📁 Repository Structure
+
+```
+ETBBS/
+├── ETBBS/                      # Core library
+│   ├── Core/                   # World state, keys, context
+│   ├── Actions/                # Atomic actions (damage, heal, move)
+│   ├── Skills/                 # Skill execution and validation
+│   ├── DSL/                    # LBR parser and compiler
+│   └── Systems/                # Turn system, events, replay
+│
+├── LB_FATE/                    # Sample console game
+│   ├── Game/                   # Game loop, initialization, turn logic
+│   ├── Program.Main.cs         # Entry point
+│   └── Net.cs                  # TCP networking
+│
+├── LB_FATE.AvaloniaClient/     # Modern GUI client
+│   ├── ViewModels/             # MVVM view models
+│   ├── Views/                  # XAML views
+│   ├── Controls/               # Custom game board control
+│   ├── Services/               # Network client, state parser
+│   └── README.md               # GUI client documentation
+│
+├── ETBBS.LbrValidator/         # CLI validation tool
+│   ├── Program.cs              # Validator logic
+│   └── README.md               # Validator documentation
+│
+├── ETBBS.Tests/                # Unit tests
+├── LB_FATE.Tests/              # Integration tests
+│
+├── docs/                       # Documentation
+│   ├── lbr.zh-CN.md            # LBR DSL guide (Chinese)
+│   └── lbr.en.md               # LBR DSL guide (English)
+│
+├── publish/                    # Distribution
+│   ├── roles/                  # Example role files (.lbr)
+│   ├── runServer.cmd           # Server launcher
+│   ├── runClient.cmd           # Client launcher
+│   └── README_LAUNCHER.md      # Launcher guide
+│
+└── vscode-extension/           # VS Code extension
+    └── etbbs-lbr-tools-*.vsix  # Installable extension
+```
+
+---
+
+## 🎯 Getting Started
+
+### Prerequisites
+
+- [.NET 8.0 SDK](https://dotnet.microsoft.com/download/dotnet/8.0) or later
+- (Optional) [VS Code](https://code.visualstudio.com/) for `.lbr` editing
+
+### Building
+
+```bash
+# Clone the repository
+git clone https://github.com/qiaohuaisun/LB_FATE.git
+cd ETBBS
+
+# Restore and build
+dotnet restore
+dotnet build ETBBS.sln -c Release
+
+# Run tests
+dotnet test
+```
+
+### Running the Game
+
+#### Local Mode (Single-Player)
+```bash
+dotnet run --project LB_FATE
+```
+Simulates 7 AI-controlled players in a free-for-all battle.
+
+#### Multiplayer Mode
+
+**Host a server**:
+```bash
+dotnet run --project LB_FATE -- --host --players 4 --port 35500 --mode ffa
+```
+
+**Connect clients**:
+```bash
+dotnet run --project LB_FATE -- --client 127.0.0.1:35500
+```
+
+#### Boss Mode
+```bash
+dotnet run --project LB_FATE -- --host --mode boss --players 7
+```
+7 players cooperate against an AI boss with scripted behavior.
+
+---
+
+## 🖥 Clients
 
 ### Avalonia GUI Client (Recommended)
 
-**Modern cross-platform graphical interface:**
+**Modern cross-platform interface with:**
+- Interactive game board (drag-and-drop, click to move/attack)
+- Real-time HP/MP bars and status effects
+- Skills panel with cooldown tracking
+- Combat log with event history
+- Command console for advanced users
 
-1. **Start the server** (using launcher scripts or command line)
-2. **Launch the GUI client**:
-   ```bash
-   dotnet run --project LB_FATE.AvaloniaClient/LB_FATE.AvaloniaClient.csproj
-   ```
-3. **Connect**: Enter server host/port on Connection tab and click "Connect to Server"
-4. **Play**: Switch to Game tab and use mouse or commands to play
+**Launch**:
+```bash
+dotnet run --project LB_FATE.AvaloniaClient
+```
+
+**Controls**:
+- **Left-click**: Select unit / Move to tile
+- **Right-click**: Attack target
+- **Mouse wheel**: Zoom (planned)
+- **Command bar**: Type commands directly
+
+📖 **Full Guide**: [LB_FATE.AvaloniaClient/README.md](LB_FATE.AvaloniaClient/README.md)
+
+---
+
+### Console Client
+
+**Text-based interface for:**
+- Terminal enthusiasts
+- Low-resource environments
+- Scripting and automation
+
+**Launcher Scripts** (Windows):
+
+| Script | Purpose | Logs |
+|--------|---------|------|
+| `publish/runServer.cmd` | Standard server | Interactive selection |
+| `publish/runServer-logs.cmd` | Debug server | Verbose + perf tracking |
+| `publish/runClient.cmd` | Standard client | Interactive selection |
+| `publish/runClient-logs.cmd` | Debug client | Verbose + auto-reconnect |
+
+**Commands** (Phases 2-4):
+- `move x y` - Move to (x, y). Cost: 0.5 MP
+- `attack P#` - Attack player. Cost: 0.5 MP
+- `cast <skill> [target]` - Use skill
+- `pass` - End turn
+- `info` - Show unit details
+- `help` - List available commands
+
+---
+
+## 🛠 Development Tools
+
+### LBR Validator
+
+Validate `.lbr` files before runtime to catch syntax errors early.
+
+**Usage**:
+```bash
+# Validate all files in a directory
+dotnet run --project ETBBS.LbrValidator -- publish/roles -v
+
+# Recursive scan with details
+dotnet run --project ETBBS.LbrValidator -- publish/roles -r -d
+
+# Quiet mode (summary only)
+dotnet run --project ETBBS.LbrValidator -- publish/roles -q
+```
 
 **Features**:
-- Interactive game board with mouse controls (left-click to move, right-click to attack)
-- Real-time unit status with HP/MP bars
-- Skills panel with cooldown tracking
-- Combat log
-- Command input with autocomplete hints
+- ✅ Batch validation of multiple files
+- ✅ Recursive directory scanning
+- ✅ Colored terminal output (✓/✗)
+- ✅ Detailed error messages with line numbers
+- ✅ CI/CD friendly (exit codes: 0 = success, 1 = errors)
 
-See `LB_FATE.AvaloniaClient/README.md` for detailed usage.
+**Example Output**:
+```
+═══════════════════════════════════════════════════════
+  ETBBS LBR Validator - Role File Syntax Checker
+═══════════════════════════════════════════════════════
 
-### Console Client (Traditional)
+Found 9 .lbr file(s) to validate
 
-#### Quick Start (Windows)
+Validating: artoria.lbr ... ✓ OK
+Validating: beast_florence.lbr ... ✓ OK
+...
 
-Use the convenient launcher scripts in `publish/`:
-- **Server**: `runServer.cmd` - Interactive log level selection
-- **Client**: `runClient.cmd` - Interactive log level selection
-- **Debug Server**: `runServer-logs.cmd` - Verbose logs + performance tracking
-- **Debug Client**: `runClient-logs.cmd` - Verbose logs + auto-reconnect
-
-See `publish/README_LAUNCHER.md` for detailed usage guide.
-
-#### Command Line
-
-- Local single‑console (7 players simulated):
-  - `dotnet run --project LB_FATE/LB_FATE.csproj`
-- Use custom roles folder:
-  - `dotnet run --project LB_FATE/LB_FATE.csproj -- --roles roles`
-- Host server (TCP):
-  - `dotnet run --project LB_FATE/LB_FATE.csproj -- --host --players 4 --port 35500 [--roles PATH] [--size WxH] [--mode ffa|boss]`
-- Client:
-  - `dotnet run --project LB_FATE/LB_FATE.csproj -- --client 127.0.0.1:35500`
-
-### Logging Options
-
-Control log verbosity with environment variables or command-line flags:
-
-**Environment Variable** (all platforms):
-```bash
-# Windows CMD
-set LB_FATE_LOG_LEVEL=Debug
-
-# Windows PowerShell
-$env:LB_FATE_LOG_LEVEL="Debug"
-
-# Linux/macOS
-export LB_FATE_LOG_LEVEL=Debug
+✓ ALL FILES PASSED VALIDATION
 ```
 
-**Command-line Flags**:
-- `--verbose` / `-v` - Verbose logging (maximum detail)
-- `--debug` / `-d` - Debug logging (development)
-- `--perf` - Enable performance tracking
+📖 **Full Guide**: [ETBBS.LbrValidator/README.md](ETBBS.LbrValidator/README.md)
 
-**Log Levels** (in order of verbosity):
-- `Verbose` - All logs including trace
-- `Debug` - Debug information
-- `Information` - Standard logs (default)
-- `Warning` - Warnings and errors only
-- `Error` - Errors only
-- `Fatal` - Fatal errors only
+---
 
-**Examples**:
-```bash
-# Development with debug logs
-dotnet run --project LB_FATE/LB_FATE.csproj -- --host --debug --perf
+## 🎮 Game Modes
 
-# Production with minimal logs
-LB_FATE_LOG_LEVEL=Warning dotnet run --project LB_FATE/LB_FATE.csproj -- --host
+### Free-for-All (FFA)
+- **Default mode**: 7 players compete for survival
+- **Victory**: Last player standing
+- **Grid**: 10x10 by default (customizable with `--size WxH`)
 
-# Client with verbose logs for troubleshooting
-dotnet run --project LB_FATE/LB_FATE.csproj -- --client 127.0.0.1:35500 --verbose
-```
+### Boss Mode
+- **Cooperative**: 7 players vs 1 AI-controlled boss
+- **Boss Selection**: Roles with `beast`/`grand` tags (e.g., `beast_florence`)
+- **AI Behavior**: Defined in `roles/<boss_id>.ai.json`
+- **Victory**: Defeat the boss within turn limit
 
-### Other Environment Variables
-
-- **Roles Directory**: `LB_FATE_ROLES_DIR=<dir>` (recursively loaded)
-- **Game Mode**: `LB_FATE_MODE=boss` (or `ffa`). Command line `--mode` takes precedence.
-
-### Modes
-
-- `ffa`: default free‑for‑all.
-- `boss`: 7 players cooperate versus an AI‑controlled Boss. The Boss is randomly chosen among roles with beast/grand hints (tag, class, or id). Falls back to high‑HP roles or built‑in `boss_beast`.
-
-### Boss AI Rule Script (optional)
-
-- Location: prefer `roles/<boss_id>.ai.json`, fallback to `ai/boss_default.ai.json`.
-- Shape (JSON):
-  - `rules`: array, matched from top to bottom; first match executes.
-    - `if`: all optional conditions
-      - `hp_pct_lte`: double in [0,1].
-      - `phase_in`: int[] phases where it fires.
-      - `skill_ready`: string skill name (checks MP/CD; range ensured by target selection).
-      - `distance_lte`: int; nearest‑enemy distance ≤ N.
-      - `min_hits` + `range_of`: estimate hits for cluster/aoe.
-      - `has_tag`: string; caster has the tag.
-    - `target`:
-      - `type`: `nearest_enemy` | `cluster` | `approach`
-      - `radius`: int; Chebyshev radius for `cluster`.
-      - `stop_at_range_of`: string; for `approach`, stop within range of this skill/basic.
-    - `action`: `cast` | `move_to` | `basic_attack` (default `cast`).
-    - `skill`: string; explicit skill name (optional if using `if.skill_ready`).
-    - `telegraph`: bool; this phase only announces, no cast.
-    - `telegraph_delay`: int; delay in phases (≥1, default 1; can span days).
-    - `telegraph_message`: string; message announced via AppendPublic.
-  - `fallback`: e.g., `basic_attack`.
-
-- Fallbacks at execution time (when telegraphed target is invalid):
-  - Tile skills: within caster `range`, choose the tile closest to the nearest enemy.
-  - Unit skills: for line‑aoe skills, scan all enemies and pick the target that maximizes “hits along the greedy path with radius R” (ties break by proximity); otherwise pick the nearest enemy.
-  - Both telegraph announce and final cast emit public messages.
-
-- Example (from `roles/boss_beast.ai.json`):
-
-```
+**Boss AI Script Example**:
+```json
 {
   "rules": [
     {
-      "if": { "skill_ready": "Mass Sweep", "min_hits": 2, "range_of": "Mass Sweep" },
-      "target": { "type": "cluster", "origin": "caster", "radius": 2 },
+      "if": {
+        "hp_pct_lte": 0.5,
+        "skill_ready": "Berserk Mode",
+        "phase_in": [3, 4]
+      },
+      "target": { "type": "nearest_enemy" },
+      "action": "cast",
+      "skill": "Berserk Mode"
+    },
+    {
+      "if": { "distance_lte": 2, "skill_ready": "Mass Sweep" },
+      "target": { "type": "cluster", "radius": 2 },
       "telegraph": true,
       "telegraph_delay": 1,
-      "telegraph_message": "Beast preparing Mass Sweep: radius 2 next phase"
+      "telegraph_message": "Boss charging Mass Sweep!"
     }
   ],
   "fallback": "basic_attack"
 }
 ```
 
-Notes
-- `LB_FATE/Program.cs` (older single‑file prototype) has been removed to avoid confusion.
-  The entry point is `LB_FATE/Program.Main.cs` and the partial `Game` class under `LB_FATE/Game/`.
+**Telegraph System**: Boss announces powerful attacks one phase in advance, giving players time to react.
 
-## Controls
+---
 
-Phases 1 & 5: all commands; Phases 2-4: move/pass/skills/info/help/hint.
+## 📝 LBR DSL (Roles & Skills)
 
-- `move x y` — Move to a reachable tile (clear path ≤ speed). Cost: 0.5 MP per move.
-- `attack P#` — Basic attack the target player id. Cost: 0.5 MP.
+LBR (role definition files) use a text-based DSL to define characters and skills.
 
-## LBR DSL (Roles & Skills)
+### File Structure
 
-- Role files: `role "Name" id "id" { description/vars/tags/skills }`
-- Skills: imperative mini‑DSL with meta and statements:
-  - Meta: `cost mp N; range N; cooldown N; targeting any|enemies|allies|self|tile; min_range N; sealed_until day D [phase P]; [ends_turn;]`
-    - Legacy: `sealed_until T;` still works but uses 0-based internal turn index.
-  - Control: `if ... then ... [else ...]`, `repeat N times ...`, `parallel { ... }`,
-    `for each <selector> [in parallel] do { ... }`, `chance P% then ... [else ...]`
-  - Actions: `deal [physical|magic] N ... [ignore ...%]`, `line ... length L [radius R]`,
-    `heal`, `move`, `dash towards`, `add/remove tag`,
-    `set unit(...) var "k" = value`, `set tile(...) var "k" = value`, `set global var "k" = value`,
-    `consume mp = N`
-  - Value refs: `var "k" of caster|target|it|unit id "..."`, with simple `+`/`-` arithmetic
+```lbr
+role "Character Name" id "unique_id" {
+  description "Displayed in info command";
 
-See `docs/lbr.zh-CN.md` for the full guide.
+  vars {
+    "hp" = 100; "max_hp" = 100;
+    "mp" = 5.0; "max_mp" = 5.0;
+    "atk" = 8; "def" = 5;
+    "matk" = 6; "mdef" = 4;
+    "range" = 2; "speed" = 3;
+  }
 
-## LBR Validator Tool
+  tags { "saber", "knight" }
 
-Validate `.lbr` file syntax before runtime:
+  skills {
+    skill "Sword Strike" {
+      range 2; targeting enemies; cooldown 1; cost mp 1;
+      deal physical 10 damage to target from caster;
+    }
 
+    skill "Healing Wave" {
+      range 3; targeting allies; cooldown 2; cost mp 2;
+      heal 15 to target;
+    }
+  }
+}
+```
+
+### Skill DSL Features
+
+**Meta Information**:
+- `cost mp N` - MP cost
+- `range N` - Maximum range
+- `cooldown N` - Turns between uses
+- `targeting any|enemies|allies|self|tile` - Valid targets
+- `sealed_until day D phase P` - Unlock timing
+- `ends_turn` - Immediately end turn after use
+
+**Control Flow**:
+- `if <condition> then <stmt> [else <stmt>]`
+- `repeat N times <stmt>`
+- `parallel { stmt; stmt; }`
+- `for each <selector> [in parallel] do { stmt }`
+- `chance P% then <stmt> [else <stmt>]`
+
+**Actions**:
+- `deal [physical|magic] N damage to <unit> [from <unit>] [ignore defense X%]`
+- `heal N to <unit>`
+- `move <unit> to (x, y)`
+- `dash towards <unit> up to N`
+- `line [physical|magic] P to <unit> length L [radius R]`
+- `add tag "tag" to <unit>` / `remove tag "tag" from <unit>`
+- `set unit(<unit>) var "key" = value`
+
+**Selectors**:
+- `enemies of caster in range 4 of caster` - All enemies within 4 tiles
+- `enemies of caster in range 5 of caster with tag "stunned"` - Stunned enemies
+- `enemies of caster in range 100 of caster order by var "hp" asc limit 1` - Lowest HP enemy
+- `nearest 3 enemies of caster` - 3 closest enemies
+
+**⚠️ Common Syntax Errors**:
+
+| ❌ Incorrect | ✅ Correct |
+|-------------|-----------|
+| `for each enemies in range 2 of caster do {` | `for each enemies of caster in range 2 of caster do {` |
+| `for each enemies of caster order by var "hp" desc in range 10 of caster do {` | `for each enemies of caster in range 10 of caster order by var "hp" desc do {` |
+
+**Clause order**: `of <unit>` → `in range` → `order by` → `limit` → `do`
+
+📖 **Full DSL Guide**: [docs/lbr.zh-CN.md](docs/lbr.zh-CN.md) | [docs/lbr.en.md](docs/lbr.en.md)
+
+---
+
+## ⚙️ Configuration
+
+### Roles Directory
+Load custom roles from:
+1. Command-line: `--roles <path>`
+2. Environment: `LB_FATE_ROLES_DIR=<path>`
+3. Default: `<app>/roles/`
+
+### Logging
+
+**Environment Variable**:
 ```bash
-# Validate all .lbr files in roles/ directory
-dotnet run --project ETBBS.LbrValidator -- roles -v
+# Windows
+set LB_FATE_LOG_LEVEL=Debug
 
-# Recursive scan with details
-dotnet run --project ETBBS.LbrValidator -- roles -r -d
-
-# Quiet mode (summary only)
-dotnet run --project ETBBS.LbrValidator -- roles -q
+# Linux/macOS
+export LB_FATE_LOG_LEVEL=Debug
 ```
 
-**Features**:
-- Batch validation of multiple files
-- Recursive directory scanning
-- Detailed error reporting with line numbers
-- Statistics and colored output
-- Exit codes for CI/CD integration (0 = success, 1 = errors)
+**Command-line Flags**:
+- `--verbose` / `-v` - Verbose logging
+- `--debug` / `-d` - Debug logging
+- `--perf` - Enable performance tracking
 
-See `ETBBS.LbrValidator/README.md` for complete documentation.
+**Levels**: `Verbose` > `Debug` > `Information` (default) > `Warning` > `Error` > `Fatal`
 
-## Launcher Scripts
+### Game Settings
 
-### Windows
+| Flag | Description | Example |
+|------|-------------|---------|
+| `--host` | Host server mode | `--host --players 4 --port 35500` |
+| `--client <addr>` | Connect to server | `--client 127.0.0.1:35500` |
+| `--mode <ffa\|boss>` | Game mode | `--mode boss` |
+| `--size WxH` | Grid size | `--size 15x15` |
+| `--roles <path>` | Roles directory | `--roles custom_roles` |
 
-Use the convenient scripts in `publish/` directory:
+---
 
-| Script | Purpose | Log Level |
-|--------|---------|-----------|
-| `runServer.cmd` | Standard server | Interactive selection (Information/Debug/Verbose/Warning) |
-| `runServer-logs.cmd` | Debug server | Verbose (fixed) + performance tracking |
-| `runClient.cmd` | Standard client | Interactive selection (Information/Debug/Warning) |
-| `runClient-logs.cmd` | Debug client | Verbose (fixed) + auto-reconnect |
+## 📚 Documentation
 
-**Interactive Selection Example**:
-```
-> runServer.cmd
+| Document | Description |
+|----------|-------------|
+| [LBR DSL Guide (Chinese)](docs/lbr.zh-CN.md) | Complete LBR syntax reference |
+| [LBR DSL Guide (English)](docs/lbr.en.md) | English LBR syntax summary |
+| [Avalonia Client Guide](LB_FATE.AvaloniaClient/README.md) | GUI client usage and architecture |
+| [LBR Validator Guide](ETBBS.LbrValidator/README.md) | Validator tool documentation |
 
-Log Level Options:
-  1. Information (Production, default)
-  2. Debug (Development)
-  3. Verbose (Detailed debugging)
-  4. Warning (Minimal logs)
+---
 
-Select log level [1-4, default 1]: 2
+## 📄 License
 
-Selected log level: Debug
-```
+This project is licensed under the MIT License - see [LICENSE.txt](LICENSE.txt) for details.
 
-For detailed usage guide, see `publish/README_LAUNCHER.md`.
+---
 
-### Configuration
+## 🙏 Acknowledgments
 
-- **Roles**: Loaded from `roles/` folder, `LB_FATE_ROLES_DIR`, or `--roles` argument
-- **Log Files**: Generated in `logs/` directory with daily rotation
-- **Performance Logs**: Available when using `--perf` flag or `-logs.cmd` scripts
+- **Avalonia UI** - Cross-platform UI framework
+- **CommunityToolkit.Mvvm** - MVVM helpers
+- **.NET Team** - For the amazing runtime and SDK
 
-## Encoding Note (Windows)
+---
 
-- The console app now forces UTF-8 I/O so Chinese text renders correctly.
-- If you still see garbled characters, use Windows Terminal, ensure the font supports CJK, or run `chcp 65001` before starting.
-
-
+**Happy Gaming! 🎮**

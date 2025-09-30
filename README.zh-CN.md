@@ -1,242 +1,507 @@
-# ETBBS + LB_FATE（中文）
+# ETBBS + LB_FATE
 
-这是一个用于网格/回合制游戏的可复用核心库（ETBBS，.NET 8），以及一个基于该核心的控制台示例游戏（LB_FATE）。同时提供 VS Code 扩展与示例角色脚本。
+[![.NET](https://img.shields.io/badge/.NET-8.0-512BD4)](https://dotnet.microsoft.com/)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE.txt)
 
-语言：中文 | English see README.md
+**语言**: [English](README.md) | 中文
 
-## 概览
+一个可复用的 .NET 8 网格回合制策略游戏框架，提供不可变状态引擎、文本技能 DSL，以及带图形界面的示例游戏。
 
-- 核心库 `ETBBS`：实现不可变世界状态、原子行动、技能组合/执行、事件总线，以及用于定义角色与技能的文本 DSL（LBR）。
-- 示例游戏 `LB_FATE`：运行 2D 网格，加载 `.lbr` 角色，支持本地与 TCP 多人。入口在 `LB_FATE/Program.Main.cs`。
-- **Avalonia GUI 客户端** `LB_FATE.AvaloniaClient`：提供现代化跨平台图形界面，支持交互式游戏棋盘、实时单位状态和鼠标操控。
-- VS Code 扩展位于 `vscode-extension/`：为 `.lbr` 文件提供语法高亮、代码片段、补全、格式化与基础诊断。
+---
 
-## 目录结构
+## 📋 目录
 
-- `ETBBS/` → 核心库
-  - 状态/键/上下文：`Core/*.cs`
-  - 原子行动：`Actions/*.cs`
-  - 技能/执行/校验：`Skills/*.cs`
-  - 角色与技能 DSL：`DSL/*.cs`
-  - 系统：回合推进、回放、事件：`Systems/*.cs`
-- `LB_FATE/` → 示例控制台游戏（本地或主机/客户端）
-  - 入口：`Program.Main.cs`
-  - 循环与 UI：`Game/*.cs`
-  - 网络：`Net.cs`
-  - 领域模型：`Domain.cs`
-- `LB_FATE.AvaloniaClient/` → 跨平台 GUI 客户端
-  - 现代化 Avalonia UI 界面
-  - MVVM 架构
-  - 支持鼠标操控的交互式游戏棋盘
-  - 实时单位状态和战斗日志
-  - 详见 `LB_FATE.AvaloniaClient/README.md`
-- `ETBBS.LbrValidator/` → 命令行 LBR 语法验证工具
-  - 批量验证 `.lbr` 文件
-  - 递归目录扫描
-  - 详细错误报告和统计信息
-  - 支持 CI/CD 集成
-  - 详见 `ETBBS.LbrValidator/README.md`
-- `roles/` → 示例 `.lbr` 角色与技能
-- `vscode-extension/` → VS Code 扩展源码与打包脚本
-- `publish/win-x64/` → Windows 预构建二进制与辅助脚本
+- [特性](#-特性)
+- [快速开始](#-快速开始)
+- [架构](#-架构)
+- [目录结构](#-目录结构)
+- [开始使用](#-开始使用)
+  - [系统要求](#系统要求)
+  - [构建](#构建)
+  - [运行游戏](#运行游戏)
+- [客户端](#-客户端)
+  - [Avalonia GUI 客户端](#avalonia-gui-客户端推荐)
+  - [控制台客户端](#控制台客户端)
+- [开发工具](#-开发工具)
+  - [LBR 验证器](#lbr-验证器)
+  - [VS Code 扩展](#vs-code-扩展)
+- [游戏模式](#-游戏模式)
+- [LBR DSL](#-lbr-dsl角色与技能)
+- [配置](#-配置)
+- [文档](#-文档)
+- [许可证](#-许可证)
 
-## 构建
+---
 
-- 依赖：.NET SDK 8.0+
-- 构建解决方案：
-  - `dotnet build ETBBS.sln -c Release`
+## ✨ 特性
 
-## 运行（示例游戏）
+### 核心框架 (ETBBS)
+- **不可变世界状态**：可预测、可测试的游戏逻辑与原子行动
+- **文本技能 DSL**：使用 `.lbr` 文件定义角色与技能
+- **事件总线系统**：响应式游戏事件与状态变更
+- **回合制执行**：基于阶段的回合系统与验证
+- **灵活目标选择**：支持单体、范围、直线攻击和选择器
+
+### 示例游戏 (LB_FATE)
+- **2D 网格战斗**：可自定义网格的战术回合制战斗
+- **TCP 多人游戏**：主机/客户端网络架构
+- **Boss 模式**：7 人合作对抗使用脚本决策树的 AI Boss
+- **混战模式**：传统大逃杀玩法
+- **现代 GUI**：跨平台 Avalonia UI 与鼠标控制
+- **传统控制台**：为终端爱好者提供的文本界面
+
+### 开发者体验
+- **语法验证器**：在运行前验证 `.lbr` 文件的 CLI 工具
+- **VS Code 扩展**：语法高亮、补全、代码片段和诊断
+- **全面日志**：多级别日志与性能追踪
+- **热重载角色**：从目录加载自定义角色
+
+---
+
+## 🚀 快速开始
+
+### GUI 客户端（推荐）
+
+1. **启动服务器**：
+   ```bash
+   cd publish
+   runServer.cmd  # Windows
+   # 或：dotnet run --project LB_FATE -- --host --players 4
+   ```
+
+2. **启动 GUI 客户端**：
+   ```bash
+   dotnet run --project LB_FATE.AvaloniaClient
+   ```
+
+3. **连接并游玩**：
+   - 输入服务器地址（如 `127.0.0.1:35500`）
+   - 使用鼠标控制单位（左键移动，右键攻击）
+
+### 控制台客户端
+
+```bash
+# 本地单人（模拟 7 个 AI 玩家）
+dotnet run --project LB_FATE
+
+# 主机多人服务器
+dotnet run --project LB_FATE -- --host --players 4 --port 35500
+
+# 作为客户端连接
+dotnet run --project LB_FATE -- --client 127.0.0.1:35500
+```
+
+---
+
+## 🏗 架构
+
+```
+┌──────────────────────────────────────────────────────┐
+│                   LB_FATE (游戏)                     │
+│  ┌────────────┐  ┌────────────┐  ┌────────────┐    │
+│  │  控制台UI  │  │  Avalonia  │  │  TCP 网络  │    │
+│  │            │  │ GUI 客户端 │  │  主机/客户端│   │
+│  └──────┬─────┘  └──────┬─────┘  └──────┬─────┘    │
+│         └────────────────┴────────────────┘          │
+└───────────────────┬──────────────────────────────────┘
+                    │
+┌───────────────────▼──────────────────────────────────┐
+│              ETBBS 核心库                            │
+│  ┌─────────┐  ┌──────────┐  ┌──────────┐           │
+│  │  世界   │  │  行动    │  │  技能    │           │
+│  │  状态   │◄─┤ （原子） │◄─┤   DSL    │           │
+│  └────┬────┘  └──────────┘  └──────────┘           │
+│       │                                              │
+│  ┌────▼────┐  ┌──────────┐  ┌──────────┐           │
+│  │  回合   │  │  事件    │  │LBR 解析器│           │
+│  │  系统   │  │  总线    │  │          │           │
+│  └─────────┘  └──────────┘  └──────────┘           │
+└──────────────────────────────────────────────────────┘
+```
+
+**核心概念**：
+- **不可变状态**：每个行动产生新的世界状态
+- **原子行动**：可组合、已验证的行动（伤害、治疗、移动等）
+- **技能脚本**：文本 DSL 编译为行动序列
+- **事件驱动**：状态变化发出 UI/日志事件
+
+---
+
+## 📁 目录结构
+
+```
+ETBBS/
+├── ETBBS/                      # 核心库
+│   ├── Core/                   # 世界状态、键、上下文
+│   ├── Actions/                # 原子行动（伤害、治疗、移动）
+│   ├── Skills/                 # 技能执行与验证
+│   ├── DSL/                    # LBR 解析器与编译器
+│   └── Systems/                # 回合系统、事件、回放
+│
+├── LB_FATE/                    # 示例控制台游戏
+│   ├── Game/                   # 游戏循环、初始化、回合逻辑
+│   ├── Program.Main.cs         # 入口点
+│   └── Net.cs                  # TCP 网络
+│
+├── LB_FATE.AvaloniaClient/     # 现代 GUI 客户端
+│   ├── ViewModels/             # MVVM 视图模型
+│   ├── Views/                  # XAML 视图
+│   ├── Controls/               # 自定义游戏棋盘控件
+│   ├── Services/               # 网络客户端、状态解析器
+│   └── README.md               # GUI 客户端文档
+│
+├── ETBBS.LbrValidator/         # CLI 验证工具
+│   ├── Program.cs              # 验证器逻辑
+│   └── README.md               # 验证器文档
+│
+├── ETBBS.Tests/                # 单元测试
+├── LB_FATE.Tests/              # 集成测试
+│
+├── docs/                       # 文档
+│   ├── lbr.zh-CN.md            # LBR DSL 指南（中文）
+│   └── lbr.en.md               # LBR DSL 指南（英文）
+│
+├── publish/                    # 发布版
+│   ├── roles/                  # 示例角色文件 (.lbr)
+│   ├── runServer.cmd           # 服务器启动器
+│   ├── runClient.cmd           # 客户端启动器
+│   └── README_LAUNCHER.md      # 启动器指南
+│
+└── vscode-extension/           # VS Code 扩展
+    └── etbbs-lbr-tools-*.vsix  # 可安装扩展
+```
+
+---
+
+## 🎯 开始使用
+
+### 系统要求
+
+- [.NET 8.0 SDK](https://dotnet.microsoft.com/download/dotnet/8.0) 或更高版本
+- （可选）[VS Code](https://code.visualstudio.com/) 用于编辑 `.lbr` 文件
+
+### 构建
+
+```bash
+# 克隆仓库
+git clone https://github.com/qiaohuaisun/LB_FATE.git
+cd ETBBS
+
+# 还原并构建
+dotnet restore
+dotnet build ETBBS.sln -c Release
+
+# 运行测试
+dotnet test
+```
+
+### 运行游戏
+
+#### 本地模式（单人）
+```bash
+dotnet run --project LB_FATE
+```
+模拟 7 个 AI 控制的玩家进行混战。
+
+#### 多人模式
+
+**主机服务器**：
+```bash
+dotnet run --project LB_FATE -- --host --players 4 --port 35500 --mode ffa
+```
+
+**连接客户端**：
+```bash
+dotnet run --project LB_FATE -- --client 127.0.0.1:35500
+```
+
+#### Boss 模式
+```bash
+dotnet run --project LB_FATE -- --host --mode boss --players 7
+```
+7 名玩家合作对抗具有脚本行为的 AI Boss。
+
+---
+
+## 🖥 客户端
 
 ### Avalonia GUI 客户端（推荐）
 
-**现代化跨平台图形界面：**
+**现代跨平台界面，包含：**
+- 交互式游戏棋盘（拖放、点击移动/攻击）
+- 实时 HP/MP 条和状态效果
+- 技能面板与冷却时间追踪
+- 战斗日志与事件历史
+- 命令控制台供高级用户使用
 
-1. **启动服务器**（使用启动脚本或命令行）
-2. **启动 GUI 客户端**：
-   ```bash
-   dotnet run --project LB_FATE.AvaloniaClient/LB_FATE.AvaloniaClient.csproj
-   ```
-3. **连接**：在连接选项卡输入服务器地址/端口，点击"连接服务器"
-4. **游戏**：切换到游戏选项卡，使用鼠标或命令进行游戏
-
-**功能特性**：
-- 支持鼠标操控的交互式棋盘（左键移动，右键攻击）
-- 实时单位状态显示（HP/MP 条）
-- 技能面板，显示冷却时间
-- 战斗日志
-- 命令输入框，支持提示
-
-详见 `LB_FATE.AvaloniaClient/README.md`。
-
-### 控制台客户端（传统）
-
-#### 快速开始（Windows）
-
-使用 `publish/` 目录下的便捷启动脚本：
-- **服务器**：`runServer.cmd` - 交互式日志级别选择
-- **客户端**：`runClient.cmd` - 交互式日志级别选择
-- **调试服务器**：`runServer-logs.cmd` - 详细日志 + 性能追踪
-- **调试客户端**：`runClient-logs.cmd` - 详细日志 + 自动重连
-
-详细使用指南请参阅 `publish/README_LAUNCHER.md`。
-
-#### 命令行方式
-
-- 本地单机（模拟 7 名玩家）：
-  - `dotnet run --project LB_FATE/LB_FATE.csproj`
-- 指定自定义角色目录：
-  - `dotnet run --project LB_FATE/LB_FATE.csproj -- --roles roles`
-- 作为主机（TCP）：
-  - `dotnet run --project LB_FATE/LB_FATE.csproj -- --host --players 4 --port 35500 [--roles 路径] [--size 宽x高] [--mode ffa|boss]`
-- 作为客户端：
-  - `dotnet run --project LB_FATE/LB_FATE.csproj -- --client 127.0.0.1:35500`
-
-### 日志配置
-
-通过环境变量或命令行参数控制日志详细程度：
-
-**环境变量**（所有平台）：
+**启动**：
 ```bash
-# Windows CMD
-set LB_FATE_LOG_LEVEL=Debug
-
-# Windows PowerShell
-$env:LB_FATE_LOG_LEVEL="Debug"
-
-# Linux/macOS
-export LB_FATE_LOG_LEVEL=Debug
+dotnet run --project LB_FATE.AvaloniaClient
 ```
 
-**命令行参数**：
-- `--verbose` / `-v` - 详细日志（最大详细程度）
-- `--debug` / `-d` - 调试日志（开发模式）
-- `--perf` - 启用性能追踪
+**控制**：
+- **左键**：选择单位 / 移动到格子
+- **右键**：攻击目标
+- **鼠标滚轮**：缩放（计划中）
+- **命令栏**：直接输入命令
 
-**日志级别**（从详细到简略）：
-- `Verbose` - 所有日志包括追踪
-- `Debug` - 调试信息
-- `Information` - 标准日志（默认）
-- `Warning` - 仅警告和错误
-- `Error` - 仅错误
-- `Fatal` - 仅致命错误
+📖 **完整指南**：[LB_FATE.AvaloniaClient/README.md](LB_FATE.AvaloniaClient/README.md)
 
-**使用示例**：
+---
+
+### 控制台客户端
+
+**文本界面适用于：**
+- 终端爱好者
+- 低资源环境
+- 脚本和自动化
+
+**启动脚本**（Windows）：
+
+| 脚本 | 用途 | 日志 |
+|------|------|------|
+| `publish/runServer.cmd` | 标准服务器 | 交互式选择 |
+| `publish/runServer-logs.cmd` | 调试服务器 | 详细 + 性能追踪 |
+| `publish/runClient.cmd` | 标准客户端 | 交互式选择 |
+| `publish/runClient-logs.cmd` | 调试客户端 | 详细 + 自动重连 |
+
+**命令**（阶段 2-4）：
+- `move x y` - 移动到 (x, y)。消耗：0.5 MP
+- `attack P#` - 攻击玩家。消耗：0.5 MP
+- `cast <技能> [目标]` - 使用技能
+- `pass` - 结束回合
+- `info` - 显示单位详情
+- `help` - 列出可用命令
+
+---
+
+## 🛠 开发工具
+
+### LBR 验证器
+
+在运行前验证 `.lbr` 文件以尽早捕获语法错误。
+
+**用法**：
 ```bash
-# 开发模式使用调试日志
-dotnet run --project LB_FATE/LB_FATE.csproj -- --host --debug --perf
+# 验证目录中的所有文件
+dotnet run --project ETBBS.LbrValidator -- publish/roles -v
 
-# 生产环境使用最小日志
-LB_FATE_LOG_LEVEL=Warning dotnet run --project LB_FATE/LB_FATE.csproj -- --host
+# 递归扫描并显示详情
+dotnet run --project ETBBS.LbrValidator -- publish/roles -r -d
 
-# 客户端详细日志用于故障排查
-dotnet run --project LB_FATE/LB_FATE.csproj -- --client 127.0.0.1:35500 --verbose
+# 安静模式（仅摘要）
+dotnet run --project ETBBS.LbrValidator -- publish/roles -q
 ```
 
-### 其他环境变量
+**功能**：
+- ✅ 批量验证多个文件
+- ✅ 递归目录扫描
+- ✅ 彩色终端输出（✓/✗）
+- ✅ 详细错误消息与行号
+- ✅ CI/CD 友好（退出码：0 = 成功，1 = 错误）
 
-- **角色目录**：`LB_FATE_ROLES_DIR=<目录>`（递归加载）
-- **游戏模式**：`LB_FATE_MODE=boss`（或 `ffa`）。命令行 `--mode` 参数优先。
-
-### 模式说明
-
-- `ffa`：默认自由对战模式（每位玩家互为敌方）。
-- `boss`：Boss 战模式。7 名玩家分配至同一队伍，与 AI 控制的 Boss 对战。Boss 从具备“beast/冠位”相关标签/类/id 的角色中随机选取；若找不到，则回退到高生命的角色或内置 `boss_beast`。
-
-### Boss AI 规则脚本（可选）
-
-- 放置位置：优先 `roles/<boss_id>.ai.json`，其次 `ai/boss_default.ai.json`。
-- 结构（JSON）：
-  - `rules`: 规则数组，自上而下匹配；命中后执行，不再继续匹配。
-    - `if`: 条件（全部满足才命中；均为可选）
-      - `hp_pct_lte`: double；血量百分比阈值（0..1）。
-      - `phase_in`: int[]；仅在这些阶段触发（与“按阶段扣”一致）。
-      - `skill_ready`: string；技能名，就绪判定包含 MP/CD（距离由目标选择保证）。
-      - `distance_lte`: int；与最近敌人的距离 ≤ N。
-      - `min_hits` + `range_of`: int + string；命中估算（与 `target.radius/cluster` 配合）。
-      - `has_tag`: string；自身带指定标签。
-    - `target`: 目标/落点选择
-      - `type`: `nearest_enemy` | `cluster` | `approach`
-      - `radius`: int；cluster（Chebyshev）半径。
-      - `stop_at_range_of`: string；approach 时，停在此技能/普攻的射程内。
-    - `action`: `cast` | `move_to` | `basic_attack`（默认为 `cast`）。
-    - `skill`: string；显式指定技能名（可省略，使用 `if.skill_ready`）。
-    - `telegraph`: bool；预警技能：本阶段仅预警，不释放。
-    - `telegraph_delay`: int；延迟的“阶段”数（≥1，默认 1；可跨日）。
-    - `telegraph_message`: string；预警提示文案，通过 AppendPublic 公共日志输出。
-  - `fallback`: 兜底动作为 `basic_attack`（可选）。
-
-- 兜底逻辑：
-  - 预警到期时若原目标失效（死亡/越界/距离不合法等），引擎自动重选：
-    - tile 技能：以施法者为中心，在 `range` 内枚举格子，选择“距离最近敌人”最优的落点。
-    - unit 技能：如为“直线 AoE（line aoe）”，将扫描所有敌人作为候选目标，估算“沿贪心路径、半径 R 的命中数”，选择命中最多（若并列，选更近）的目标；否则选最近敌人。
-  - 预警与释放均通过 AppendPublic 输出提示。
-
-- 示例（摘自 `roles/boss_beast.ai.json`）：
-
+**示例输出**：
 ```
+═══════════════════════════════════════════════════════
+  ETBBS LBR Validator - Role File Syntax Checker
+═══════════════════════════════════════════════════════
+
+Found 9 .lbr file(s) to validate
+
+Validating: artoria.lbr ... ✓ OK
+Validating: beast_florence.lbr ... ✓ OK
+...
+
+✓ ALL FILES PASSED VALIDATION
+```
+
+📖 **完整指南**：[ETBBS.LbrValidator/README.md](ETBBS.LbrValidator/README.md)
+
+---
+
+## 🎮 游戏模式
+
+### 混战模式 (FFA)
+- **默认模式**：7 名玩家争夺生存
+- **胜利条件**：最后存活的玩家
+- **网格**：默认 10x10（可用 `--size WxH` 自定义）
+
+### Boss 模式
+- **合作**：7 名玩家对抗 1 个 AI 控制的 Boss
+- **Boss 选择**：带有 `beast`/`grand` 标签的角色（如 `beast_florence`）
+- **AI 行为**：在 `roles/<boss_id>.ai.json` 中定义
+- **胜利条件**：在回合限制内击败 Boss
+
+**Boss AI 脚本示例**：
+```json
 {
   "rules": [
     {
-      "if": { "skill_ready": "Mass Sweep", "min_hits": 2, "range_of": "Mass Sweep" },
-      "target": { "type": "cluster", "origin": "caster", "radius": 2 },
+      "if": {
+        "hp_pct_lte": 0.5,
+        "skill_ready": "狂暴模式",
+        "phase_in": [3, 4]
+      },
+      "target": { "type": "nearest_enemy" },
+      "action": "cast",
+      "skill": "狂暴模式"
+    },
+    {
+      "if": { "distance_lte": 2, "skill_ready": "群体横扫" },
+      "target": { "type": "cluster", "radius": 2 },
       "telegraph": true,
       "telegraph_delay": 1,
-      "telegraph_message": "野兽蓄力横扫：下一阶段范围2"
+      "telegraph_message": "Boss 正在蓄力群体横扫！"
     }
   ],
   "fallback": "basic_attack"
 }
 ```
 
-说明
-- 旧的 `LB_FATE/Program.cs`（单文件原型）已移除以避免混淆。入口为 `LB_FATE/Program.Main.cs` 与 `LB_FATE/Game/` 下的分部 `Game` 类。
+**预警系统**：Boss 提前一个阶段宣布强力攻击，给玩家时间应对。
 
-## LBR DSL（角色与技能）
+---
 
-- 角色文件：`role "名称" id "id" { description/vars/tags/skills }`
-- 技能：命令式迷你 DSL，包含元信息与语句：
-  - 元信息：`cost mp N; range N; cooldown N; targeting any|enemies|allies|self|tile; min_range N; sealed_until day D [phase P]; [ends_turn;]`（保留 `sealed_until T;` 旧语法，T 为内部回合索引，0 基）
-  - 控制：`if ... then ... [else ...]`、`repeat N times ...`、`parallel { ... }`、`for each <selector> [in parallel] do { ... }`、`chance P% then ... [else ...]`
-  - 动作：`deal [physical|magic] N ... [ignore ...%]`、`line ... length L [radius R]`、`heal`、`move`、`dash towards`、`add/remove tag`、
-    `set unit(...) var "k" = value`、`set tile(...) var "k" = value`、`set global var "k" = value`、`consume mp = N`
-  - 值引用：`var "k" of caster|target|it|unit id "..."`，支持简单 `+`/`-` 运算
+## 📝 LBR DSL（角色与技能）
 
-更多语法示例可参考英文 `README.md` 或 `docs/` 下相关文档（若存在）。
+LBR（角色定义文件）使用基于文本的 DSL 定义角色和技能。
 
-## LBR 验证工具
+### 文件结构
 
-在运行时之前验证 `.lbr` 文件语法：
+```lbr
+role "角色名称" id "unique_id" {
+  description "在 info 命令中显示";
 
-```bash
-# 验证 roles/ 目录下的所有 .lbr 文件
-dotnet run --project ETBBS.LbrValidator -- roles -v
+  vars {
+    "hp" = 100; "max_hp" = 100;
+    "mp" = 5.0; "max_mp" = 5.0;
+    "atk" = 8; "def" = 5;
+    "matk" = 6; "mdef" = 4;
+    "range" = 2; "speed" = 3;
+  }
 
-# 递归扫描并显示详细信息
-dotnet run --project ETBBS.LbrValidator -- roles -r -d
+  tags { "saber", "knight" }
 
-# 安静模式（仅摘要）
-dotnet run --project ETBBS.LbrValidator -- roles -q
+  skills {
+    skill "剑击" {
+      range 2; targeting enemies; cooldown 1; cost mp 1;
+      deal physical 10 damage to target from caster;
+    }
+
+    skill "治疗波" {
+      range 3; targeting allies; cooldown 2; cost mp 2;
+      heal 15 to target;
+    }
+  }
+}
 ```
 
-**功能特性**：
-- 批量验证多个文件
-- 递归目录扫描
-- 详细的错误报告（含行号）
-- 统计信息和彩色输出
-- 支持 CI/CD 集成（退出码：0 = 成功，1 = 错误）
+### 技能 DSL 功能
 
-完整文档请参阅 `ETBBS.LbrValidator/README.md`。
+**元信息**：
+- `cost mp N` - MP 消耗
+- `range N` - 最大射程
+- `cooldown N` - 使用间隔回合数
+- `targeting any|enemies|allies|self|tile` - 有效目标
+- `sealed_until day D phase P` - 解锁时机
+- `ends_turn` - 使用后立即结束回合
 
-## Windows 运行
+**控制流**：
+- `if <条件> then <语句> [else <语句>]`
+- `repeat N times <语句>`
+- `parallel { 语句; 语句; }`
+- `for each <选择器> [in parallel] do { 语句 }`
+- `chance P% then <语句> [else <语句>]`
 
-- 使用 `publish/win-x64/` 下脚本启动 host/client/local 模式。
-- 角色来源依次为应用目录 `roles/`、环境变量 `LB_FATE_ROLES_DIR`、命令行 `--roles`。
+**行动**：
+- `deal [physical|magic] N damage to <单位> [from <单位>] [ignore defense X%]`
+- `heal N to <单位>`
+- `move <单位> to (x, y)`
+- `dash towards <单位> up to N`
+- `line [physical|magic] P to <单位> length L [radius R]`
+- `add tag "标签" to <单位>` / `remove tag "标签" from <单位>`
+- `set unit(<单位>) var "键" = 值`
 
-## 控制台中文显示（Windows）
+**选择器**：
+- `enemies of caster in range 4 of caster` - 4 格内所有敌人
+- `enemies of caster in range 5 of caster with tag "stunned"` - 晕眩敌人
+- `enemies of caster in range 100 of caster order by var "hp" asc limit 1` - HP 最低的敌人
+- `nearest 3 enemies of caster` - 最近的 3 个敌人
 
-阶段规则：第 1/5 阶段可用全部指令；第 2~4 阶段可用 move/pass/skills/info/help/hint。
+**⚠️ 常见语法错误**：
 
-- 控制台程序已强制使用 UTF-8 输入/输出以正确显示中文。
-- 若仍出现乱码，建议使用 Windows Terminal，确保字体支持中文，或在启动前执行 `chcp 65001`。
+| ❌ 错误 | ✅ 正确 |
+|--------|--------|
+| `for each enemies in range 2 of caster do {` | `for each enemies of caster in range 2 of caster do {` |
+| `for each enemies of caster order by var "hp" desc in range 10 of caster do {` | `for each enemies of caster in range 10 of caster order by var "hp" desc do {` |
 
+**子句顺序**：`of <单位>` → `in range` → `order by` → `limit` → `do`
+
+📖 **完整 DSL 指南**：[docs/lbr.zh-CN.md](docs/lbr.zh-CN.md) | [docs/lbr.en.md](docs/lbr.en.md)
+
+---
+
+## ⚙️ 配置
+
+### 角色目录
+从以下位置加载自定义角色：
+1. 命令行：`--roles <路径>`
+2. 环境变量：`LB_FATE_ROLES_DIR=<路径>`
+3. 默认：`<应用>/roles/`
+
+### 日志
+
+**环境变量**：
+```bash
+# Windows
+set LB_FATE_LOG_LEVEL=Debug
+
+# Linux/macOS
+export LB_FATE_LOG_LEVEL=Debug
+```
+
+**命令行标志**：
+- `--verbose` / `-v` - 详细日志
+- `--debug` / `-d` - 调试日志
+- `--perf` - 启用性能追踪
+
+**级别**：`Verbose` > `Debug` > `Information`（默认）> `Warning` > `Error` > `Fatal`
+
+### 游戏设置
+
+| 标志 | 说明 | 示例 |
+|------|------|------|
+| `--host` | 主机服务器模式 | `--host --players 4 --port 35500` |
+| `--client <地址>` | 连接到服务器 | `--client 127.0.0.1:35500` |
+| `--mode <ffa\|boss>` | 游戏模式 | `--mode boss` |
+| `--size WxH` | 网格大小 | `--size 15x15` |
+| `--roles <路径>` | 角色目录 | `--roles custom_roles` |
+
+---
+
+## 📚 文档
+
+| 文档 | 说明 |
+|------|------|
+| [LBR DSL 指南（中文）](docs/lbr.zh-CN.md) | 完整 LBR 语法参考 |
+| [LBR DSL 指南（英文）](docs/lbr.en.md) | 英文 LBR 语法摘要 |
+| [Avalonia 客户端指南](LB_FATE.AvaloniaClient/README.md) | GUI 客户端使用与架构 |
+| [LBR 验证器指南](ETBBS.LbrValidator/README.md) | 验证器工具文档 |
+
+---
+
+## 📄 许可证
+
+本项目采用 MIT 许可证 - 详见 [LICENSE.txt](LICENSE.txt)。
+
+---
+
+## 🙏 致谢
+
+- **Avalonia UI** - 跨平台 UI 框架
+- **CommunityToolkit.Mvvm** - MVVM 助手
+- **.NET 团队** - 卓越的运行时和 SDK
+
+---
+
+**游戏愉快！ 🎮**
