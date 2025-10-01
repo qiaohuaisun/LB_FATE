@@ -91,7 +91,7 @@ public partial class Game
         }
         try
         {
-            ep.SendLine($"WELCOME {pid} (reconnected)");
+            ep.SendLine($"欢迎 {pid}（已重连）");
             SendBoardTo(pid, lastDay, lastPhase);
             foreach (var kv in endpoints)
                 if (kv.Key != pid)

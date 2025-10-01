@@ -115,7 +115,7 @@ partial class Game
             lines.Add(sb.ToString());
         }
         lines.Add(border);
-        lines.Add($"{AnsiColor.Bold}{AnsiColor.Yellow}Legend / Status:{AnsiColor.Reset}");
+        lines.Add($"{AnsiColor.Bold}{AnsiColor.Yellow}图例 / 状态：{AnsiColor.Reset}");
         var idsToShow = viewerPid is null ? playerIds.AsEnumerable() : new[] { viewerPid };
         // In boss mode, also show boss status
         if (bossMode && state.Units.ContainsKey(bossId) && GetInt(bossId, Keys.Hp, 0) > 0)
@@ -132,24 +132,24 @@ partial class Game
             var pos = (Coord)u.Vars[Keys.Pos];
             bool isOffline = endpoints.Count > 0 && !endpoints.ContainsKey(pid) && pid != bossId;
             var head = isOffline ? "!" : symbolOf[pid].ToString();
-            var offMark = isOffline ? $"{AnsiColor.Red} (offline){AnsiColor.Reset}" : string.Empty;
+            var offMark = isOffline ? $"{AnsiColor.Red} (离线){AnsiColor.Reset}" : string.Empty;
             var displayName = (bossMode && pid == bossId) ? $"{AnsiColor.Bold}{AnsiColor.BrightRed}【{bossName}】{AnsiColor.Reset}" : pid;
             var hpColor = GetHpColor(hp, maxHp);
             var hpBar = Bar(hp, maxHp, 10);
             lines.Add($" {GetAnsiColorForClass(classOf[pid])}{head}{AnsiColor.Reset}: {displayName} {AnsiColor.Cyan}{classOf[pid],-10}{AnsiColor.Reset} {hpColor}HP[{hpBar}]({hp}/{maxHp}){AnsiColor.Reset} {AnsiColor.BrightBlue}MP={mpStr}{AnsiColor.Reset} {AnsiColor.Gray}Pos={pos}{AnsiColor.Reset}{offMark}");
         }
         lines.Add("");
-        lines.Add($"{AnsiColor.Green}Commands:{AnsiColor.Reset} move x y | attack P# | skills | use <n> [P#|x y|up|down|left|right] | info | hint move | pass | help | quit");
-        lines.Add($"{AnsiColor.Yellow}Costs   :{AnsiColor.Reset} Move 0.5 MP; Attack 0.5 MP");
-        lines.Add($"{AnsiColor.Dim}Note    : Each player acts once per phase.{AnsiColor.Reset}");
-        lines.Add($"{AnsiColor.Dim}Tip     : Press TAB for auto-completion (commands, targets, directions).{AnsiColor.Reset}");
+        lines.Add($"{AnsiColor.Green}命令：{AnsiColor.Reset} move x y | attack P# | skills | use <n> [P#|x y|up|down|left|right] | info | hint move | pass | help | quit");
+        lines.Add($"{AnsiColor.Yellow}消耗    ：{AnsiColor.Reset} 移动 0.5 MP；攻击 0.5 MP");
+        lines.Add($"{AnsiColor.Dim}注意    ：每个玩家每阶段行动一次。{AnsiColor.Reset}");
+        lines.Add($"{AnsiColor.Dim}提示    ：按 TAB 键自动补全（命令、目标、方向）。{AnsiColor.Reset}");
         // Recent logs: 合并公共日志 + 当前观者的私有日志（仅 debug 写入）
         var mergedLogs = new List<string>();
         mergedLogs.AddRange(publicLog);
         if (viewerPid is not null && privateLog.TryGetValue(viewerPid, out var priv)) mergedLogs.AddRange(priv);
         if (mergedLogs.Count > 0)
         {
-            lines.Add($"{AnsiColor.Bold}{AnsiColor.Magenta}Recent:{AnsiColor.Reset}");
+            lines.Add($"{AnsiColor.Bold}{AnsiColor.Magenta}最近记录：{AnsiColor.Reset}");
             foreach (var m in mergedLogs.TakeLast(5))
             {
                 var coloredMsg = ColorizeLogMessage(m);
@@ -285,7 +285,7 @@ partial class Game
             Console.WriteLine(y); // Y-axis coordinate at the end
         }
         Console.Write("+"); for (int x = 0; x < width; x++) Console.Write("-"); Console.WriteLine("+");
-        Console.WriteLine("Legend / Status:");
+        Console.WriteLine("图例 / 状态：");
         var idsToShow = playerIds.AsEnumerable();
         // In boss mode, also show boss status
         if (bossMode && state.Units.ContainsKey(bossId) && GetInt(bossId, Keys.Hp, 0) > 0)
@@ -304,17 +304,17 @@ partial class Game
             var head = isOffline ? "!" : symbolOf[pid].ToString();
             var displayName = (bossMode && pid == bossId) ? $"【{bossName}】" : pid;
             Console.ForegroundColor = GetColor(classOf[pid]); Console.Write($" {head}: {displayName} {classOf[pid],-10} "); Console.ResetColor();
-            Console.Write($"HP[{Bar(hp, maxHp, 10)}]({hp}/{maxHp}) MP={mpStr} Pos={pos}{(isOffline ? " (offline)" : string.Empty)}");
+            Console.Write($"HP[{Bar(hp, maxHp, 10)}]({hp}/{maxHp}) MP={mpStr} Pos={pos}{(isOffline ? " (离线)" : string.Empty)}");
             Console.WriteLine();
         }
         Console.WriteLine();
-        Console.WriteLine("Commands: move x y | attack P# | skills | use <n> P# | info | hint move | pass | help | quit");
-        Console.WriteLine("Note    : Each player acts once per phase.");
+        Console.WriteLine("命令：move x y | attack P# | skills | use <n> P# | info | hint move | pass | help | quit");
+        Console.WriteLine("注意    ：每个玩家每阶段行动一次。");
         // 控制台本地模式：显示公共日志（无私有视角）
         var mergedLogs = new List<string>(publicLog);
         if (mergedLogs.Count > 0)
         {
-            Console.WriteLine("Recent:");
+            Console.WriteLine("最近记录：");
             foreach (var m in mergedLogs.TakeLast(5)) Console.WriteLine(" - " + m);
         }
     }

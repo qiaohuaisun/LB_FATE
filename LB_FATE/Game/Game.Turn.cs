@@ -39,8 +39,8 @@ partial class Game
             }
             if (GetInt(pid, Keys.CannotActTurns, 0) > 0)
             {
-                if (ep is not null) WriteLineTo(pid, "You are incapacitated and cannot act this phase.");
-                else AppendPublic(new[] { $"{pid} cannot act this phase." });
+                if (ep is not null) WriteLineTo(pid, "你被控制，无法在此阶段行动。");
+                else AppendPublic(new[] { $"{pid} 无法在此阶段行动。" });
                 break;
             }
             bool isRooted = state.Units[pid].Tags.Contains(Tags.Rooted);
@@ -62,16 +62,16 @@ partial class Game
 
                 if (cmd is "help" or "h")
                 {
-                    WriteLineTo(pid, $"move x y | m x y : move to a reachable tile (clear path ≤ speed, cost: {GameConstants.MovementCost} MP)");
-                    WriteLineTo(pid, $"attack P# | a P# : attack target (cost: {GameConstants.BasicAttackCost} MP; LBR Basic Attack if exists)");
-                    WriteLineTo(pid, "skills | s       : list available skills");
-                    WriteLineTo(pid, "info | i         : show role description");
-                    WriteLineTo(pid, "use n P# | u n P#: cast skill #n (target optional by targeting)");
-                    WriteLineTo(pid, "hint move|hm     : highlight reachable tiles");
-                    WriteLineTo(pid, "pass | p         : end your turn");
-                    WriteLineTo(pid, $"Costs           : Move {GameConstants.MovementCost} MP; Attack {GameConstants.BasicAttackCost} MP");
-                    WriteLineTo(pid, "Note            : Each action (move/attack/skill) ends your turn.");
-                    WriteLineTo(pid, "Tip             : Press TAB for auto-completion");
+                    WriteLineTo(pid, $"move x y | m x y : 移动到可达格子（畅通路径 ≤ 速度，消耗：{GameConstants.MovementCost} MP）");
+                    WriteLineTo(pid, $"attack P# | a P# : 攻击目标（消耗：{GameConstants.BasicAttackCost} MP；如存在 LBR 普攻则使用）");
+                    WriteLineTo(pid, "skills | s       : 列出可用技能");
+                    WriteLineTo(pid, "info | i         : 显示角色描述");
+                    WriteLineTo(pid, "use n P# | u n P#: 释放技能 #n（目标可选，依据 targeting）");
+                    WriteLineTo(pid, "hint move|hm     : 高亮可达格子");
+                    WriteLineTo(pid, "pass | p         : 结束回合");
+                    WriteLineTo(pid, $"消耗            : 移动 {GameConstants.MovementCost} MP；攻击 {GameConstants.BasicAttackCost} MP");
+                    WriteLineTo(pid, "注意            : 每个动作（移动/攻击/技能）都会结束回合。");
+                    WriteLineTo(pid, "提示            : 按 TAB 键自动补全");
                     continue;
                 }
                 if (cmd is "info" or "i")
@@ -81,12 +81,12 @@ partial class Game
                         var role = roleOf[pid];
                         WriteLineTo(pid, $"{role.Name} ({role.Id})");
                         var desc = role.Description;
-                        if (string.IsNullOrWhiteSpace(desc)) WriteLineTo(pid, "  No description available.");
+                        if (string.IsNullOrWhiteSpace(desc)) WriteLineTo(pid, "  无可用描述。");
                         else foreach (var ln in desc.Split('\n')) WriteLineTo(pid, "  " + ln.TrimEnd());
                     }
                     else
                     {
-                        WriteLineTo(pid, "No LBR role for this unit.");
+                        WriteLineTo(pid, "此单位没有 LBR 角色。");
                     }
                     continue;
                 }
@@ -101,7 +101,7 @@ partial class Game
                             // rooted/frozen: cannot move; show no reachable tiles
                             highlightCells = new HashSet<Coord>();
                             highlightChar = 'o';
-                            WriteLineTo(pid, "You are rooted/frozen and cannot move.");
+                            WriteLineTo(pid, "你被定身/冰冻，无法移动。");
                             if (ep is not null) { SendBoardTo(pid, day, phase); } else { ShowBoard(day, phase); }
                             continue;
                         }
@@ -110,28 +110,28 @@ partial class Game
                         if (ep is not null) { SendBoardTo(pid, day, phase); } else { ShowBoard(day, phase); }
                         continue;
                     }
-                    WriteLineTo(pid, "Usage: hint move"); continue;
+                    WriteLineTo(pid, "用法：hint move"); continue;
                 }
                 if (cmd is "move" or "m")
                 {
-                    if (isRooted) { WriteLineTo(pid, "You are rooted/frozen and cannot move."); continue; }
+                    if (isRooted) { WriteLineTo(pid, "你被定身/冰冻，无法移动。"); continue; }
                     if (parts.Length != 3 || !int.TryParse(parts[1], out var x) || !int.TryParse(parts[2], out var y))
-                    { WriteLineTo(pid, "Usage: move x y"); continue; }
+                    { WriteLineTo(pid, "用法：move x y"); continue; }
                     var dest = new Coord(x, y);
                     var cur = ctx.GetUnitVar<Coord>(pid, Keys.Pos, default);
-                    if (dest.X < 0 || dest.X >= width || dest.Y < 0 || dest.Y >= height) { WriteLineTo(pid, "Out of bounds."); continue; }
+                    if (dest.X < 0 || dest.X >= width || dest.Y < 0 || dest.Y >= height) { WriteLineTo(pid, "超出边界。"); continue; }
                     // Path must be reachable within speed without passing through occupied tiles
                     var reachable = ReachableCells(pid, speed);
-                    if (!reachable.Contains(dest)) { WriteLineTo(pid, "Destination not reachable (blocked path or too far)."); continue; }
+                    if (!reachable.Contains(dest)) { WriteLineTo(pid, "目标不可达（路径被阻挡或距离过远）。"); continue; }
                     // MP cost for moving
                     var mpObj0 = ctx.GetUnitVar<object>(pid, Keys.Mp, 0);
                     double mp0 = mpObj0 is double dd0 ? dd0 : (mpObj0 is int ii0 ? ii0 : 0);
                     double moveCost = GameConstants.MovementCost;
-                    if (mp0 < moveCost) { WriteLineTo(pid, $"Not enough MP to move ({moveCost:0.##} required)."); continue; }
+                    if (mp0 < moveCost) { WriteLineTo(pid, $"魔力不足，无法移动（需要 {moveCost:0.##} MP）。"); continue; }
                     // Validator to re-assert path reachability during execution
                     ActionValidator pathValidator = (Context _, AtomicAction[] __, out string? reason) =>
                     {
-                        if (!reachable.Contains(dest)) { reason = "Destination not reachable"; return false; }
+                        if (!reachable.Contains(dest)) { reason = "目标不可达"; return false; }
                         reason = null; return true;
                     };
                     var moveValidator = pathValidator;
@@ -172,17 +172,17 @@ partial class Game
                     }
                     else
                     {
-                        WriteLineTo(pid, "No LBR role loaded; only 'attack' available.");
+                        WriteLineTo(pid, "未加载 LBR 角色；仅 'attack' 可用。");
                     }
                     continue;
                 }
                 if (cmd is "use" or "u")
                 {
-                    if (isSilenced) { WriteLineTo(pid, "You are silenced and cannot use skills."); continue; }
-                    if (!roleOf.ContainsKey(pid)) { WriteLineTo(pid, "No LBR role for this unit."); continue; }
-                    if (parts.Length < 2 || !int.TryParse(parts[1], out var idx)) { WriteLineTo(pid, "Usage: use <n> [P#]"); continue; }
+                    if (isSilenced) { WriteLineTo(pid, "你被沉默，无法使用技能。"); continue; }
+                    if (!roleOf.ContainsKey(pid)) { WriteLineTo(pid, "此单位没有 LBR 角色。"); continue; }
+                    if (parts.Length < 2 || !int.TryParse(parts[1], out var idx)) { WriteLineTo(pid, "用法：use <n> [P#]"); continue; }
                     var role = roleOf[pid];
-                    if (idx < 0 || idx >= role.Skills.Length) { WriteLineTo(pid, "Out of range."); continue; }
+                    if (idx < 0 || idx >= role.Skills.Length) { WriteLineTo(pid, "超出范围。"); continue; }
                     var skill = role.Skills[idx];
 
                     // Parse target argument robustly: allow unit id OR coordinates OR direction.
@@ -258,12 +258,12 @@ partial class Game
                         {
                             // Valid unit id
                             tid = argUpper;
-                            if (GetInt(tid, Keys.Hp, 0) <= 0) { WriteLineTo(pid, "Invalid target."); continue; }
+                            if (GetInt(tid, Keys.Hp, 0) <= 0) { WriteLineTo(pid, "无效目标。"); continue; }
                         }
                         else
                         {
                             // Not a unit, not direction, and not coordinates → invalid
-                            WriteLineTo(pid, "Invalid target.");
+                            WriteLineTo(pid, "无效目标。");
                             continue;
                         }
                     }
@@ -281,7 +281,7 @@ partial class Game
                     // Skills with range > 0 and targeting != self/tile require a target or direction
                     if (targeting != "self" && targeting != "tile" && skillRange > 0 && string.IsNullOrEmpty(tid) && !hasPointArg)
                     {
-                        WriteLineTo(pid, $"Skill '{skill.Name}' requires a target. Usage: use {idx} <target|x y|up|down|left|right>");
+                        WriteLineTo(pid, $"技能 '{skill.Name}' 需要目标。用法：use {idx} <目标|x y|up|down|left|right>");
                         continue;
                     }
                     state = WorldStateOps.WithGlobal(state, g => g with
@@ -354,10 +354,10 @@ partial class Game
                 }
                 if (cmd is "attack" or "a")
                 {
-                    if (parts.Length != 2) { WriteLineTo(pid, "Usage: attack P#"); continue; }
+                    if (parts.Length != 2) { WriteLineTo(pid, "用法：attack P#"); continue; }
                     var tid = parts[1].ToUpperInvariant();
                     if (!state.Units.ContainsKey(tid) || GetInt(tid, Keys.Hp, 0) <= 0)
-                    { WriteLineTo(pid, "Invalid target."); continue; }
+                    { WriteLineTo(pid, "无效目标。"); continue; }
                     var myPos = ctx.GetUnitVar<Coord>(pid, Keys.Pos, default);
                     var tgPos = ctx.GetUnitVar<Coord>(tid, Keys.Pos, default);
                     var d = Math.Abs(myPos.X - tgPos.X) + Math.Abs(myPos.Y - tgPos.Y);
@@ -393,7 +393,7 @@ partial class Game
                         var mpObjB = ctx.GetUnitVar<object>(pid, Keys.Mp, 0);
                         double mpB = mpObjB is double ddb ? ddb : (mpObjB is int ib ? ib : 0);
                         double basicCost = GameConstants.BasicAttackCost;
-                        if (mpB < basicCost) { WriteLineTo(pid, "Not enough MP."); continue; }
+                        if (mpB < basicCost) { WriteLineTo(pid, "魔力不足。"); continue; }
                         int repeats = (d <= twinRange && extraStrikes > 1) ? extraStrikes : 1;
                         for (int i = 0; i < repeats; i++)
                         {
@@ -407,13 +407,13 @@ partial class Game
                     }
                     else
                     {
-                        if (d > range) { WriteLineTo(pid, $"Target out of range ({range})."); continue; }
+                        if (d > range) { WriteLineTo(pid, $"目标超出范围（{range}）。"); continue; }
                         var actions = new List<AtomicAction>();
                         // 普攻统一消耗：所有阶职 MP
                         var mpObj = ctx.GetUnitVar<object>(pid, Keys.Mp, 0);
                         double mp = mpObj is double dd ? dd : (mpObj is int i2 ? i2 : 0);
                         double cost = GameConstants.BasicAttackCost;
-                        if (mp < cost) { WriteLineTo(pid, "Not enough MP."); continue; }
+                        if (mp < cost) { WriteLineTo(pid, "魔力不足。"); continue; }
                         actions.Add(new ModifyUnitVar(pid, Keys.Mp, v => (v is double d0 ? d0 : Convert.ToDouble(v)) - cost));
                         var power = 5;
                         int repeats2 = (d <= twinRange && extraStrikes > 1) ? extraStrikes : 1;
@@ -426,7 +426,7 @@ partial class Game
                     highlightCells = null;
                     break; // End turn after attack
                 }
-                WriteLineTo(pid, "Unknown command. Type 'help'.");
+                WriteLineTo(pid, "未知命令。输入 'help' 查看帮助。");
             }
             else
             {

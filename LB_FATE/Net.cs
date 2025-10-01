@@ -113,16 +113,16 @@ class NetServer : IDisposable
     {
         if (!_started) Start();
         var map = new Dictionary<string, IPlayerEndpoint>();
-        Console.WriteLine($"Waiting for {count} players to connect...");
+        Console.WriteLine($"等待 {count} 名玩家连接...");
         for (int i = 1; i <= count; i++)
         {
             var client = _listener.AcceptTcpClient();
             var pid = $"P{i}";
             var ep = new TcpPlayerEndpoint(pid, client);
             map[pid] = ep;
-            ep.SendLine($"WELCOME {pid}");
-            ep.SendLine("You are connected. Wait for your turn.");
-            try { Console.WriteLine($"[NET] Player connected and assigned: {pid} from {(client.Client.RemoteEndPoint?.ToString() ?? "?")}"); } catch { }
+            ep.SendLine($"欢迎 {pid}");
+            ep.SendLine("你已连接。等待回合开始。");
+            try { Console.WriteLine($"[NET] 玩家已连接并分配：{pid} 来自 {(client.Client.RemoteEndPoint?.ToString() ?? "?")}"); } catch { }
         }
         return map;
     }
@@ -150,14 +150,14 @@ class NetServer : IDisposable
                         {
                             var stream = tmp.GetStream();
                             using var writer = new StreamWriter(stream, new UTF8Encoding(false)) { AutoFlush = true, NewLine = "\n" };
-                            writer.WriteLine("SERVER: no offline seats available");
+                            writer.WriteLine("服务器：无可用离线座位");
                         }
                         catch { }
-                        try { Console.WriteLine($"[NET] Reconnection rejected (no seat): {(client.Client.RemoteEndPoint?.ToString() ?? "?")}"); } catch { }
+                        try { Console.WriteLine($"[NET] 重连被拒绝（无座位）：{(client.Client.RemoteEndPoint?.ToString() ?? "?")}"); } catch { }
                         continue;
                     }
                     var ep = new TcpPlayerEndpoint(pid, client);
-                    try { Console.WriteLine($"[NET] Player reconnected to {pid} from {(client.Client.RemoteEndPoint?.ToString() ?? "?")}"); } catch { }
+                    try { Console.WriteLine($"[NET] 玩家重连到 {pid} 来自 {(client.Client.RemoteEndPoint?.ToString() ?? "?")}"); } catch { }
                     attach(pid, ep);
                 }
                 catch { try { client?.Close(); } catch { } }
@@ -197,7 +197,7 @@ static class NetClient
                 using var reader = new StreamReader(stream, new UTF8Encoding(false), detectEncodingFromByteOrderMarks: true);
                 using var writer = new StreamWriter(stream, new UTF8Encoding(false)) { AutoFlush = true, NewLine = "\n" };
 
-                Console.WriteLine($"Connected to {host}:{port}");
+                Console.WriteLine($"已连接到 {host}:{port}");
                 while (true)
                 {
                     string? line;
@@ -216,13 +216,13 @@ static class NetClient
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Client error: {ex.Message}");
+                Console.WriteLine($"客户端错误：{ex.Message}");
             }
 
             if (!auto && maxAttempts <= 0) break;
             attempt++;
-            if (maxAttempts > 0 && attempt > maxAttempts) { Console.WriteLine("Reached max reconnect attempts."); break; }
-            Console.WriteLine($"Reconnecting in {delaySec}s... (attempt {attempt})");
+            if (maxAttempts > 0 && attempt > maxAttempts) { Console.WriteLine("已达到最大重连次数。"); break; }
+            Console.WriteLine($"{delaySec} 秒后重连...（尝试 {attempt}）");
             try { Thread.Sleep(TimeSpan.FromSeconds(delaySec)); } catch { }
         }
     }

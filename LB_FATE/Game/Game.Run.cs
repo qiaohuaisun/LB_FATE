@@ -11,7 +11,7 @@ partial class Game
         SetupEventLogging();
         var roleCount = registry.All().Count();
         var unitCount = state.Units.Count;
-        var initMsg = $"[Init] Roles loaded: {roleCount}, Units created: {unitCount}";
+        var initMsg = $"[初始化] 已加载角色：{roleCount}，已创建单位：{unitCount}";
         Console.WriteLine(initMsg);
         AppendPublic(new[] { initMsg });
         if (endpoints.Count > 0)
@@ -82,7 +82,7 @@ partial class Game
                         {
                             state = WorldStateOps.WithUnit(state, uid, u => u with { Tags = u.Tags.Remove("stasis"), Vars = u.Vars.SetItem(Keys.CannotActTurns, 0).SetItem(Keys.UntargetableTurns, 0) });
                         }
-                        AppendPublic(new[] { $"[手术中断] 对 Boss 的伤害达到阈值，已释放 {toRelease.Count} 名受术者。" });
+                        AppendPublic(new[] { $"[手术中断] 对 BOSS 的伤害达到阈值，已释放 {toRelease.Count} 名受术者。" });
                     }
                 }
                 catch { }
@@ -101,12 +101,12 @@ partial class Game
         string endMsg;
         if (!string.IsNullOrEmpty(winner))
         {
-            endMsg = $"Winner: {winner} ({classOf[winner]})";
+            endMsg = $"胜者：{winner} ({classOf[winner]})";
             Console.WriteLine(endMsg);
         }
         else
         {
-            endMsg = "No winner.";
+            endMsg = "无胜者。";
             Console.WriteLine(endMsg);
         }
         AppendPublic(new[] { endMsg });
@@ -114,7 +114,7 @@ partial class Game
         BroadcastBoard(day, phase: 5);
         if (endpoints.Count > 0)
         {
-            foreach (var ep in endpoints.Values) ep.SendLine("GAME OVER");
+            foreach (var ep in endpoints.Values) ep.SendLine("游戏结束");
             foreach (var ep in endpoints.Values) ep.SendLine(endMsg);
         }
 
@@ -133,7 +133,7 @@ partial class Game
             {
                 "+----------------------------------+",
                 "|                                  |",
-                "|            GAME  OVER            |",
+                "|             游戏结束             |",
                 "|                                  |",
                 "+----------------------------------+"
             };
@@ -161,7 +161,7 @@ partial class Game
                     try
                     {
                         ep.SendLine("==================================");
-                        ep.SendLine("            GAME  OVER            ");
+                        ep.SendLine("              游戏结束            ");
                         ep.SendLine(endMsg);
                         ep.SendLine("==================================");
                     }

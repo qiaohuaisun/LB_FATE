@@ -101,7 +101,7 @@ class Program
             catch (Exception ex)
             {
                 Log.Error(ex, "Client fatal error");
-                Console.WriteLine($"Client fatal error: {ex.Message}");
+                Console.WriteLine($"客户端致命错误：{ex.Message}");
             }
             return;
         }
@@ -111,7 +111,7 @@ class Program
             server.Start();
             var playerSeats = Math.Max(1, Math.Min(7, players));
             var endpoints = server.WaitForPlayers(playerSeats);
-            Console.WriteLine("Hosting: games will auto-restart. Press Ctrl+C to stop.");
+            Console.WriteLine("正在托管：游戏将自动重启。按 Ctrl+C 停止。");
             Game? currentGame = null;
             var seats = Enumerable.Range(1, playerSeats).Select(i => $"P{i}");
             server.StartReconnections(
@@ -127,12 +127,12 @@ class Program
                 ShowNextGameBanner(endpoints, seconds: 3);
             }
         }
-        Console.WriteLine("Local mode: 7 players on one console.");
+        Console.WriteLine("本地模式：7 名玩家在同一控制台。");
         while (true)
         {
             new Game(rolesDir, 7, null, mapW, mapH).Run();
             Console.WriteLine();
-            Console.Write("Start another local game? (Y/n): ");
+            Console.Write("开始新一局游戏？(Y/n): ");
             var resp = Console.ReadLine();
             if (!string.IsNullOrWhiteSpace(resp) && (resp.StartsWith("n", StringComparison.OrdinalIgnoreCase) || resp.StartsWith("q", StringComparison.OrdinalIgnoreCase)))
                 break;
@@ -148,12 +148,12 @@ class Program
             Console.ForegroundColor = ConsoleColor.Cyan;
             Console.WriteLine();
             Console.WriteLine("+==================================+");
-            Console.WriteLine("|         NEW GAME STARTING        |");
+            Console.WriteLine("|          新游戏即将开始          |");
             Console.WriteLine("+==================================+");
             Console.ResetColor();
             for (int s = seconds; s >= 1; s--)
             {
-                Console.WriteLine($"Starting in {s}...");
+                Console.WriteLine($"{s} 秒后开始...");
                 if (endpoints != null)
                 {
                     foreach (var ep in endpoints.Values)
@@ -161,8 +161,8 @@ class Program
                         try
                         {
                             ep.SendLine("==================================");
-                            ep.SendLine("NEW GAME STARTING");
-                            ep.SendLine($"Starting in {s}...");
+                            ep.SendLine("新游戏即将开始");
+                            ep.SendLine($"{s} 秒后开始...");
                             ep.SendLine("==================================");
                         }
                         catch (Exception ex)
