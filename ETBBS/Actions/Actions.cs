@@ -197,11 +197,28 @@ public sealed record PhysicalDamage(string AttackerId, string TargetId, int Powe
         // Apply attack multiplier
         raw = (int)Math.Max(0, Math.Round(raw * atkMult));
 
+        // Next attack crit (consume the flag)
+        if (au is not null && au.GetIntVar(Keys.NextAttackCrit) > 0)
+        {
+            state = WorldStateOps.WithUnit(state, AttackerId, u => u with { Vars = u.Vars.SetItem(Keys.NextAttackCrit, 0) });
+            raw = (int)Math.Round(raw * 2.0); // Critical hit does 2x damage
+            au = state.GetUnitOrNull(AttackerId);
+            tu = state.GetUnitOrNull(TargetId); // Refresh target after state change
+        }
+
         // Duel mode
         bool attackerHasDuel = au?.Tags.Contains(Tags.Duel) ?? false;
-        bool targetHasDuel = tu.Tags.Contains(Tags.Duel);
+        bool targetHasDuel = tu?.Tags.Contains(Tags.Duel) ?? false;
         if (attackerHasDuel && targetHasDuel)
-            raw = (int)Math.Round(raw * GameConstants.DuelDamageMultiplier);
+        {
+            // Check for custom duel damage bonus (only if explicitly set)
+            double duelBonus = GameConstants.DuelDamageMultiplier;
+            if (au is not null && au.Vars.ContainsKey(Keys.DuelDamageBonus))
+            {
+                duelBonus = au.GetDoubleVar(Keys.DuelDamageBonus);
+            }
+            raw = (int)Math.Round(raw * duelBonus);
+        }
 
         // Apply damage with full pipeline
         return WorldStateOps.WithUnit(state, TargetId, t =>
@@ -259,6 +276,29 @@ public sealed record MagicDamage(string AttackerId, string TargetId, int Power, 
         }
 
         raw = (int)Math.Max(0, Math.Round(raw * atkMult));
+
+        // Next attack crit (consume the flag)
+        if (au is not null && au.GetIntVar(Keys.NextAttackCrit) > 0)
+        {
+            state = WorldStateOps.WithUnit(state, AttackerId, u => u with { Vars = u.Vars.SetItem(Keys.NextAttackCrit, 0) });
+            raw = (int)Math.Round(raw * 2.0); // Critical hit does 2x damage
+            au = state.GetUnitOrNull(AttackerId);
+            tu = state.GetUnitOrNull(TargetId); // Refresh target after state change
+        }
+
+        // Duel mode (same as physical damage)
+        bool attackerHasDuel = au?.Tags.Contains(Tags.Duel) ?? false;
+        bool targetHasDuel = tu?.Tags.Contains(Tags.Duel) ?? false;
+        if (attackerHasDuel && targetHasDuel)
+        {
+            // Check for custom duel damage bonus (only if explicitly set)
+            double duelBonus = GameConstants.DuelDamageMultiplier;
+            if (au is not null && au.Vars.ContainsKey(Keys.DuelDamageBonus))
+            {
+                duelBonus = au.GetDoubleVar(Keys.DuelDamageBonus);
+            }
+            raw = (int)Math.Round(raw * duelBonus);
+        }
 
         // Apply damage with full pipeline
         return WorldStateOps.WithUnit(state, TargetId, t =>

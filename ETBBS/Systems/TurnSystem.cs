@@ -154,6 +154,14 @@ public sealed class TurnSystem
                 cur = WorldStateOps.WithUnit(cur, id, u => u with { Vars = u.Vars.SetItem(Keys.ForceIgnoreDefTurns, newTurns) });
             }
 
+            // Damage reduction tick
+            int damageReductionTurns = unit.GetIntVar(Keys.DamageReductionTurns);
+            if (damageReductionTurns > 0)
+            {
+                var newTurns = damageReductionTurns - 1;
+                cur = WorldStateOps.WithUnit(cur, id, u => u with { Vars = u.Vars.SetItem(Keys.DamageReductionTurns, newTurns) });
+            }
+
             // mp regen
             if (unit.Vars.TryGetValue(Keys.MpRegenPerTurn, out var rv))
             {

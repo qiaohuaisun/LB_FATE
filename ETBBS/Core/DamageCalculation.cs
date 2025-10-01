@@ -20,14 +20,15 @@ public static class DamageCalculation
 
     /// <summary>
     /// Applies damage to a unit with full damage pipeline:
-    /// 1. Shield absorption
-    /// 2. HP reduction
-    /// 3. Auto-heal below half (first time trigger)
-    /// 4. On-damage heal (if active)
-    /// 5. Undying prevention (cannot die while undying)
+    /// 1. Damage reduction (if active)
+    /// 2. Shield absorption
+    /// 3. HP reduction
+    /// 4. Auto-heal below half (first time trigger)
+    /// 5. On-damage heal (if active)
+    /// 6. Undying prevention (cannot die while undying)
     /// </summary>
     /// <param name="unit">The unit taking damage</param>
-    /// <param name="rawDamage">Raw damage amount before shields</param>
+    /// <param name="rawDamage">Raw damage amount before reduction and shields</param>
     /// <returns>DamageResult with final HP and modified unit state</returns>
     public static DamageResult ApplyDamage(UnitState unit, int rawDamage)
     {
@@ -39,6 +40,19 @@ public static class DamageCalculation
         bool preventedDeath = false;
 
         var modifiedUnit = unit;
+
+        // Step 0: Damage reduction (if active)
+        int damageReductionTurns = modifiedUnit.GetIntVar(Keys.DamageReductionTurns);
+        if (damageReductionTurns > 0)
+        {
+            double reduction = modifiedUnit.GetDoubleVar(Keys.DamageReduction);
+            reduction = Math.Clamp(reduction, 0.0, 1.0);
+            if (reduction > 0)
+            {
+                int reducedAmount = (int)Math.Round(damageToApply * reduction);
+                damageToApply = Math.Max(0, damageToApply - reducedAmount);
+            }
+        }
 
         // Step 1: Shield absorption
         if (modifiedUnit.Vars.TryGetValue(Keys.ShieldValue, out var sv))

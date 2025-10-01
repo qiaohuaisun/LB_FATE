@@ -14,7 +14,10 @@
       "Bash(dotnet run:*)",
       "Bash(pwsh:*)",
       "Bash(tree:*)",
-      "Bash(npm run compile:*)"
+      "Bash(npm run compile:*)",
+      "Bash(for:*)",
+      "Bash(do echo \"=== $f ===\")",
+      "Bash(done)"
     ],
     "deny": [],
     "ask": []

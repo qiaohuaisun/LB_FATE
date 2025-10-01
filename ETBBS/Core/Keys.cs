@@ -167,6 +167,18 @@ public static class Keys
     /// <summary>Number of turns defense is completely ignored. Type: int</summary>
     public const string ForceIgnoreDefTurns = "force_ignore_def_turns";
 
+    /// <summary>Custom duel damage multiplier for this unit. Type: double (e.g., 1.5 = 150% damage in duels)</summary>
+    public const string DuelDamageBonus = "duel_damage_bonus";
+
+    /// <summary>Flag indicating next attack will be a critical hit. Type: int (1 = crit, 0 = normal)</summary>
+    public const string NextAttackCrit = "next_attack_crit";
+
+    /// <summary>Damage reduction percentage (0.0-1.0). Type: double (e.g., 0.3 = 30% damage reduction)</summary>
+    public const string DamageReduction = "damage_reduction";
+
+    /// <summary>Number of turns damage reduction is active. Type: int</summary>
+    public const string DamageReductionTurns = "damage_reduction_turns";
+
     // ===== Character Progression =====
 
     /// <summary>Character level. Type: int</summary>
