@@ -159,8 +159,12 @@ partial class Game
                             int cdLeft = 0;
                             if (cd is int cdi)
                             {
-                                var last = cooldowns.GetLastUseTurn(pid, s.Name) ?? int.MinValue;
-                                cdLeft = Math.Max(0, last + cdi - state.Global.Turn);
+                                var last = cooldowns.GetLastUseTurn(pid, s.Name);
+                                if (last.HasValue)
+                                {
+                                    cdLeft = Math.Max(0, last.Value + cdi - state.Global.Turn);
+                                }
+                                // If never used, cdLeft remains 0 (ready to use)
                             }
                             string sealStr = "";
                             if (sealedUntil is int sut && state.Global.Turn < sut)
@@ -278,7 +282,12 @@ partial class Game
                         tid = pid;
                     }
 
-                    // Skills with range > 0 and targeting != self/tile require a target or direction
+                    // Skills with range > 0 and targeting != self require a target or direction or coordinates
+                    if (targeting == "tile" && skillRange > 0 && !hasPointArg)
+                    {
+                        WriteLineTo(pid, $"技能 '{skill.Name}' 需要目标坐标。用法：use {idx} <x y> 或 use {idx} <up|down|left|right> [距离]");
+                        continue;
+                    }
                     if (targeting != "self" && targeting != "tile" && skillRange > 0 && string.IsNullOrEmpty(tid) && !hasPointArg)
                     {
                         WriteLineTo(pid, $"技能 '{skill.Name}' 需要目标。用法：use {idx} <目标|x y|up|down|left|right>");
