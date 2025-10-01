@@ -321,7 +321,43 @@ internal sealed class RoleParser
     private char Peek() => _src[_pos];
     private char Next() => _src[_pos++];
     private bool Eof() => _pos >= _src.Length;
-    private Exception Error(string msg) => new FormatException($"LBR parse error at {_pos}: {msg}");
+
+    private (int line, int col, string lineText) GetLineCol(int pos)
+    {
+        int line = 1, col = 1;
+        int i = 0, lineStart = 0;
+        while (i < _src.Length && i < pos)
+        {
+            var c = _src[i++];
+            if (c == '\r') { continue; }
+            if (c == '\n') { line++; col = 1; lineStart = i; }
+            else { col++; }
+        }
+        int j = lineStart;
+        var sb = new StringBuilder();
+        while (j < _src.Length && _src[j] != '\n' && _src[j] != '\r') { sb.Append(_src[j++]); }
+        var lineText = sb.ToString();
+        var displayLine = lineText.Replace('\t', ' ');
+        return (line, Math.Max(col, 1), displayLine);
+    }
+
+    private Exception Error(string msg)
+    {
+        var (line, col, lineText) = GetLineCol(_pos);
+        const int maxLen = 160;
+        int displayCol = col;
+        if (lineText.Length > maxLen)
+        {
+            int start = Math.Max(0, Math.Min(lineText.Length - maxLen, col - 40));
+            int end = Math.Min(lineText.Length, start + maxLen);
+            if (start > 0) lineText = "…" + lineText.Substring(start, end - start);
+            else lineText = lineText.Substring(start, end - start);
+            if (start > 0) displayCol = Math.Max(2, col - start + 1);
+        }
+        var caret = new string(' ', Math.Max(0, displayCol - 1)) + '^';
+        var full = $"LBR parse error at line {line}, column {col}: {msg}\n  {lineText}\n  {caret}";
+        return new FormatException(full);
+    }
 }
 
 /// <summary>
