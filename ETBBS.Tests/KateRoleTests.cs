@@ -1,9 +1,9 @@
+using ETBBS;
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.IO;
 using System.Linq;
-using ETBBS;
 using Xunit;
 
 public class KateRoleTests
@@ -38,7 +38,9 @@ public class KateRoleTests
                 .Add(Keys.Mp, 4.5),
             ImmutableHashSet<string>.Empty));
         var teams = new Dictionary<string, string> { ["A"] = "T1", ["B"] = "T2" };
-        s = WorldStateOps.WithGlobal(s, g => g with { Vars = g.Vars
+        s = WorldStateOps.WithGlobal(s, g => g with
+        {
+            Vars = g.Vars
             .SetItem(DslRuntime.CasterKey, "A")
             .SetItem(DslRuntime.TargetKey, "B")
             .SetItem(DslRuntime.TeamsKey, teams)

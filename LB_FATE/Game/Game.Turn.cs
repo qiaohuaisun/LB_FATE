@@ -564,13 +564,13 @@ partial class Game
                                     Coord best = point; int bestScore = int.MaxValue;
                                     var targetPos = (newTid is null) ? point : new Context(state).GetUnitVar<Coord>(newTid, Keys.Pos, default);
                                     for (int dx = -range; dx <= range; dx++)
-                                    for (int dy = -range; dy <= range; dy++)
-                                    {
-                                        int md = Math.Abs(dx) + Math.Abs(dy); if (md > range) continue;
-                                        var c = new Coord(Math.Clamp(myPos.X + dx, 0, width - 1), Math.Clamp(myPos.Y + dy, 0, height - 1));
-                                        int score = Math.Abs(c.X - targetPos.X) + Math.Abs(c.Y - targetPos.Y);
-                                        if (score < bestScore) { bestScore = score; best = c; }
-                                    }
+                                        for (int dy = -range; dy <= range; dy++)
+                                        {
+                                            int md = Math.Abs(dx) + Math.Abs(dy); if (md > range) continue;
+                                            var c = new Coord(Math.Clamp(myPos.X + dx, 0, width - 1), Math.Clamp(myPos.Y + dy, 0, height - 1));
+                                            int score = Math.Abs(c.X - targetPos.X) + Math.Abs(c.Y - targetPos.Y);
+                                            if (score < bestScore) { bestScore = score; best = c; }
+                                        }
                                     point = best; tid = newTid; // prefer proximity
                                 }
                                 else
@@ -824,20 +824,20 @@ partial class Game
                 var ctx = new Context(state); var p0 = ctx.GetUnitVar<Coord>(pid, Keys.Pos, default);
                 int best = -1; Coord bestC = p0;
                 for (int dx = -radius; dx <= radius; dx++)
-                for (int dy = -radius; dy <= radius; dy++)
-                {
-                    var c = new Coord(Math.Clamp(p0.X + dx, 0, width - 1), Math.Clamp(p0.Y + dy, 0, height - 1));
-                    int count = 0;
-                    foreach (var (id, u) in state.Units)
+                    for (int dy = -radius; dy <= radius; dy++)
                     {
-                        if (id == pid) continue; if (GetInt(id, Keys.Hp, 0) <= 0) continue;
-                        if (teamOf.TryGetValue(id, out var t) && teamOf.TryGetValue(pid, out var tb) && t == tb) continue;
-                        var pos = ctx.GetUnitVar<Coord>(id, Keys.Pos, default);
-                        int d = Math.Max(Math.Abs(pos.X - c.X), Math.Abs(pos.Y - c.Y));
-                        if (d <= radius) count++;
+                        var c = new Coord(Math.Clamp(p0.X + dx, 0, width - 1), Math.Clamp(p0.Y + dy, 0, height - 1));
+                        int count = 0;
+                        foreach (var (id, u) in state.Units)
+                        {
+                            if (id == pid) continue; if (GetInt(id, Keys.Hp, 0) <= 0) continue;
+                            if (teamOf.TryGetValue(id, out var t) && teamOf.TryGetValue(pid, out var tb) && t == tb) continue;
+                            var pos = ctx.GetUnitVar<Coord>(id, Keys.Pos, default);
+                            int d = Math.Max(Math.Abs(pos.X - c.X), Math.Abs(pos.Y - c.Y));
+                            if (d <= radius) count++;
+                        }
+                        if (count > best) { best = count; bestC = c; }
                     }
-                    if (count > best) { best = count; bestC = c; }
-                }
                 point = bestC; usePoint = true;
             }
             else if (tgt.Type.Equals("nearest_enemy", StringComparison.OrdinalIgnoreCase))

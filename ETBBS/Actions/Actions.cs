@@ -87,8 +87,11 @@ public sealed record Damage(string TargetId, int Amount) : AtomicAction
             int evadeCharges = u.GetIntVar(Keys.EvadeCharges);
             if (evadeCharges > 0)
             {
-                return u with { Vars = u.Vars.SetItem(Keys.EvadeCharges, evadeCharges - 1)
-                                                .SetItem(Keys.NextAttackMultiplier, GameConstants.EvadeCounterMultiplier) };
+                return u with
+                {
+                    Vars = u.Vars.SetItem(Keys.EvadeCharges, evadeCharges - 1)
+                                                .SetItem(Keys.NextAttackMultiplier, GameConstants.EvadeCounterMultiplier)
+                };
             }
 
             // Apply damage with full pipeline (shield, heal triggers, undying)

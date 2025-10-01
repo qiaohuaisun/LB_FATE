@@ -1,7 +1,6 @@
+using ETBBS;
 using Serilog;
 using Serilog.Events;
-using Microsoft.Extensions.Logging;
-using ETBBS;
 
 namespace LB_FATE.Logging;
 

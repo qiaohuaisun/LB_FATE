@@ -1,8 +1,8 @@
+using ETBBS;
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
-using ETBBS;
 using Xunit;
 
 public class MoreCoverageTests
@@ -86,7 +86,8 @@ public class MoreCoverageTests
     {
         var s = EmptyWorld();
         s = WithUnit(s, "A", new Dictionary<string, object> { [Keys.Atk] = 10, [Keys.Pos] = new Coord(1, 1) });
-        s = WithUnit(s, "T", new Dictionary<string, object> {
+        s = WithUnit(s, "T", new Dictionary<string, object>
+        {
             [Keys.Hp] = 100,
             [Keys.MaxHp] = 100,
             [Keys.Def] = 5,
@@ -105,7 +106,8 @@ public class MoreCoverageTests
     public void Heal_CannotExceedMaxHp()
     {
         var s = EmptyWorld();
-        s = WithUnit(s, "H", new Dictionary<string, object> {
+        s = WithUnit(s, "H", new Dictionary<string, object>
+        {
             [Keys.Hp] = 80,
             [Keys.MaxHp] = 100,
             [Keys.Pos] = new Coord(1, 1)
@@ -123,7 +125,8 @@ public class MoreCoverageTests
     {
         var s = EmptyWorld();
         s = WithUnit(s, "C", new Dictionary<string, object> { [Keys.Atk] = 15, [Keys.Pos] = new Coord(1, 1) });
-        s = WithUnit(s, "T", new Dictionary<string, object> {
+        s = WithUnit(s, "T", new Dictionary<string, object>
+        {
             [Keys.Hp] = 100,
             [Keys.MaxHp] = 100,
             [Keys.Def] = 3,
@@ -160,7 +163,8 @@ public class MoreCoverageTests
     {
         var s = EmptyWorld();
         s = WithUnit(s, "A", new Dictionary<string, object> { [Keys.Atk] = 10, [Keys.Pos] = new Coord(1, 1) });
-        s = WithUnit(s, "T", new Dictionary<string, object> {
+        s = WithUnit(s, "T", new Dictionary<string, object>
+        {
             [Keys.Hp] = 100,
             [Keys.MaxHp] = 100,
             [Keys.Def] = 5,

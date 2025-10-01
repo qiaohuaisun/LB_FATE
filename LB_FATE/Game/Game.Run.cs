@@ -138,7 +138,7 @@ partial class Game
                 "+----------------------------------+"
             };
             if (!string.IsNullOrWhiteSpace(endMsg))
-                lines.Insert(3, $"|  {endMsg.PadRight(30).Substring(0,30)}  |");
+                lines.Insert(3, $"|  {endMsg.PadRight(30).Substring(0, 30)}  |");
 
             // Local console: brief flash animation
             if (endpoints.Count == 0)

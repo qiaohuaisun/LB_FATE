@@ -1,7 +1,6 @@
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
-using System.Linq;
 
 namespace LB_FATE;
 
@@ -187,7 +186,7 @@ static class NetClient
         catch { }
 
         int attempt = 0;
-        for (;;)
+        for (; ; )
         {
             try
             {

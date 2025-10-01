@@ -1,7 +1,7 @@
+using ETBBS;
 using System.Buffers;
 using System.Text;
 using System.Text.Json;
-using ETBBS;
 
 // Minimal LSP server for .lbr files: initialize, didOpen/didChange, completion, diagnostics
 class Program
@@ -444,7 +444,7 @@ sealed class LspServer
     {
         if (off < 0 || off >= text.Length) return string.Empty;
         int i = off; while (i > 0 && !char.IsLetterOrDigit(text[i - 1]) && text[i - 1] != '_') i--;
-        int j = i; while (j < text.Length && (char.IsLetterOrDigit(text[j]) || text[j] == '_' )) j++;
+        int j = i; while (j < text.Length && (char.IsLetterOrDigit(text[j]) || text[j] == '_')) j++;
         return text.Substring(i, Math.Max(0, j - i));
     }
 
@@ -549,7 +549,7 @@ sealed class LspServer
     {
         var sb = new StringBuilder();
         int indent = 0;
-        for (int i = 0; i < text.Length; )
+        for (int i = 0; i < text.Length;)
         {
             // read a line
             int j = i; while (j < text.Length && text[j] != '\n') j++;

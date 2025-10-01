@@ -1,7 +1,6 @@
+using ETBBS;
 using System;
 using System.IO;
-using System.Linq;
-using ETBBS;
 using Xunit;
 
 public class RolesSyntaxTests

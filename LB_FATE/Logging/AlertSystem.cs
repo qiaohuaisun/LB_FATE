@@ -1,6 +1,4 @@
 using Serilog;
-using Serilog.Events;
-using Serilog.Sinks.File;
 using System.Collections.Concurrent;
 
 namespace LB_FATE.Logging;

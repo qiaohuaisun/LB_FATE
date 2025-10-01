@@ -154,7 +154,8 @@ public partial class Game
                     {
                         if (!phaseDamageTo.ContainsKey(e.UnitId)) phaseDamageTo[e.UnitId] = 0;
                         phaseDamageTo[e.UnitId] += Math.Max(0, e.Amount);
-                    } catch { }
+                    }
+                    catch { }
                 }
             });
             events.Subscribe(EventTopics.UnitMoved, o =>

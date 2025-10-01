@@ -93,7 +93,7 @@ public static partial class TextDsl
                     var prob = Math.Clamp(Probability, 0.0, 1.0);
                     var result = v < prob;
                     var trace = TraceExtensions.CurrentTrace;
-                    trace?.LogCondition($"chance {prob*100:F0}%", result, new Dictionary<string, object> { ["roll"] = v });
+                    trace?.LogCondition($"chance {prob * 100:F0}%", result, new Dictionary<string, object> { ["roll"] = v });
                     return result;
                 },
                 then: sub => Then.Emit(sub, opts, getIt, setIt),
@@ -560,21 +560,21 @@ public static partial class TextDsl
                     }
                     else
                     {
-                    // Default: metric-based range (global $distance)
-                    var metric = ctx.GetGlobalVar<string>(DslRuntime.DistanceKey, "manhattan");
-                    ids = ids.Where(id =>
-                    {
-                        var p = ctx.GetUnitVar<Coord>(id, Keys.Pos, default);
-                        if (p.Equals(default)) return false;
-                        int d = metric switch
+                        // Default: metric-based range (global $distance)
+                        var metric = ctx.GetGlobalVar<string>(DslRuntime.DistanceKey, "manhattan");
+                        ids = ids.Where(id =>
                         {
-                            "chebyshev" => Math.Max(Math.Abs(p.X - oPos.X), Math.Abs(p.Y - oPos.Y)),
-                            "euclidean" => (int)Math.Round(Math.Sqrt((p.X - oPos.X) * (p.X - oPos.X) + (p.Y - oPos.Y) * (p.Y - oPos.Y))),
-                            _ => Math.Abs(p.X - oPos.X) + Math.Abs(p.Y - oPos.Y)
-                        };
-                        return d <= r;
-                    });
-                }
+                            var p = ctx.GetUnitVar<Coord>(id, Keys.Pos, default);
+                            if (p.Equals(default)) return false;
+                            int d = metric switch
+                            {
+                                "chebyshev" => Math.Max(Math.Abs(p.X - oPos.X), Math.Abs(p.Y - oPos.Y)),
+                                "euclidean" => (int)Math.Round(Math.Sqrt((p.X - oPos.X) * (p.X - oPos.X) + (p.Y - oPos.Y) * (p.Y - oPos.Y))),
+                                _ => Math.Abs(p.X - oPos.X) + Math.Abs(p.Y - oPos.Y)
+                            };
+                            return d <= r;
+                        });
+                    }
                 }
 
                 if (!string.IsNullOrEmpty(VarKey) && VarValue.HasValue && !string.IsNullOrEmpty(VarOp))

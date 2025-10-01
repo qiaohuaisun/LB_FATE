@@ -1,6 +1,6 @@
+using ETBBS;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using ETBBS;
 
 namespace LB_FATE;
 

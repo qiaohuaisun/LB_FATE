@@ -1,5 +1,5 @@
-using System;
 using ETBBS;
+using System;
 using Xunit;
 
 public class FuzzTests
