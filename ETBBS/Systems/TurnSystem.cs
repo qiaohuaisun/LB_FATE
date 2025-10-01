@@ -300,6 +300,35 @@ public sealed class TurnSystem
 
         turnTimer.Stop();
 
+        // Remove dead units (HP <= 0)
+        var deadUnits = new List<string>();
+        foreach (var (id, unit) in cur.Units)
+        {
+            int hp = 0;
+            if (unit.Vars.TryGetValue(Keys.Hp, out var hpVal))
+            {
+                hp = hpVal switch
+                {
+                    int i => i,
+                    long l => (int)l,
+                    double d => (int)Math.Round(d),
+                    _ => 0
+                };
+            }
+            if (hp <= 0)
+            {
+                deadUnits.Add(id);
+            }
+        }
+
+        foreach (var deadId in deadUnits)
+        {
+            _logger.LogInformation("Unit died and removed: {UnitId}", deadId);
+            cur = cur with { Units = cur.Units.Remove(deadId) };
+            events?.Publish(EventTopics.UnitDied, new UnitDiedEvent(deadId));
+            log.Info($"Unit {deadId} died and was removed from the game.");
+        }
+
         // Summary logging
         int statusEffectsActive = 0;
         int unitsWithDot = 0;

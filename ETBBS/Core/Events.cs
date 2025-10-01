@@ -16,6 +16,7 @@ public static class EventTopics
     public const string UndyingEnd = "status.undying.end";
 
     public const string UnitDamaged = "unit.damaged";
+    public const string UnitDied = "unit.died";
     public const string UnitMoved = "unit.moved";
     public const string UnitTagAdded = "unit.tag.added";
     public const string UnitTagRemoved = "unit.tag.removed";
@@ -35,6 +36,7 @@ public sealed record ActionExecutingEvent(Context Context, AtomicAction Action);
 public sealed record ActionExecutedEvent(WorldState Before, WorldState After, AtomicAction Action);
 
 public sealed record UnitDamagedEvent(string UnitId, int BeforeHp, int AfterHp, int Amount);
+public sealed record UnitDiedEvent(string UnitId);
 public sealed record UnitMovedEvent(string UnitId, Coord Before, Coord After);
 public sealed record UnitTagEvent(string UnitId, string Tag, bool Added);
 public sealed record TileTagEvent(Coord Pos, string Tag, bool Added);

@@ -158,6 +158,15 @@ public partial class Game
                     catch { }
                 }
             });
+            events.Subscribe(EventTopics.UnitDied, o =>
+            {
+                if (o is UnitDiedEvent e)
+                {
+                    var msg = $"【{e.UnitId} 阵亡】";
+                    ServerLog(msg);
+                    AppendPublic(new[] { msg });
+                }
+            });
             events.Subscribe(EventTopics.UnitMoved, o =>
             {
                 if (o is UnitMovedEvent e)
