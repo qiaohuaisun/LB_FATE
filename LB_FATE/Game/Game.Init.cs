@@ -15,9 +15,13 @@ partial class Game
         if (!string.IsNullOrWhiteSpace(envDir) && System.IO.Directory.Exists(envDir!)) registry.LoadDirectory(envDir!, recursive: true);
         if (!string.IsNullOrWhiteSpace(rolesDirArg) && System.IO.Directory.Exists(rolesDirArg!)) registry.LoadDirectory(rolesDirArg!, recursive: true);
 
-        // Assign unique classes randomly
-        var classes = Enum.GetValues<ClassType>().ToList();
-        classes = classes.OrderBy(_ => rng.Next()).ToList();
+        // Assign unique classes randomly (exclude Beast/Grand from controllable player classes)
+        // As requested: In FFA (and even in boss mode), Beast/Grand should NOT be player-controlled.
+        // They are reserved for the AI boss only when boss mode is enabled.
+        var classes = Enum.GetValues<ClassType>()
+            .Where(ct => ct != ClassType.Beast && ct != ClassType.Grand)
+            .OrderBy(_ => rng.Next())
+            .ToList();
         for (int i = 0; i < playerIds.Length; i++)
         {
             var pid = playerIds[i];

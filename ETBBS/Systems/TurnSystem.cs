@@ -308,21 +308,18 @@ public sealed class TurnSystem
         var deadUnits = new List<string>();
         foreach (var (id, unit) in cur.Units)
         {
-            int hp = 0;
-            if (unit.Vars.TryGetValue(Keys.Hp, out var hpVal))
+            // If HP is not present, do not treat as dead — some tests/units omit HP intentionally
+            if (!unit.Vars.TryGetValue(Keys.Hp, out var hpVal))
+                continue;
+
+            int hp = hpVal switch
             {
-                hp = hpVal switch
-                {
-                    int i => i,
-                    long l => (int)l,
-                    double d => (int)Math.Round(d),
-                    _ => 0
-                };
-            }
-            if (hp <= 0)
-            {
-                deadUnits.Add(id);
-            }
+                int i => i,
+                long l => (int)l,
+                double d => (int)Math.Round(d),
+                _ => 0
+            };
+            if (hp <= 0) deadUnits.Add(id);
         }
 
         foreach (var deadId in deadUnits)
@@ -355,5 +352,4 @@ public sealed class TurnSystem
         return (cur, log);
     }
 }
-
 
