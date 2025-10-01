@@ -124,6 +124,9 @@ partial class Game
         }
         foreach (var pid in idsToShow)
         {
+            // Skip if unit has been removed (e.g., died and was cleaned up)
+            if (!state.Units.ContainsKey(pid)) continue;
+
             var u = state.Units[pid];
             var hp = GetInt(pid, Keys.Hp, 0);
             var maxHp = GetInt(pid, Keys.MaxHp, hp);
@@ -168,6 +171,8 @@ partial class Game
         ClassType.Caster => AnsiColor.Magenta,
         ClassType.Berserker => AnsiColor.BrightRed,
         ClassType.Assassin => AnsiColor.BrightCyan,
+        ClassType.Beast => AnsiColor.BrightMagenta,
+        ClassType.Grand => AnsiColor.Yellow,
         _ => AnsiColor.White
     };
 
@@ -294,6 +299,9 @@ partial class Game
         }
         foreach (var pid in idsToShow)
         {
+            // Skip if unit has been removed (e.g., died and was cleaned up)
+            if (!state.Units.ContainsKey(pid)) continue;
+
             var u = state.Units[pid];
             var hp = GetInt(pid, Keys.Hp, 0);
             var maxHp = GetInt(pid, Keys.MaxHp, hp);
@@ -328,6 +336,8 @@ partial class Game
         ClassType.Caster => ConsoleColor.Magenta,
         ClassType.Berserker => ConsoleColor.Red,
         ClassType.Assassin => ConsoleColor.DarkCyan,
+        ClassType.Beast => ConsoleColor.Magenta,
+        ClassType.Grand => ConsoleColor.Yellow,
         _ => ConsoleColor.White
     };
 

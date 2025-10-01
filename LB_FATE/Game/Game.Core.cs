@@ -19,6 +19,8 @@ public partial class Game
         [ClassType.Caster] = new ClassDef(26, 6, 5, 3, 2, 2),
         [ClassType.Berserker] = new ClassDef(34, 2, 9, 3, 1, 3),
         [ClassType.Assassin] = new ClassDef(28, 3, 6, 4, 1, 4),
+        [ClassType.Beast] = new ClassDef(50, 5, 10, 8, 2, 3),
+        [ClassType.Grand] = new ClassDef(60, 8, 12, 10, 3, 2),
     };
 
     private readonly char[] symbols = new[] { '1', '2', '3', '4', '5', '6', '7' };

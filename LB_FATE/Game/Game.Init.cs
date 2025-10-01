@@ -91,7 +91,7 @@ partial class Game
                 var pos = new Coord(width / 2, height / 2);
                 if (Occupied(pos)) pos = RandomEmpty();
                 state = UnitFactory.AddUnit(state, bossId, bossRole);
-                classOf[bossId] = ClassType.Berserker; // visual only
+                classOf[bossId] = ClassType.Beast; // visual only (Beast for boss display)
                 roleOf[bossId] = bossRole;
                 teamOf[bossId] = "BOSS";
                 symbolOf[bossId] = 'B';

@@ -156,6 +156,8 @@ partial class Game
                             object? cd = s.Compiled.Extras.ContainsKey("cooldown") ? s.Compiled.Extras["cooldown"] : null;
                             object? tgt = s.Compiled.Extras.ContainsKey("targeting") ? s.Compiled.Extras["targeting"] : "any";
                             object? sealedUntil = s.Compiled.Extras.ContainsKey("sealed_until") ? s.Compiled.Extras["sealed_until"] : null;
+                            object? sealedUntilDay = s.Compiled.Extras.ContainsKey("sealed_until_day") ? s.Compiled.Extras["sealed_until_day"] : null;
+                            object? sealedUntilPhase = s.Compiled.Extras.ContainsKey("sealed_until_phase") ? s.Compiled.Extras["sealed_until_phase"] : null;
                             int cdLeft = 0;
                             if (cd is int cdi)
                             {
@@ -167,7 +169,17 @@ partial class Game
                                 // If never used, cdLeft remains 0 (ready to use)
                             }
                             string sealStr = "";
-                            if (sealedUntil is int sut && state.Global.Turn < sut)
+                            if (sealedUntilDay is int sud)
+                            {
+                                int sup = sealedUntilPhase is int supInt ? supInt : 1;
+                                bool locked = (day < sud) || (day == sud && phase < sup);
+                                if (locked)
+                                {
+                                    sealStr = $", seal:D{sud}";
+                                    if (sealedUntilPhase is not null) sealStr += $"P{sup}";
+                                }
+                            }
+                            else if (sealedUntil is int sut && state.Global.Turn < sut)
                             {
                                 sealStr = $", seal:{sut - state.Global.Turn} left";
                             }
