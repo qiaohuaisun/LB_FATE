@@ -17,7 +17,6 @@ sealed class LspServer
 {
     private readonly Dictionary<string, string> _docs = new(StringComparer.OrdinalIgnoreCase);
     private Localizer _loc = new Localizer(Environment.GetEnvironmentVariable("ETBBS_LSP_LANG") ?? "en");
-    private Localizer _loc = new Localizer(Environment.GetEnvironmentVariable("ETBBS_LSP_LANG") ?? "en");
 
     public async Task RunAsync()
     {
@@ -680,6 +679,16 @@ sealed class LspServer
         }
     }
 
+    private static string? FindRoleId(string text)
+    {
+        int idx = text.IndexOf("id \"", StringComparison.Ordinal);
+        if (idx < 0) return null;
+        idx += 4;
+        int end = text.IndexOf('"', idx);
+        if (end < 0) return null;
+        return text.Substring(idx, end - idx);
+    }
+
     private static readonly Dictionary<string, string> _hover = new(StringComparer.OrdinalIgnoreCase)
     {
         ["role"] = "Top-level LBR declaration of a role: `role \"Name\" id \"id\" { ... }`",
@@ -706,3 +715,4 @@ sealed class LspServer
         ["nearest"] = "Selector: nearest units by distance",
         ["farthest"] = "Selector: farthest units by distance"
     };
+}

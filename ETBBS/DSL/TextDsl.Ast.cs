@@ -150,7 +150,7 @@ public static partial class TextDsl
 
     private sealed class ActionStmt : IStmt
     {
-        public int Pos;
+        public int Pos = 0;
         public required ActionKind Kind;
         public int IntArg;
         public int IntArg2;
