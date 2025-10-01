@@ -532,10 +532,47 @@ This project is licensed under the MIT License - see [LICENSE.txt](LICENSE.txt) 
 
 ---
 
+## 👨‍💻 About the Author
+
+Hi! I'm a freshman student who created this game library and sample game using **Claude Code**. This is my first time developing a project of this scale, and I've learned a lot throughout the development process.
+
+### 🎮 Testing & Feedback Welcome
+
+I warmly welcome everyone to:
+- **Test the game**: Find bugs or suggest improvements
+- **Share feedback**: Tell me about your gaming experience and ideas
+- **Submit characters**: Design and contribute your own `.lbr` character files! I'll carefully review and include excellent submissions
+
+### 🤝 Looking for Collaborators
+
+If you're interested in this project and willing to help me develop and improve this game framework, I would be extremely grateful! Although I'm a student, I can offer **modest compensation** as a token of appreciation.
+
+Whether you're interested in:
+- 🎨 **Art & Design**: UI, character portraits, icons, etc.
+- 💻 **Programming**: New features, performance optimization, bug fixes
+- 📝 **Content Creation**: Character design, storylines, game balance
+- 🌍 **Localization**: Multi-language translation and documentation
+
+All contributions are welcome!
+
+### 📧 Contact
+
+For any questions, suggestions, or collaboration inquiries, please feel free to contact me:
+
+**Email**: qiaohuaisun@gmail.com
+
+Looking forward to hearing from you!
+
+---
+
 ## 🙏 Acknowledgments
 
+Special thanks to:
+- **Dawen** and **Xiaomao** - My dear friends who provided tremendous support and advice
+- **Claude Code** - The powerful AI coding assistant that made this project possible
 - **.NET Team** - For the amazing runtime and SDK
-- **Claude code** - A powerful agentic coding tool
+
+Thanks to all testers, contributors, and supporters!
 
 ---
 
