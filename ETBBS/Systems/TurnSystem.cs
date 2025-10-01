@@ -206,6 +206,10 @@ public sealed class TurnSystem
                 cur = WorldStateOps.WithUnit(cur, id, u =>
                 {
                     int hp = u.GetIntVar(Keys.Hp);
+                    // Dead units (HP <= 0) cannot regenerate HP - prevents "resurrection"
+                    if (hp <= 0)
+                        return u;
+
                     int maxHp = u.GetIntVar(Keys.MaxHp, int.MaxValue);
                     int newHp = Math.Min(maxHp, hp + (int)Math.Round(hpRegen));
                     return u with { Vars = u.Vars.SetItem(Keys.Hp, newHp) };

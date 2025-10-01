@@ -134,6 +134,11 @@ public sealed record Heal(string TargetId, int Amount) : AtomicAction
         return WorldStateOps.WithUnit(state, TargetId, u =>
         {
             int hp = u.GetIntVar(Keys.Hp);
+            // Dead units (HP <= 0) cannot be healed - prevents resurrection
+            if (hp <= 0)
+            {
+                return u;
+            }
             int newHp = hp + Math.Max(0, Amount);
 
             int maxHp = u.GetIntVar(Keys.MaxHp);
