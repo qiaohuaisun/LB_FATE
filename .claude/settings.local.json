@@ -11,7 +11,10 @@
       "Bash(dotnet build:*)",
       "Bash(cat:*)",
       "Bash(awk:*)",
-      "Bash(dotnet run:*)"
+      "Bash(dotnet run:*)",
+      "Bash(pwsh:*)",
+      "Bash(tree:*)",
+      "Bash(npm run compile:*)"
     ],
     "deny": [],
     "ask": []

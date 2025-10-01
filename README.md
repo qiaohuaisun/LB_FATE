@@ -49,9 +49,10 @@ A reusable .NET 8 framework for grid-based turn-based strategy games, featuring 
 
 ### Developer Experience
 - **Syntax Validator**: CLI tool to validate `.lbr` files before runtime
-- **VS Code Extension**: Syntax highlighting, completions, snippets, and diagnostics
+- **VSCode Extension with LSP**: Full language server integration with syntax highlighting, IntelliSense, diagnostics, hover docs, code actions, and formatting
 - **Comprehensive Logging**: Multiple log levels with performance tracking
 - **Hot-reloadable Roles**: Load custom roles from directories
+- **Skill Trace Debugger**: Step-by-step execution tracing for debugging complex skills
 
 ---
 
@@ -127,9 +128,17 @@ ETBBS/
 ├── ETBBS.Tests/                # Unit tests
 ├── LB_FATE.Tests/              # Integration tests
 │
+├── ETBBS.Lsp/                  # LSP server for VSCode
+│   └── Program.cs              # Language server implementation
+│
 ├── docs/                       # Documentation
 │   ├── lbr.zh-CN.md            # LBR DSL guide (Chinese)
-│   └── lbr.en.md               # LBR DSL guide (English)
+│   ├── lbr.en.md               # LBR DSL guide (English)
+│   ├── LSP.md                  # LSP server documentation
+│   ├── PROJECT_OVERVIEW.md     # Comprehensive project guide
+│   ├── TRACE_USAGE_GUIDE.md    # Skill trace debugger guide
+│   ├── QUICK_REFERENCE.md      # DSL quick reference card
+│   └── ...                     # Additional documentation
 │
 ├── publish/                    # Distribution
 │   ├── roles/                  # Example role files (.lbr)
@@ -137,8 +146,19 @@ ETBBS/
 │   ├── runClient.cmd           # Client launcher
 │   └── README_LAUNCHER.md      # Launcher guide
 │
-└── vscode-extension/           # VS Code extension
-    └── etbbs-lbr-tools-*.vsix  # Installable extension
+└── vscode-lbr-extension/       # VSCode extension (full LSP integration)
+    ├── client/                 # TypeScript LSP client
+    ├── server/                 # Compiled LSP server binaries
+    ├── syntaxes/               # TextMate grammar for syntax highlighting
+    ├── docs/                   # Extension documentation
+    │   ├── INDEX.md            # Documentation index
+    │   ├── QUICKSTART.md       # 5-minute setup guide
+    │   ├── USAGE.md            # Complete user manual
+    │   └── BUILD.md            # Build and publish guide
+    ├── prepare-server.ps1      # Build and copy LSP server
+    ├── verify-setup.ps1        # Environment verification
+    ├── DEBUG.md                # Troubleshooting guide
+    └── package.json            # Extension manifest
 ```
 
 ---
@@ -260,6 +280,49 @@ Validating: beast_florence.lbr ... ✓ OK
 ```
 
 📖 **Full Guide**: [ETBBS.LbrValidator/README.md](ETBBS.LbrValidator/README.md)
+
+### VSCode Extension
+
+Get full language support for `.lbr` files with the official VSCode extension.
+
+**Features**:
+- ✅ Syntax highlighting with TextMate grammar
+- ✅ IntelliSense auto-completion (context-aware)
+- ✅ Real-time diagnostics and error checking
+- ✅ Hover documentation for keywords
+- ✅ Quick fixes and code actions
+- ✅ Code formatting (auto-indent)
+- ✅ Workspace symbol search
+- ✅ Multi-language support (English/中文)
+
+**Installation**:
+
+1. **Option 1: Install from VSIX** (Recommended)
+   ```bash
+   cd vscode-lbr-extension
+   pwsh -File verify-setup.ps1  # Verify environment
+   npm install && npm run compile
+   npm run package              # Creates .vsix file
+   code --install-extension lbr-language-support-*.vsix
+   ```
+
+2. **Option 2: Development Mode**
+   ```bash
+   cd vscode-lbr-extension
+   pwsh -File prepare-server.ps1  # Build LSP server
+   npm install && npm run compile
+   # Press F5 in VSCode to launch Extension Development Host
+   ```
+
+**Quick Start**:
+- Open any `.lbr` file in VSCode
+- Enjoy syntax highlighting and IntelliSense
+- Hover over keywords for documentation
+- Press `Ctrl+.` for quick fixes
+
+📖 **Full Guide**: [vscode-lbr-extension/README.md](vscode-lbr-extension/README.md)
+📖 **Documentation**: [vscode-lbr-extension/docs/INDEX.md](vscode-lbr-extension/docs/INDEX.md)
+🐛 **Troubleshooting**: [vscode-lbr-extension/DEBUG.md](vscode-lbr-extension/DEBUG.md)
 
 ---
 
@@ -432,11 +495,34 @@ export LB_FATE_LOG_LEVEL=Debug
 
 ## 📚 Documentation
 
+### Core Documentation
+
 | Document | Description |
 |----------|-------------|
-| [LBR DSL Guide (Chinese)](docs/lbr.zh-CN.md) | Complete LBR syntax reference |
+| [LBR DSL Guide (Chinese)](docs/lbr.zh-CN.md) | Complete LBR syntax reference with examples |
 | [LBR DSL Guide (English)](docs/lbr.en.md) | English LBR syntax summary |
-| [LBR Validator Guide](ETBBS.LbrValidator/README.md) | Validator tool documentation |
+| [Project Overview](docs/PROJECT_OVERVIEW.md) | Comprehensive guide to architecture and features |
+| [Quick Reference](docs/QUICK_REFERENCE.md) | Handy DSL syntax cheat sheet |
+| [Skill Trace Guide](docs/TRACE_USAGE_GUIDE.md) | Debugging skills with execution tracing |
+| [LSP Documentation](docs/LSP.md) | Language Server Protocol implementation details |
+
+### Tools Documentation
+
+| Document | Description |
+|----------|-------------|
+| [LBR Validator](ETBBS.LbrValidator/README.md) | CLI validator tool for `.lbr` files |
+| [VSCode Extension](vscode-lbr-extension/README.md) | Full-featured VSCode extension guide |
+| [Extension Quick Start](vscode-lbr-extension/docs/QUICKSTART.md) | 5-minute setup guide |
+| [Extension Usage](vscode-lbr-extension/docs/USAGE.md) | Complete feature walkthrough |
+| [Extension Build Guide](vscode-lbr-extension/docs/BUILD.md) | Building and publishing the extension |
+| [Extension Troubleshooting](vscode-lbr-extension/DEBUG.md) | Debugging extension issues |
+
+### Additional Resources
+
+| Document | Description |
+|----------|-------------|
+| [Replay JSON Format](docs/Replay_JSON.md) | Replay file structure and usage |
+| [Benchmarks](docs/Benchmarks.md) | Performance benchmarks and analysis |
 
 ---
 

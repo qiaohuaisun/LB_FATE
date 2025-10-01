@@ -1,0 +1,140 @@
+// Example LBR file for testing the VSCode extension
+
+role "Test Warrior" id "test_warrior" {
+  description "A brave warrior for testing"
+
+  vars {
+    "hp" = 100
+    "max_hp" = 100
+    "mp" = 50
+    "max_mp" = 50
+    "atk" = 20
+    "def" = 15
+    "spd" = 10
+  }
+
+  tags {
+    "melee"
+    "physical"
+  }
+
+  skills {
+    skill "Power Strike" {
+      range 1
+      min_range 1
+      targeting enemies
+      mp_cost 10
+      cooldown 2
+
+      // Deal physical damage to target
+      deal physical 25 damage to target from caster;
+
+      // 50% chance to stun
+      chance 0.5 then {
+        add tag "stunned" to target;
+      }
+    }
+
+    skill "Whirlwind" {
+      range 2
+      targeting enemies
+      mp_cost 20
+
+      // Hit all enemies in circle
+      for each enemies in circle radius 2 of caster do {
+        deal physical 15 damage to it from caster;
+      }
+    }
+
+    skill "Battle Cry" {
+      range 0
+      targeting self
+      mp_cost 15
+
+      // Buff all allies
+      for each allies in range 3 of caster do {
+        set unit(it) var "atk" = unit(it).var("atk") + 5;
+      }
+    }
+
+    skill "Precise Strike" {
+      range 2
+      targeting enemies
+      distance euclidean
+      mp_cost 12
+
+      // Hit weakest enemy in range
+      for each weakest 1 enemies in range 2 of caster do {
+        deal physical 30 damage to it from caster;
+      }
+    }
+
+    skill "Heal Self" {
+      range 0
+      targeting self
+
+      heal 20 to caster;
+    }
+
+    skill "Cleave" {
+      range 1
+      targeting enemies
+      mp_cost 8
+
+      // Line attack
+      for each enemies in line length 3 width 1 dir "$dir" of caster do {
+        deal physical 18 damage to it from caster;
+      }
+    }
+  }
+
+  quotes {
+    on_turn_start [
+      "Ready for battle!",
+      "Let's do this!",
+      "Time to fight!"
+    ]
+
+    on_turn_end [
+      "Good move.",
+      "Next!"
+    ]
+
+    on_skill "Power Strike" [
+      "Take this!",
+      "Power Strike!"
+    ]
+
+    on_skill "Whirlwind" [
+      "Spinning attack!",
+      "Whirlwind!"
+    ]
+
+    on_damage [
+      "Ugh!",
+      "That hurt!"
+    ]
+
+    on_hp_below 0.5 [
+      "I'm not done yet!",
+      "This is just a scratch!"
+    ]
+
+    on_hp_below 0.2 [
+      "I need to be careful...",
+      "This is bad..."
+    ]
+
+    on_victory [
+      "Victory is mine!",
+      "Well fought!",
+      "Another battle won!"
+    ]
+
+    on_defeat [
+      "I have fallen...",
+      "Not like this...",
+      "I'll be back stronger..."
+    ]
+  }
+}

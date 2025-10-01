@@ -1,0 +1,91 @@
+{
+  "name": "lbr-language-support",
+  "displayName": "LBR Language Support",
+  "description": "Language support for ETBBS .lbr role definition files",
+  "version": "0.1.0",
+  "publisher": "etbbs",
+  "engines": {
+    "vscode": "^1.75.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "keywords": [
+    "lbr",
+    "etbbs",
+    "dsl",
+    "game"
+  ],
+  "main": "./client/out/extension.js",
+  "activationEvents": [
+    "onLanguage:lbr"
+  ],
+  "contributes": {
+    "languages": [
+      {
+        "id": "lbr",
+        "extensions": [
+          ".lbr"
+        ],
+        "aliases": [
+          "LBR",
+          "lbr"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "lbr",
+        "scopeName": "source.lbr",
+        "path": "./syntaxes/lbr.tmLanguage.json"
+      }
+    ],
+    "configuration": {
+      "type": "object",
+      "title": "LBR Language Server",
+      "properties": {
+        "lbrLanguageServer.serverPath": {
+          "type": "string",
+          "default": "",
+          "description": "Path to ETBBS.Lsp server executable. Leave empty to use bundled server."
+        },
+        "lbrLanguageServer.trace.server": {
+          "type": "string",
+          "enum": [
+            "off",
+            "messages",
+            "verbose"
+          ],
+          "default": "off",
+          "description": "Traces the communication between VS Code and the language server."
+        },
+        "lbrLanguageServer.locale": {
+          "type": "string",
+          "enum": [
+            "en",
+            "zh-CN"
+          ],
+          "default": "en",
+          "description": "Language for diagnostics and hover information."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./client",
+    "watch": "tsc -watch -p ./client",
+    "pretest": "npm run compile",
+    "package": "vsce package"
+  },
+  "devDependencies": {
+    "@types/node": "^18.0.0",
+    "@types/vscode": "^1.75.0",
+    "@vscode/vsce": "^2.22.0",
+    "typescript": "^5.3.0"
+  },
+  "dependencies": {
+    "vscode-languageclient": "^9.0.1"
+  }
+}

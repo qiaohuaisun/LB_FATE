@@ -49,9 +49,10 @@
 
 ### 开发者体验
 - **语法验证器**：在运行前验证 `.lbr` 文件的 CLI 工具
-- **VS Code 扩展**：语法高亮、补全、代码片段和诊断
+- **VSCode 扩展与 LSP**：完整语言服务器集成，提供语法高亮、智能补全、诊断、悬停文档、代码操作和格式化
 - **全面日志**：多级别日志与性能追踪
 - **热重载角色**：从目录加载自定义角色
+- **技能追踪调试器**：逐步执行追踪，用于调试复杂技能
 
 ---
 
@@ -127,9 +128,17 @@ ETBBS/
 ├── ETBBS.Tests/                # 单元测试
 ├── LB_FATE.Tests/              # 集成测试
 │
+├── ETBBS.Lsp/                  # VSCode 的 LSP 服务器
+│   └── Program.cs              # 语言服务器实现
+│
 ├── docs/                       # 文档
 │   ├── lbr.zh-CN.md            # LBR DSL 指南（中文）
-│   └── lbr.en.md               # LBR DSL 指南（英文）
+│   ├── lbr.en.md               # LBR DSL 指南（英文）
+│   ├── LSP.md                  # LSP 服务器文档
+│   ├── PROJECT_OVERVIEW.md     # 项目全面指南
+│   ├── TRACE_USAGE_GUIDE.md    # 技能追踪调试器指南
+│   ├── QUICK_REFERENCE.md      # DSL 快速参考卡
+│   └── ...                     # 其他文档
 │
 ├── publish/                    # 发布版
 │   ├── roles/                  # 示例角色文件 (.lbr)
@@ -137,8 +146,19 @@ ETBBS/
 │   ├── runClient.cmd           # 客户端启动器
 │   └── README_LAUNCHER.md      # 启动器指南
 │
-└── vscode-extension/           # VS Code 扩展
-    └── etbbs-lbr-tools-*.vsix  # 可安装扩展
+└── vscode-lbr-extension/       # VSCode 扩展（完整 LSP 集成）
+    ├── client/                 # TypeScript LSP 客户端
+    ├── server/                 # 编译的 LSP 服务器二进制文件
+    ├── syntaxes/               # 用于语法高亮的 TextMate 语法
+    ├── docs/                   # 扩展文档
+    │   ├── INDEX.md            # 文档索引
+    │   ├── QUICKSTART.md       # 5分钟设置指南
+    │   ├── USAGE.md            # 完整用户手册
+    │   └── BUILD.md            # 构建和发布指南
+    ├── prepare-server.ps1      # 构建并复制 LSP 服务器
+    ├── verify-setup.ps1        # 环境验证
+    ├── DEBUG.md                # 故障排除指南
+    └── package.json            # 扩展清单
 ```
 
 ---
@@ -260,6 +280,49 @@ Validating: beast_florence.lbr ... ✓ OK
 ```
 
 📖 **完整指南**：[ETBBS.LbrValidator/README.md](ETBBS.LbrValidator/README.md)
+
+### VSCode 扩展
+
+为 `.lbr` 文件提供完整语言支持的官方 VSCode 扩展。
+
+**功能**：
+- ✅ 基于 TextMate 语法的语法高亮
+- ✅ 智能补全（上下文感知）
+- ✅ 实时诊断和错误检查
+- ✅ 关键字悬停文档
+- ✅ 快速修复和代码操作
+- ✅ 代码格式化（自动缩进）
+- ✅ 工作区符号搜索
+- ✅ 多语言支持（英文/中文）
+
+**安装**：
+
+1. **选项 1：从 VSIX 安装**（推荐）
+   ```bash
+   cd vscode-lbr-extension
+   pwsh -File verify-setup.ps1  # 验证环境
+   npm install && npm run compile
+   npm run package              # 创建 .vsix 文件
+   code --install-extension lbr-language-support-*.vsix
+   ```
+
+2. **选项 2：开发模式**
+   ```bash
+   cd vscode-lbr-extension
+   pwsh -File prepare-server.ps1  # 构建 LSP 服务器
+   npm install && npm run compile
+   # 在 VSCode 中按 F5 启动扩展开发主机
+   ```
+
+**快速开始**：
+- 在 VSCode 中打开任意 `.lbr` 文件
+- 享受语法高亮和智能补全
+- 悬停在关键字上查看文档
+- 按 `Ctrl+.` 获取快速修复
+
+📖 **完整指南**：[vscode-lbr-extension/README.md](vscode-lbr-extension/README.md)
+📖 **文档**：[vscode-lbr-extension/docs/INDEX.md](vscode-lbr-extension/docs/INDEX.md)
+🐛 **故障排除**：[vscode-lbr-extension/DEBUG.md](vscode-lbr-extension/DEBUG.md)
 
 ---
 
@@ -432,11 +495,34 @@ export LB_FATE_LOG_LEVEL=Debug
 
 ## 📚 文档
 
+### 核心文档
+
 | 文档 | 说明 |
 |------|------|
-| [LBR DSL 指南（中文）](docs/lbr.zh-CN.md) | 完整 LBR 语法参考 |
+| [LBR DSL 指南（中文）](docs/lbr.zh-CN.md) | 完整 LBR 语法参考与示例 |
 | [LBR DSL 指南（英文）](docs/lbr.en.md) | 英文 LBR 语法摘要 |
-| [LBR 验证器指南](ETBBS.LbrValidator/README.md) | 验证器工具文档 |
+| [项目概览](docs/PROJECT_OVERVIEW.md) | 架构和功能的全面指南 |
+| [快速参考](docs/QUICK_REFERENCE.md) | 方便的 DSL 语法速查表 |
+| [技能追踪指南](docs/TRACE_USAGE_GUIDE.md) | 使用执行追踪调试技能 |
+| [LSP 文档](docs/LSP.md) | 语言服务器协议实现细节 |
+
+### 工具文档
+
+| 文档 | 说明 |
+|------|------|
+| [LBR 验证器](ETBBS.LbrValidator/README.md) | `.lbr` 文件的 CLI 验证器工具 |
+| [VSCode 扩展](vscode-lbr-extension/README.md) | 功能完整的 VSCode 扩展指南 |
+| [扩展快速开始](vscode-lbr-extension/docs/QUICKSTART.md) | 5分钟设置指南 |
+| [扩展使用](vscode-lbr-extension/docs/USAGE.md) | 完整功能演练 |
+| [扩展构建指南](vscode-lbr-extension/docs/BUILD.md) | 构建和发布扩展 |
+| [扩展故障排除](vscode-lbr-extension/DEBUG.md) | 调试扩展问题 |
+
+### 其他资源
+
+| 文档 | 说明 |
+|------|------|
+| [回放 JSON 格式](docs/Replay_JSON.md) | 回放文件结构和用法 |
+| [基准测试](docs/Benchmarks.md) | 性能基准和分析 |
 
 ---
 

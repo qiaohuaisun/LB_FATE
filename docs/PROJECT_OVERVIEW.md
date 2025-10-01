@@ -461,6 +461,107 @@ foreach (var entry in trace.Entries.Where(e => e.Type == "Damage"))
 - ✅ **共享不可变集合** - 使用ImmutableDictionary
 - ✅ **可选追踪** - enabled:false时零开销
 
+## 🛠️ 开发工具
+
+ETBBS 提供了完整的工具链，帮助开发者高效地编写、调试和验证 LBR 角色文件。
+
+### 1. VSCode 扩展（推荐）
+
+**位置**: `vscode-lbr-extension/`
+
+完整的 IDE 支持，包括：
+- ✅ **语法高亮** - 基于 TextMate 语法
+- ✅ **智能补全** - 上下文感知的 IntelliSense
+- ✅ **实时诊断** - 语法和语义错误检查
+- ✅ **悬停文档** - 关键字和语法帮助
+- ✅ **快速修复** - 自动修复常见问题
+- ✅ **代码格式化** - 自动缩进和格式化
+- ✅ **符号搜索** - 跳转到角色和技能定义
+- ✅ **多语言支持** - English/中文
+
+**快速安装**:
+```bash
+cd vscode-lbr-extension
+pwsh -File verify-setup.ps1    # 验证环境
+pwsh -File prepare-server.ps1  # 构建 LSP 服务器
+npm install && npm run compile
+npm run package                # 创建 .vsix
+code --install-extension lbr-language-support-*.vsix
+```
+
+**文档**:
+- [完整指南](../vscode-lbr-extension/README.md)
+- [快速开始](../vscode-lbr-extension/docs/QUICKSTART.md) - 5分钟
+- [使用手册](../vscode-lbr-extension/docs/USAGE.md) - 15分钟
+- [故障排除](../vscode-lbr-extension/DEBUG.md)
+
+### 2. LBR 验证器
+
+**位置**: `ETBBS.LbrValidator/`
+
+命令行工具，用于批量验证 `.lbr` 文件：
+
+```bash
+# 验证单个文件
+dotnet run --project ETBBS.LbrValidator -- file.lbr
+
+# 验证整个目录
+dotnet run --project ETBBS.LbrValidator -- publish/roles -r -v
+
+# CI/CD 集成（返回退出码）
+dotnet run --project ETBBS.LbrValidator -- publish/roles -q
+```
+
+**功能**:
+- ✅ 批量验证多个文件
+- ✅ 递归目录扫描
+- ✅ 彩色终端输出
+- ✅ 详细错误消息（行号、列号）
+- ✅ CI/CD 友好
+
+### 3. 技能追踪调试器
+
+**位置**: `ETBBS/Systems/SkillTrace.cs`
+
+逐步追踪技能执行过程：
+
+```csharp
+var trace = new SkillTrace(enabled: true);
+TraceExtensions.CurrentTrace = trace;
+
+// 执行技能...
+
+// 查看追踪
+Console.WriteLine(trace.FormatTrace(verbose: true));
+```
+
+**追踪内容**:
+- 选择器执行和选中单位
+- 条件判断结果
+- 伤害/治疗事件
+- 变量修改
+- 作用域层次
+
+**文档**: [TRACE_USAGE_GUIDE.md](TRACE_USAGE_GUIDE.md)
+
+### 4. LSP 语言服务器
+
+**位置**: `ETBBS.Lsp/`
+
+供 VSCode 扩展和其他编辑器使用的语言服务器：
+
+**支持的 LSP 功能**:
+- `textDocument/didOpen`, `didChange` → 诊断
+- `textDocument/completion` → 补全
+- `textDocument/hover` → 悬停文档
+- `textDocument/formatting` → 格式化
+- `textDocument/codeAction` → 快速修复
+- `workspace/symbol` → 符号搜索
+
+**文档**: [LSP.md](LSP.md)
+
+---
+
 ## 🔧 扩展点
 
 ### 自定义动作

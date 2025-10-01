@@ -1,0 +1,132 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "LBR",
+  "scopeName": "source.lbr",
+  "patterns": [
+    { "include": "#comments" },
+    { "include": "#keywords" },
+    { "include": "#strings" },
+    { "include": "#numbers" },
+    { "include": "#operators" },
+    { "include": "#selectors" },
+    { "include": "#variables" }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.line.number-sign.lbr",
+          "match": "#.*$"
+        },
+        {
+          "name": "comment.line.double-slash.lbr",
+          "match": "//.*$"
+        },
+        {
+          "name": "comment.block.lbr",
+          "begin": "/\\*",
+          "end": "\\*/"
+        }
+      ]
+    },
+    "keywords": {
+      "patterns": [
+        {
+          "name": "keyword.control.lbr",
+          "match": "\\b(role|vars|tags|skills|skill|quotes|description)\\b"
+        },
+        {
+          "name": "keyword.other.lbr",
+          "match": "\\b(range|min_range|cooldown|targeting|distance|ends_turn|sealed_until|day|phase|mp_cost|target_mode)\\b"
+        },
+        {
+          "name": "keyword.control.flow.lbr",
+          "match": "\\b(for|each|do|if|then|else|chance|repeat|in|parallel)\\b"
+        },
+        {
+          "name": "keyword.action.lbr",
+          "match": "\\b(deal|heal|set|add|remove|move|dash|physical|magic|damage|tag|var|global|tile|unit)\\b"
+        },
+        {
+          "name": "keyword.selector.lbr",
+          "match": "\\b(enemies|allies|units|nearest|farthest|random|healthiest|weakest|caster|target|it|point)\\b"
+        },
+        {
+          "name": "keyword.geometry.lbr",
+          "match": "\\b(circle|cross|line|cone|length|width|radius|angle|dir)\\b"
+        },
+        {
+          "name": "keyword.distance.lbr",
+          "match": "\\b(manhattan|chebyshev|euclidean)\\b"
+        },
+        {
+          "name": "keyword.targeting.lbr",
+          "match": "\\b(any|self|from|to|of|within|around)\\b"
+        },
+        {
+          "name": "keyword.events.lbr",
+          "match": "\\b(on_turn_start|on_turn_end|on_skill|on_damage|on_hp_below|on_victory|on_defeat)\\b"
+        }
+      ]
+    },
+    "strings": {
+      "patterns": [
+        {
+          "name": "string.quoted.double.lbr",
+          "begin": "\"",
+          "end": "\"",
+          "patterns": [
+            {
+              "name": "constant.character.escape.lbr",
+              "match": "\\\\."
+            }
+          ]
+        }
+      ]
+    },
+    "numbers": {
+      "patterns": [
+        {
+          "name": "constant.numeric.lbr",
+          "match": "\\b\\d+(\\.\\d+)?\\b"
+        }
+      ]
+    },
+    "operators": {
+      "patterns": [
+        {
+          "name": "keyword.operator.comparison.lbr",
+          "match": "(>=|<=|==|!=|>|<)"
+        },
+        {
+          "name": "keyword.operator.arithmetic.lbr",
+          "match": "(\\+|\\-|\\*|\\/|%)"
+        },
+        {
+          "name": "keyword.operator.assignment.lbr",
+          "match": "="
+        }
+      ]
+    },
+    "selectors": {
+      "patterns": [
+        {
+          "name": "support.function.selector.lbr",
+          "match": "\\b(unit|tile)\\s*\\("
+        }
+      ]
+    },
+    "variables": {
+      "patterns": [
+        {
+          "name": "variable.language.lbr",
+          "match": "\\$\\w+"
+        },
+        {
+          "name": "variable.other.lbr",
+          "match": "\\b(hp|max_hp|mp|max_mp|atk|def|m_atk|m_def|spd)\\b"
+        }
+      ]
+    }
+  }
+}
