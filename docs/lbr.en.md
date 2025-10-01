@@ -18,6 +18,11 @@ role "<Name>" id "<id>" {
     skill "<SkillName>" { <script> }
     ...
   }
+  quotes {
+    on_turn_start ["Quote 1", "Quote 2", ...]
+    on_skill "<SkillName>" ["Quote 1", "Quote 2", ...]
+    ...
+  }
 }
 ```
 
@@ -66,17 +71,48 @@ role "<Name>" id "<id>" {
 
 ## Selectors and Conditions
 
-- Selectors:
-  - `enemies|allies of <unit> [in range <R> of <unit|point>] [with tag "<tag>"] [with var "<key>" OP <int>] [order by var "<key>" asc|desc] [limit <N>]`
-    - **Note**: `of <unit>` is **required** (typically `of caster` or `of target`)
-    - `in range <R> of <unit>` specifies range filtering
-    - `order by var "<key>" asc|desc` for sorting (**must come after `in range`**)
-    - `limit <N>` limits the result count
-  - `units with tag "<tag>"` / `units with var "<key>" OP <int>`
-  - `nearest|farthest [N] enemies|allies of <unit|point>`
-- Conditions:
-  - `<unit> has tag "<tag>"`
-  - `<unit> mp OP <int>` (OP: `>=, >, <=, <, ==, !=`)
+### Selectors
+
+**Basic Syntax:**
+- `enemies [clauses...]` - Select enemy units
+- `allies [clauses...]` - Select ally units
+- `nearest [N] enemies|allies of <unit|point>` - Select N nearest units
+- `farthest [N] enemies|allies of <unit|point>` - Select N farthest units
+- `units with tag "<tag>"` / `units with var "<key>" OP <int>` - Select all units matching criteria
+
+**Available Clauses** (can appear in **any order**):
+- `of <unit>` - Specify the reference unit (typically `caster` or `target`). **Optional** for range-based selectors.
+- `in range <R> of <unit|point>` - Filter units within range R
+- `with tag "<tag>"` - Filter units with specific tag
+- `with var "<key>" OP <value>` - Filter units by variable condition
+- `order by var "<key>" [asc|desc]` - Sort by variable (default: asc)
+- `limit <N>` - Limit result count to N units
+
+**Examples:**
+```lbr
+# All clauses - any order works!
+enemies of caster in range 4 of caster with tag "stunned" limit 2
+
+# Same as above, different order
+enemies in range 4 of caster of caster limit 2 with tag "stunned"
+
+# Order by HP, lowest first
+enemies of caster in range 10 of caster order by var "hp" asc limit 1
+
+# Simplified: omit "of caster" when using range
+enemies in range 3 of target
+
+# Nearest units (of clause implicit in "of" after enemies)
+nearest 3 enemies of caster
+
+# All allies within range
+allies in range 5 of caster
+```
+
+### Conditions
+
+- `<unit> has tag "<tag>"` - Check if unit has a tag
+- `<unit> mp OP <int>` - Compare MP value (OP: `>=, >, <=, <, ==, !=`)
 
 ## Values and Expressions
 
@@ -98,54 +134,132 @@ role "<Name>" id "<id>" {
 - Turn system (outside of skills) applies per‑turn updates: counters decay, undying/end, regen,
   DoT (`bleed`/`burn`), generic `per_turn_add:<key>` with clamping.
 
+## Quotes System
+
+Roles can define quotes/dialogues that play during specific game events to enhance immersion. Each event type can have multiple quotes, and the system will randomly select one to display.
+
+### Supported Event Types
+
+```
+quotes {
+  # When turn starts
+  on_turn_start ["Quote 1", "Quote 2", ...]
+
+  # When turn ends
+  on_turn_end ["Quote 1", "Quote 2", ...]
+
+  # When using specific skills (can be defined per skill)
+  on_skill "<SkillName>" ["Quote 1", "Quote 2", ...]
+
+  # When taking damage
+  on_damage ["Quote 1", "Quote 2", ...]
+
+  # When HP falls below specified percentage (0-1 decimal)
+  on_hp_below 0.5 ["Quote 1", "Quote 2", ...]
+  on_hp_below 0.2 ["Quote 1", "Quote 2", ...]
+
+  # When victorious
+  on_victory ["Quote 1", "Quote 2", ...]
+
+  # When defeated
+  on_defeat ["Quote 1", "Quote 2", ...]
+}
+```
+
+### Notes
+
+- HP threshold quotes trigger only once per threshold
+- Thresholds are checked from high to low; triggers on first match
+- Quotes block is optional; omitting it won't affect role functionality
+- Current version primarily supports quote display for Boss characters
+
+### Example
+
+```lbr
+role "Beast King" id "boss_beast" {
+  vars { "hp" = 105; "max_hp" = 105; }
+
+  skills {
+    skill "Destructive Roar" {
+      range 4; targeting enemies;
+      deal magic 6 damage to target from caster;
+    }
+  }
+
+  quotes {
+    on_turn_start [
+      "Foolish humans, tremble before me!",
+      "The hour of destruction has come..."
+    ]
+
+    on_skill "Destructive Roar" [
+      "Hear the roar of annihilation!",
+      "Perish—Destructive Roar!"
+    ]
+
+    on_hp_below 0.5 [
+      "Hmph... not bad, but not enough!",
+      "You've successfully angered me!"
+    ]
+
+    on_hp_below 0.2 [
+      "Impossible... how could I...",
+      "Curse you... mere humans..."
+    ]
+  }
+}
+```
+
 ## Common Syntax Errors
 
-### Error 1: Missing `of` clause in `for each`
+### Error 1: Invalid unit reference
 
 **Incorrect:**
 ```lbr
-for each enemies in range 2 of caster do { ... }
+deal physical 10 damage to enemy
 ```
 
 **Error message:**
 ```
-DSL parse error at X: keyword 'do' expected
+DSL parse error: unknown unit reference
+Suggestion: Expected one of: caster, target, it, unit id "..."
 ```
 
 **Correct:**
 ```lbr
-for each enemies of caster in range 2 of caster do { ... }
+deal physical 10 damage to target from caster
 ```
 
-**Explanation:** The `of <unit>` clause is **required** and must immediately follow `enemies`/`allies`.
-
-### Error 2: `order by` must come after `in range`
+### Error 2: Duplicate clauses in selector
 
 **Incorrect:**
 ```lbr
-for each enemies of caster order by var "hp" desc in range 100 of caster do { ... }
+for each enemies of caster in range 2 of caster limit 3 limit 5 do { ... }
 ```
 
 **Error message:**
 ```
-DSL parse error at X: keyword 'do' expected
+DSL parse error: duplicate 'limit' clause in selector
 ```
 
 **Correct:**
 ```lbr
-for each enemies of caster in range 100 of caster order by var "hp" desc do { ... }
+for each enemies of caster in range 2 of caster limit 3 do { ... }
 ```
-
-**Explanation:** Parser requires clause order: `of <unit>` → `in range` → `order by` → `limit` → `do`
 
 ### Error 3: `in parallel` placement
+
+**Incorrect:**
+```lbr
+for each enemies in parallel of caster in range 2 of caster do { ... }
+```
 
 **Correct:**
 ```lbr
 for each enemies of caster in range 2 of caster in parallel do { ... }
 ```
 
-**Explanation:** The `in parallel` modifier must come after all filtering clauses, before `do`.
+**Explanation:** The `in parallel` modifier must come after all selector clauses, immediately before `do`.
 
 ### Using the Validator Tool
 

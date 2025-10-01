@@ -372,14 +372,21 @@ role "Character Name" id "unique_id" {
 - `enemies of caster in range 100 of caster order by var "hp" asc limit 1` - Lowest HP enemy
 - `nearest 3 enemies of caster` - 3 closest enemies
 
-**⚠️ Common Syntax Errors**:
+**💡 Flexible Syntax** (v2.0+):
 
-| ❌ Incorrect | ✅ Correct |
-|-------------|-----------|
-| `for each enemies in range 2 of caster do {` | `for each enemies of caster in range 2 of caster do {` |
-| `for each enemies of caster order by var "hp" desc in range 10 of caster do {` | `for each enemies of caster in range 10 of caster order by var "hp" desc do {` |
+Selector clauses can now appear in **any order**:
 
-**Clause order**: `of <unit>` → `in range` → `order by` → `limit` → `do`
+```lbr
+# All valid!
+for each enemies of caster in range 4 of caster limit 2 do { ... }
+for each enemies limit 2 in range 4 of caster of caster do { ... }
+for each enemies in range 4 of caster order by var "hp" asc limit 1 do { ... }
+```
+
+**Enhanced Error Messages**:
+- Duplicate clause detection
+- Helpful suggestions for common mistakes
+- Clear syntax error locations with caret indicators
 
 📖 **Full DSL Guide**: [docs/lbr.zh-CN.md](docs/lbr.zh-CN.md) | [docs/lbr.en.md](docs/lbr.en.md)
 

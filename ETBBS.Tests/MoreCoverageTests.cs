@@ -36,7 +36,7 @@ public class MoreCoverageTests
         var action = new RemoveGlobalVar("temp");
         var se = new SkillExecutor();
         (s, _) = se.Execute(s, new[] { action });
-        Assert.False(s.Global.Vars.ContainsKey("temp"));
+        Assert.DoesNotContain("temp", s.Global.Vars.Keys);
     }
 
     [Fact]
@@ -48,7 +48,7 @@ public class MoreCoverageTests
         var action = new RemoveTileVar(pos, "marker");
         var se = new SkillExecutor();
         (s, _) = se.Execute(s, new[] { action });
-        Assert.False(s.Tiles[pos.X, pos.Y].Vars.ContainsKey("marker"));
+        Assert.DoesNotContain("marker", s.Tiles[pos.X, pos.Y].Vars.Keys);
     }
 
     [Fact]
@@ -59,7 +59,7 @@ public class MoreCoverageTests
         var action = new RemoveUnitVar("U1", "temp_buff");
         var se = new SkillExecutor();
         (s, _) = se.Execute(s, new[] { action });
-        Assert.False(s.Units["U1"].Vars.ContainsKey("temp_buff"));
+        Assert.DoesNotContain("temp_buff", s.Units["U1"].Vars.Keys);
     }
 
     [Fact]
@@ -188,7 +188,7 @@ public class MoreCoverageTests
         var cfgLocked = new ActionValidationConfig(CasterId: "C", CurrentDay: 3, CurrentPhase: 1);
         var valLocked = ActionValidators.ForSkillWithExtras(skill, cfgLocked, cooldownStore: null);
         (s, _) = se.ExecutePlan(s, skill.BuildPlan(new Context(s)), validator: valLocked);
-        Assert.False(s.Global.Vars.ContainsKey("ok"));
+        Assert.DoesNotContain("ok", s.Global.Vars.Keys);
 
         // At unlock: day 3 phase 2 -> allowed
         var cfgOpen = cfgLocked with { CurrentPhase = 2 };
@@ -210,7 +210,7 @@ public class MoreCoverageTests
         var cfgM = new ActionValidationConfig(CasterId: "C", TargetPos: new Coord(2, 2));
         var valM = ActionValidators.ForSkillWithExtras(skill, cfgM, null);
         (s, _) = se.ExecutePlan(s, skill.BuildPlan(new Context(s)), validator: valM);
-        Assert.False(s.Global.Vars.ContainsKey("hit"));
+        Assert.DoesNotContain("hit", s.Global.Vars.Keys);
 
         // Chebyshev: d=1 -> allowed
         var cfgC = cfgM with { DistanceMetric = DistanceMetric.Chebyshev };
@@ -243,7 +243,7 @@ public class MoreCoverageTests
         // Without multiplier raw = 5 + 5 - 0 = 10; double => 20
         s = new PhysicalDamage("B", "A", Power: 5).Compile()(s);
         Assert.Equal(20, (int)s.Units["A"].Vars[Keys.Hp]);
-        Assert.False(s.Units["B"].Vars.ContainsKey(Keys.NextAttackMultiplier));
+        Assert.DoesNotContain(Keys.NextAttackMultiplier, s.Units["B"].Vars.Keys);
     }
 
     [Fact]
@@ -313,7 +313,7 @@ public class MoreCoverageTests
         var se = new SkillExecutor();
         (s, _) = se.ExecutePlan(s, skill.BuildPlan(new Context(s)), validator: null);
         Assert.Equal(1, (int)Convert.ToInt32(s.Units["E1"].Vars["mark"]));
-        Assert.False(s.Units["E2"].Vars.ContainsKey("mark"));
+        Assert.DoesNotContain("mark", s.Units["E2"].Vars.Keys);
     }
 
     [Fact]
@@ -365,9 +365,9 @@ public class MoreCoverageTests
         (s, _) = se.ExecutePlan(s, skill.BuildPlan(new Context(s)), validator: null);
 
         // Only E2 (highest HP) should have the tag
-        Assert.False(s.Units["E1"].Tags.Contains("diagnosed"));
-        Assert.True(s.Units["E2"].Tags.Contains("diagnosed"));
-        Assert.False(s.Units["E3"].Tags.Contains("diagnosed"));
+        Assert.DoesNotContain("diagnosed", s.Units["E1"].Tags);
+        Assert.Contains("diagnosed", s.Units["E2"].Tags);
+        Assert.DoesNotContain("diagnosed", s.Units["E3"].Tags);
     }
 
     [Fact]
@@ -383,8 +383,8 @@ public class MoreCoverageTests
         (s, _) = se.ExecutePlan(s, skill.BuildPlan(new Context(s)), validator: null);
 
         // 100% chance should always execute 'then' branch
-        Assert.True(s.Global.Vars.ContainsKey("hit"));
-        Assert.False(s.Global.Vars.ContainsKey("miss"));
+        Assert.Contains("hit", s.Global.Vars.Keys);
+        Assert.DoesNotContain("miss", s.Global.Vars.Keys);
 
         // Test 0% chance
         s = WorldStateOps.WithGlobal(s, g => g with { Vars = g.Vars.Remove("hit").Remove("miss") });
@@ -393,8 +393,8 @@ public class MoreCoverageTests
         (s, _) = se.ExecutePlan(s, skill2.BuildPlan(new Context(s)), validator: null);
 
         // 0% chance should always execute 'else' branch
-        Assert.False(s.Global.Vars.ContainsKey("hit"));
-        Assert.True(s.Global.Vars.ContainsKey("miss"));
+        Assert.DoesNotContain("hit", s.Global.Vars.Keys);
+        Assert.Contains("miss", s.Global.Vars.Keys);
     }
 
     [Fact]
@@ -416,8 +416,8 @@ public class MoreCoverageTests
         var se = new SkillExecutor();
         (s, _) = se.ExecutePlan(s, skill.BuildPlan(new Context(s)), validator: null);
 
-        Assert.True(s.Global.Vars.ContainsKey("is_dragon"));
-        Assert.False(s.Global.Vars.ContainsKey("not_dragon"));
+        Assert.Contains("is_dragon", s.Global.Vars.Keys);
+        Assert.DoesNotContain("not_dragon", s.Global.Vars.Keys);
     }
 
     [Fact]
@@ -1056,7 +1056,7 @@ public class MoreCoverageTests
         var se = new SkillExecutor();
         (s, _) = se.Execute(s, new[] { action });
 
-        Assert.True(s.Global.Tags.Contains("apocalypse"));
+        Assert.Contains("apocalypse", s.Global.Tags);
     }
 
     [Fact]
@@ -1068,7 +1068,7 @@ public class MoreCoverageTests
         var se = new SkillExecutor();
         (s, _) = se.Execute(s, new[] { action });
 
-        Assert.True(s.Tiles[pos.X, pos.Y].Tags.Contains("fire"));
+        Assert.Contains("fire", s.Tiles[pos.X, pos.Y].Tags);
     }
 
     [Fact]
@@ -1080,7 +1080,7 @@ public class MoreCoverageTests
         var se = new SkillExecutor();
         (s, _) = se.Execute(s, new[] { action });
 
-        Assert.True(s.Units["U1"].Tags.Contains("blessed"));
+        Assert.Contains("blessed", s.Units["U1"].Tags);
     }
 
     [Fact]
@@ -1152,7 +1152,7 @@ public class MoreCoverageTests
         (s, _) = se.Execute(s, new[] { action });
 
         // Damage should heal instead
-        Assert.Equal(60, (int)s.Units["U"].Vars[Keys.Hp]);
+        Assert.Equal(60, s.Units["U"].GetIntVar(Keys.Hp));
     }
 
     [Fact]
@@ -1170,7 +1170,7 @@ public class MoreCoverageTests
         var se = new SkillExecutor();
         (s, _) = se.Execute(s, new[] { action });
 
-        Assert.Equal(100, (int)s.Units["U"].Vars[Keys.Hp]);
+        Assert.Equal(100, s.Units["U"].GetIntVar(Keys.Hp));
     }
 
     [Fact]
@@ -1196,8 +1196,8 @@ public class MoreCoverageTests
         (s, _) = se.Execute(s, new[] { action });
 
         // Damage should be reduced by resistance
-        var hp = (int)s.Units["T"].Vars[Keys.Hp];
-        Assert.True(hp > 80 && hp < 100); // Some damage reduction
+        var hp = s.Units["T"].GetIntVar(Keys.Hp);
+        Assert.InRange(hp, 81, 99); // Some damage reduction
     }
 
     [Fact]
@@ -1221,7 +1221,7 @@ public class MoreCoverageTests
         var se = new SkillExecutor();
         (s, _) = se.Execute(s, new[] { action });
 
-        var hp = (int)s.Units["T"].Vars[Keys.Hp];
+        var hp = s.Units["T"].GetIntVar(Keys.Hp);
         Assert.True(hp < 75); // More damage due to ignoring defense
     }
 
@@ -1250,8 +1250,8 @@ public class MoreCoverageTests
         var ts = new TurnSystem();
         (s, _) = ts.AdvanceTurn(s);
 
-        Assert.Equal(2, (int)s.Units["U"].Vars[Keys.UndyingTurns]);
-        Assert.True(s.Units["U"].Tags.Contains(Tags.Undying));
+        Assert.Equal(2, s.Units["U"].GetIntVar(Keys.UndyingTurns));
+        Assert.Contains(Tags.Undying, s.Units["U"].Tags);
     }
 
     [Fact]
@@ -1268,7 +1268,7 @@ public class MoreCoverageTests
         var ts = new TurnSystem();
         (s, _) = ts.AdvanceTurn(s);
 
-        Assert.False(s.Units["U"].Tags.Contains(Tags.Undying));
+        Assert.DoesNotContain(Tags.Undying, s.Units["U"].Tags);
     }
 
     [Fact]
@@ -1284,8 +1284,8 @@ public class MoreCoverageTests
         var ts = new TurnSystem();
         (s, _) = ts.AdvanceTurn(s);
 
-        Assert.Equal(1, (int)s.Units["U"].Vars[Keys.StunnedTurns]);
-        Assert.True(s.Units["U"].Tags.Contains(Tags.Stunned));
+        Assert.Equal(1, s.Units["U"].GetIntVar(Keys.StunnedTurns));
+        Assert.Contains(Tags.Stunned, s.Units["U"].Tags);
     }
 
     [Fact]
@@ -1303,8 +1303,8 @@ public class MoreCoverageTests
         var ts = new TurnSystem();
         (s, _) = ts.AdvanceTurn(s);
 
-        Assert.Equal(95, (int)s.Units["U"].Vars[Keys.Hp]);
-        Assert.Equal(1, (int)s.Units["U"].Vars[Keys.BleedTurns]);
+        Assert.Equal(95, s.Units["U"].GetIntVar(Keys.Hp));
+        Assert.Equal(1, s.Units["U"].GetIntVar(Keys.BleedTurns));
     }
 
     [Fact]
@@ -1322,8 +1322,8 @@ public class MoreCoverageTests
         var ts = new TurnSystem();
         (s, _) = ts.AdvanceTurn(s);
 
-        Assert.Equal(97, (int)s.Units["U"].Vars[Keys.Hp]);
-        Assert.Equal(2, (int)s.Units["U"].Vars[Keys.BurnTurns]);
+        Assert.Equal(97, s.Units["U"].GetIntVar(Keys.Hp));
+        Assert.Equal(2, s.Units["U"].GetIntVar(Keys.BurnTurns));
     }
 
     [Fact]
@@ -1340,7 +1340,7 @@ public class MoreCoverageTests
         var ts = new TurnSystem();
         (s, _) = ts.AdvanceTurn(s);
 
-        Assert.Equal(60, (int)s.Units["U"].Vars[Keys.Mp]);
+        Assert.Equal(60, s.Units["U"].GetIntVar(Keys.Mp));
     }
 
     [Fact]
@@ -1357,7 +1357,7 @@ public class MoreCoverageTests
         var ts = new TurnSystem();
         (s, _) = ts.AdvanceTurn(s);
 
-        Assert.Equal(55, (int)s.Units["U"].Vars[Keys.Hp]);
+        Assert.Equal(55, s.Units["U"].GetIntVar(Keys.Hp));
     }
 
     [Fact]
@@ -1374,7 +1374,7 @@ public class MoreCoverageTests
         var ts = new TurnSystem();
         (s, _) = ts.AdvanceTurn(s);
 
-        Assert.Equal(100, (int)s.Units["U"].Vars[Keys.Mp]);
+        Assert.Equal(100, s.Units["U"].GetIntVar(Keys.Mp));
     }
 
     [Fact]
@@ -1386,7 +1386,7 @@ public class MoreCoverageTests
         var ts = new TurnSystem();
         (s, _) = ts.AdvanceTurn(s);
 
-        Assert.Equal(2, (int)s.Global.Vars[Keys.ReverseHealTurnsGlobal]);
+        Assert.Equal(2, TypeConversion.GetIntFrom(s.Global.Vars, Keys.ReverseHealTurnsGlobal, 0));
     }
 
     [Fact]
@@ -1398,7 +1398,7 @@ public class MoreCoverageTests
         var ts = new TurnSystem();
         (s, _) = ts.AdvanceTurn(s);
 
-        Assert.False(s.Global.Vars.ContainsKey(Keys.ReverseHealTurnsGlobal));
+        Assert.DoesNotContain(Keys.ReverseHealTurnsGlobal, s.Global.Vars.Keys);
     }
 
     [Fact]
@@ -1414,7 +1414,7 @@ public class MoreCoverageTests
         var ts = new TurnSystem();
         (s, _) = ts.AdvanceTurn(s);
 
-        var resist = (double)s.Units["U"].Vars["resist_magic"];
+        var resist = TypeConversion.GetDoubleFrom(s.Units["U"].Vars, "resist_magic", 0.0);
         Assert.True(Math.Abs(resist - 0.15) < 0.001);
     }
 
@@ -1431,8 +1431,7 @@ public class MoreCoverageTests
         var ts = new TurnSystem();
         (s, _) = ts.AdvanceTurn(s);
 
-        var resist = (double)s.Units["U"].Vars["resist_magic"];
+        var resist = TypeConversion.GetDoubleFrom(s.Units["U"].Vars, "resist_magic", 0.0);
         Assert.True(resist <= 1.0); // Should be clamped to max 1.0
     }
 }
-

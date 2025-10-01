@@ -48,13 +48,22 @@ public static partial class TextDsl
                 prog.Cooldown = ParseInt();
                 return true;
             }
+            if (TryKeyword("distance"))
+            {
+                if (TryKeyword("manhattan")) prog.Distance = "manhattan";
+                else if (TryKeyword("chebyshev")) prog.Distance = "chebyshev";
+                else if (TryKeyword("euclidean")) prog.Distance = "euclidean";
+                else throw Error("unknown distance metric");
+                return true;
+            }
             if (TryKeyword("targeting"))
             {
                 if (TryKeyword("any")) prog.Targeting = "any";
                 else if (TryKeyword("enemies")) prog.Targeting = "enemies";
                 else if (TryKeyword("allies")) prog.Targeting = "allies";
                 else if (TryKeyword("self")) prog.Targeting = "self";
-                else if (TryKeyword("tile") || TryKeyword("point")) prog.Targeting = "tile";
+                else if (TryKeyword("tile")) { prog.Targeting = "tile"; prog.TargetMode = "tile"; }
+                else if (TryKeyword("point")) { prog.Targeting = "tile"; prog.TargetMode = "point"; }
                 else throw Error("unknown targeting mode");
                 return true;
             }
@@ -105,7 +114,7 @@ public static partial class TextDsl
         private BlockStmt ParseBlock()
         {
             Expect('{');
-            var blk = new BlockStmt();
+            var blk = new BlockStmt(); blk.Pos = _pos;
             SkipWs();
             while (!Eof() && Peek() != '}')
             {
@@ -120,39 +129,43 @@ public static partial class TextDsl
         private IStmt ParseIf()
         {
             // already consumed 'if'
+            var pos = _pos;
             var cond = ParseCond();
             RequireKeyword("then");
             var thenSt = ParseActionOrBlock();
             IStmt? elseSt = null;
             if (TryKeyword("else")) elseSt = ParseActionOrBlock();
-            return new IfStmt { Cond = cond, Then = thenSt, Else = elseSt };
+            return new IfStmt { Pos = pos, Cond = cond, Then = thenSt, Else = elseSt };
         }
 
         private IStmt ParseChance()
         {
             // chance <P>% then <stmt> [else <stmt>]
+            var node = new ChanceStmt(); node.Pos = _pos;
             var p = ParsePercent();
             RequireKeyword("then");
             var thenSt = ParseActionOrBlock();
             IStmt? elseSt = null;
             if (TryKeyword("else")) elseSt = ParseActionOrBlock();
-            return new ChanceStmt { Probability = p, Then = thenSt, Else = elseSt };
+            node.Probability = p; node.Then = thenSt; node.Else = elseSt; return node;
         }
 
         private IStmt ParseRepeat()
         {
             // already consumed 'repeat'
+            var node = new RepeatStmt(); node.Pos = _pos;
             var n = ParseInt();
             RequireKeyword("times");
             var body = ParseActionOrBlock();
-            return new RepeatStmt { Times = n, Body = body };
+            node.Times = n; node.Body = body; return node;
         }
 
         private IStmt ParseParallel()
         {
             // already consumed 'parallel'
+            var pos = _pos;
             var blk = ParseBlock();
-            var ps = new ParallelStmt();
+            var ps = new ParallelStmt(); ps.Pos = pos;
             ps.Branches.AddRange(blk.Items);
             return ps;
         }
@@ -160,65 +173,163 @@ public static partial class TextDsl
         private IStmt ParseForEach()
         {
             // already consumed 'for'
+            var pos = _pos;
             RequireKeyword("each");
             var sel = ParseSelector();
             var parallel = TryKeyword("in") && RequireKeyword("parallel");
             RequireKeyword("do");
             var body = ParseActionOrBlock();
-            return new ForEachStmt { Selector = sel, Parallel = parallel, Body = body };
+            return new ForEachStmt { Pos = pos, Selector = sel, Parallel = parallel, Body = body };
+        }
+
+        private CombinedSelector ParseCombinedSelector(CombinedSelector.BaseKind kind)
+        {
+            var sel = new CombinedSelector { Kind = kind };
+            bool hasOf = false, hasRange = false, hasWithTag = false, hasWithVar = false, hasOrder = false, hasLimit = false;
+
+            // Parse clauses in any order
+            while (true)
+            {
+                var save = _pos;
+
+                // Try "of <unit>"
+                if (TryKeyword("of"))
+                {
+                    if (hasOf) throw Error($"duplicate 'of' clause in selector");
+                    sel.OfUnit = ParseUnitRef();
+                    hasOf = true;
+                    continue;
+                }
+
+                // Try shapes/range clauses: in circle/cross/line/cone OR in range N of <unit|point> OR within/around N of <unit|point>
+                // (disambiguate from 'in parallel')
+                bool consumedIn = TryKeyword("in");
+                bool consumedWithin = !consumedIn && TryKeyword("within");
+                bool consumedAround = !consumedIn && !consumedWithin && TryKeyword("around");
+
+                if (consumedIn || consumedWithin || consumedAround)
+                {
+                    // First: shape forms
+                    if (consumedIn && TryKeyword("circle"))
+                    {
+                        if (hasRange) throw Error($"duplicate range/shape clause in selector");
+                        sel.Shape = CombinedSelector.ShapeKind.Circle; sel.Range = ParseInt();
+                        if (TryKeyword("of")) { if (TryKeyword("point")) sel.RangeFromPoint = true; else sel.RangeOrigin = ParseUnitRef(); } else sel.RangeOrigin = new UnitRefCaster();
+                        hasRange = true; continue;
+                    }
+                    if (consumedIn && TryKeyword("cross"))
+                    {
+                        if (hasRange) throw Error($"duplicate range/shape clause in selector");
+                        sel.Shape = CombinedSelector.ShapeKind.Cross; sel.Range = ParseInt();
+                        if (TryKeyword("of")) { if (TryKeyword("point")) sel.RangeFromPoint = true; else sel.RangeOrigin = ParseUnitRef(); } else sel.RangeOrigin = new UnitRefCaster();
+                        hasRange = true; continue;
+                    }
+                    if (consumedIn && TryKeyword("line"))
+                    {
+                        if (hasRange) throw Error($"duplicate range/shape clause in selector");
+                        sel.Shape = CombinedSelector.ShapeKind.Line; RequireKeyword("length"); sel.Length = ParseInt(); if (TryKeyword("width")) sel.Width = ParseInt();
+                        if (TryKeyword("of")) { if (TryKeyword("point")) sel.RangeFromPoint = true; else sel.RangeOrigin = ParseUnitRef(); } else sel.RangeOrigin = new UnitRefCaster();
+                        if (TryKeyword("dir")) sel.Dir = ParseString(); hasRange = true; continue;
+                    }
+                    if (consumedIn && (TryKeyword("cone") || TryKeyword("sector")))
+                    {
+                        if (hasRange) throw Error($"duplicate range/shape clause in selector");
+                        sel.Shape = CombinedSelector.ShapeKind.Cone; RequireKeyword("radius"); sel.Range = ParseInt(); if (TryKeyword("angle")) sel.AngleDeg = ParseInt();
+                        if (TryKeyword("of")) { if (TryKeyword("point")) sel.RangeFromPoint = true; else sel.RangeOrigin = ParseUnitRef(); } else sel.RangeOrigin = new UnitRefCaster();
+                        if (TryKeyword("dir")) sel.Dir = ParseString(); hasRange = true; continue;
+                    }
+
+                    // Fallback: in range/within/around
+                    bool isRangeClause = consumedWithin || consumedAround || (consumedIn && TryKeyword("range"));
+                    if (isRangeClause)
+                    {
+                        if (hasRange) throw Error($"duplicate range clause in selector");
+                        sel.Range = ParseInt();
+
+                        // "of <unit|point>" is optional - defaults to caster if omitted
+                        if (TryKeyword("of"))
+                        {
+                            if (TryKeyword("point")) sel.RangeFromPoint = true;
+                            else sel.RangeOrigin = ParseUnitRef();
+                        }
+                        else
+                        {
+                            // Default to caster
+                            sel.RangeOrigin = new UnitRefCaster();
+                        }
+                        hasRange = true;
+                        continue;
+                    }
+                    else
+                    {
+                        _pos = save; // not a shape/range clause, backtrack (might be 'in parallel')
+                        break;
+                    }
+                }
+
+                // Try "with tag <string>"
+                if (TryKeyword("with"))
+                {
+                    if (TryKeyword("tag"))
+                    {
+                        if (hasWithTag) throw Error($"duplicate 'with tag' clause in selector");
+                        sel.TagFilter = ParseString();
+                        hasWithTag = true;
+                        continue;
+                    }
+                    else if (TryKeyword("var"))
+                    {
+                        if (hasWithVar) throw Error($"duplicate 'with var' clause in selector");
+                        sel.VarKey = ParseString();
+                        sel.VarOp = ParseOp();
+                        sel.VarValue = ParseInt();
+                        hasWithVar = true;
+                        continue;
+                    }
+                    else
+                    {
+                        throw Error("expected 'tag' or 'var' after 'with'");
+                    }
+                }
+
+                // Try "order by var <key> [asc|desc]"
+                if (TryKeyword("order"))
+                {
+                    if (hasOrder) throw Error($"duplicate 'order by' clause in selector");
+                    RequireKeyword("by");
+                    RequireKeyword("var");
+                    sel.VarOrderKey = ParseString();
+                    sel.VarOrderDesc = TryKeyword("desc");
+                    if (!sel.VarOrderDesc) TryKeyword("asc");
+                    hasOrder = true;
+                    continue;
+                }
+
+                // Try "limit N"
+                if (TryKeyword("limit"))
+                {
+                    if (hasLimit) throw Error($"duplicate 'limit' clause in selector");
+                    sel.Limit = ParseInt();
+                    hasLimit = true;
+                    continue;
+                }
+
+                // No more recognized clauses
+                break;
+            }
+
+            return sel;
         }
 
         private SelectorExpr ParseSelector()
         {
             if (TryKeyword("enemies"))
             {
-                var sel = new CombinedSelector { Kind = CombinedSelector.BaseKind.Enemies };
-                if (TryKeyword("of")) sel.OfUnit = ParseUnitRef();
-                // Disambiguate 'in range' vs. outer 'in parallel'
-                {
-                    var save = _pos;
-                    if (TryKeyword("in"))
-                    {
-                        if (TryKeyword("range"))
-                        {
-                            sel.Range = ParseInt(); RequireKeyword("of"); if (TryKeyword("point")) sel.RangeFromPoint = true; else sel.RangeOrigin = ParseUnitRef();
-                        }
-                        else
-                        {
-                            _pos = save; // not an in-range clause; leave 'in' for caller (e.g., 'in parallel')
-                        }
-                    }
-                }
-                if (TryKeyword("with")) { RequireKeyword("tag"); sel.TagFilter = ParseString(); }
-                if (TryKeyword("with")) { RequireKeyword("var"); sel.VarKey = ParseString(); sel.VarOp = ParseOp(); sel.VarValue = ParseInt(); }
-                if (TryKeyword("order")) { RequireKeyword("by"); RequireKeyword("var"); sel.VarOrderKey = ParseString(); sel.VarOrderDesc = TryKeyword("desc"); if (!sel.VarOrderDesc) { sel.VarOrderDesc = false; TryKeyword("asc"); } }
-                if (TryKeyword("limit")) sel.Limit = ParseInt();
-                return sel;
+                return ParseCombinedSelector(CombinedSelector.BaseKind.Enemies);
             }
             if (TryKeyword("allies"))
             {
-                var sel = new CombinedSelector { Kind = CombinedSelector.BaseKind.Allies };
-                if (TryKeyword("of")) sel.OfUnit = ParseUnitRef();
-                // Disambiguate 'in range' vs. outer 'in parallel'
-                {
-                    var save = _pos;
-                    if (TryKeyword("in"))
-                    {
-                        if (TryKeyword("range"))
-                        {
-                            sel.Range = ParseInt(); RequireKeyword("of"); if (TryKeyword("point")) sel.RangeFromPoint = true; else sel.RangeOrigin = ParseUnitRef();
-                        }
-                        else
-                        {
-                            _pos = save;
-                        }
-                    }
-                }
-                if (TryKeyword("with")) { RequireKeyword("tag"); sel.TagFilter = ParseString(); }
-                if (TryKeyword("with")) { RequireKeyword("var"); sel.VarKey = ParseString(); sel.VarOp = ParseOp(); sel.VarValue = ParseInt(); }
-                if (TryKeyword("order")) { RequireKeyword("by"); RequireKeyword("var"); sel.VarOrderKey = ParseString(); sel.VarOrderDesc = TryKeyword("desc"); if (!sel.VarOrderDesc) { sel.VarOrderDesc = false; TryKeyword("asc"); } }
-                if (TryKeyword("limit")) sel.Limit = ParseInt();
-                return sel;
+                return ParseCombinedSelector(CombinedSelector.BaseKind.Allies);
             }
             if (TryKeyword("units"))
             {
@@ -232,6 +343,35 @@ public static partial class TextDsl
                 if (TryKeyword("order")) { RequireKeyword("by"); RequireKeyword("var"); sel.VarOrderKey = ParseString(); sel.VarOrderDesc = TryKeyword("desc"); if (!sel.VarOrderDesc) { sel.VarOrderDesc = false; TryKeyword("asc"); } }
                 if (TryKeyword("limit")) sel.Limit = ParseInt();
                 return sel;
+            }
+            if (TryKeyword("in"))
+            {
+                // Standalone shape selector: in circle/cross/line/cone ... of <unit|point>
+                if (TryKeyword("circle"))
+                {
+                    var sel = new CombinedSelector { Kind = CombinedSelector.BaseKind.Units, Shape = CombinedSelector.ShapeKind.Circle };
+                    sel.Range = ParseInt(); RequireKeyword("of"); if (TryKeyword("point")) sel.RangeFromPoint = true; else sel.RangeOrigin = ParseUnitRef();
+                    return sel;
+                }
+                if (TryKeyword("cross"))
+                {
+                    var sel = new CombinedSelector { Kind = CombinedSelector.BaseKind.Units, Shape = CombinedSelector.ShapeKind.Cross };
+                    sel.Range = ParseInt(); RequireKeyword("of"); if (TryKeyword("point")) sel.RangeFromPoint = true; else sel.RangeOrigin = ParseUnitRef();
+                    return sel;
+                }
+                if (TryKeyword("line"))
+                {
+                    var sel = new CombinedSelector { Kind = CombinedSelector.BaseKind.Units, Shape = CombinedSelector.ShapeKind.Line };
+                    RequireKeyword("length"); sel.Length = ParseInt(); if (TryKeyword("width")) sel.Width = ParseInt(); RequireKeyword("of"); if (TryKeyword("point")) sel.RangeFromPoint = true; else sel.RangeOrigin = ParseUnitRef(); if (TryKeyword("dir")) sel.Dir = ParseString();
+                    return sel;
+                }
+                if (TryKeyword("cone") || TryKeyword("sector"))
+                {
+                    var sel = new CombinedSelector { Kind = CombinedSelector.BaseKind.Units, Shape = CombinedSelector.ShapeKind.Cone };
+                    RequireKeyword("radius"); sel.Range = ParseInt(); if (TryKeyword("angle")) sel.AngleDeg = ParseInt(); RequireKeyword("of"); if (TryKeyword("point")) sel.RangeFromPoint = true; else sel.RangeOrigin = ParseUnitRef(); if (TryKeyword("dir")) sel.Dir = ParseString();
+                    return sel;
+                }
+                throw Error("unknown shape after 'in'");
             }
             if (TryKeyword("nearest"))
             {
@@ -276,12 +416,82 @@ public static partial class TextDsl
                 }
                 throw Error("farthest expects allies|enemies");
             }
-            throw Error("unknown selector");
+            if (TryKeyword("random"))
+            {
+                SkipWs();
+                int? n = null; if (!Eof() && char.IsDigit(Peek())) n = ParseInt();
+                SkipWs();
+                if (TryKeyword("enemies"))
+                {
+                    var sel = new CombinedSelector { Kind = CombinedSelector.BaseKind.Enemies, RandomSelect = true };
+                    if (TryKeyword("of")) sel.OfUnit = ParseUnitRef();
+                    sel.Limit = n;
+                    return sel;
+                }
+                if (TryKeyword("allies"))
+                {
+                    var sel = new CombinedSelector { Kind = CombinedSelector.BaseKind.Allies, RandomSelect = true };
+                    if (TryKeyword("of")) sel.OfUnit = ParseUnitRef();
+                    sel.Limit = n;
+                    return sel;
+                }
+                if (TryKeyword("units"))
+                {
+                    var sel = new CombinedSelector { Kind = CombinedSelector.BaseKind.Units, RandomSelect = true };
+                    sel.Limit = n;
+                    return sel;
+                }
+                throw Error("random expects allies|enemies|units");
+            }
+            if (TryKeyword("healthiest"))
+            {
+                SkipWs();
+                int? n = null; if (!Eof() && char.IsDigit(Peek())) n = ParseInt();
+                SkipWs();
+                if (TryKeyword("enemies"))
+                {
+                    var sel = new CombinedSelector { Kind = CombinedSelector.BaseKind.Enemies, HealthiestSelect = true };
+                    if (TryKeyword("of")) sel.OfUnit = ParseUnitRef();
+                    sel.Limit = n ?? 1;
+                    return sel;
+                }
+                if (TryKeyword("allies"))
+                {
+                    var sel = new CombinedSelector { Kind = CombinedSelector.BaseKind.Allies, HealthiestSelect = true };
+                    if (TryKeyword("of")) sel.OfUnit = ParseUnitRef();
+                    sel.Limit = n ?? 1;
+                    return sel;
+                }
+                throw Error("healthiest expects allies|enemies");
+            }
+            if (TryKeyword("weakest"))
+            {
+                SkipWs();
+                int? n = null; if (!Eof() && char.IsDigit(Peek())) n = ParseInt();
+                SkipWs();
+                if (TryKeyword("enemies"))
+                {
+                    var sel = new CombinedSelector { Kind = CombinedSelector.BaseKind.Enemies, WeakestSelect = true };
+                    if (TryKeyword("of")) sel.OfUnit = ParseUnitRef();
+                    sel.Limit = n ?? 1;
+                    return sel;
+                }
+                if (TryKeyword("allies"))
+                {
+                    var sel = new CombinedSelector { Kind = CombinedSelector.BaseKind.Allies, WeakestSelect = true };
+                    if (TryKeyword("of")) sel.OfUnit = ParseUnitRef();
+                    sel.Limit = n ?? 1;
+                    return sel;
+                }
+                throw Error("weakest expects allies|enemies");
+            }
+            throw ErrorWithSuggestion("unknown selector",
+                "Expected one of: enemies, allies, units, nearest, farthest, random, healthiest, weakest");
         }
 
         private CondExpr ParseCond()
         {
-            // <unitRef> has tag "x" | <unitRef> mp OP int
+            // <unitRef> has tag "x" | <unitRef> mp OP int | <unitRef> hp OP int | <unitRef> var "key" OP int
             var u = ParseUnitRef();
             if (TryKeyword("has"))
             {
@@ -293,7 +503,18 @@ public static partial class TextDsl
                 var op = ParseOp(); var n = ParseInt();
                 return new MpCompareCond { Unit = u, Op = op, Value = n };
             }
-            throw Error("unsupported condition");
+            if (TryKeyword("hp"))
+            {
+                var op = ParseOp(); var n = ParseInt();
+                return new HpCompareCond { Unit = u, Op = op, Value = n };
+            }
+            if (TryKeyword("var"))
+            {
+                var key = ParseString(); var op = ParseOp(); var n = ParseInt();
+                return new VarCompareCond { Unit = u, Key = key, Op = op, Value = n };
+            }
+            throw ErrorWithSuggestion("unsupported condition",
+                "Expected: <unit> has tag \"...\", <unit> mp/hp/var \"...\" OP value");
         }
 
         private ActionStmt ParseAction()
@@ -434,7 +655,8 @@ public static partial class TextDsl
                     return new ActionStmt { Kind = ActionKind.SetUnitVar, KeyArg = key, ValueArg = val, Target = ur };
                 }
             }
-            throw Error("unknown action");
+            throw ErrorWithSuggestion("unknown action",
+                "Expected one of: deal, heal, add, remove, move, dash, line, consume, set");
         }
 
         private UnitRef ParseUnitRefInParensOptional()
@@ -454,7 +676,8 @@ public static partial class TextDsl
                 RequireKeyword("id"); var id = ParseString();
                 return new UnitRefById { Id = id };
             }
-            throw Error("unknown unit reference");
+            throw ErrorWithSuggestion("unknown unit reference",
+                "Expected one of: caster, target, it, unit id \"...\"");
         }
 
         private Coord ParseCoord()
@@ -465,21 +688,56 @@ public static partial class TextDsl
 
         private object ParseValue()
         {
-            // support simple additive expressions: <primary> (('+'|'-') <primary>)*
-            object left = ParsePrimaryValue();
+            return ParseAdditiveExpr();
+        }
+
+        private object ParseAdditiveExpr()
+        {
+            // <multiplicative> (('+' | '-') <multiplicative>)*
+            object left = ParseMultiplicativeExpr();
             while (true)
             {
                 SkipWs();
                 if (TryConsume("+"))
                 {
-                    var right = ParsePrimaryValue();
+                    var right = ParseMultiplicativeExpr();
                     left = new ArithExpr { Left = left, Right = right, Op = '+' };
                     continue;
                 }
                 if (TryConsume("-"))
                 {
-                    var right = ParsePrimaryValue();
+                    var right = ParseMultiplicativeExpr();
                     left = new ArithExpr { Left = left, Right = right, Op = '-' };
+                    continue;
+                }
+                break;
+            }
+            return left;
+        }
+
+        private object ParseMultiplicativeExpr()
+        {
+            // <primary> (('*' | '/' | '%') <primary>)*
+            object left = ParsePrimaryValue();
+            while (true)
+            {
+                SkipWs();
+                if (TryConsume("*"))
+                {
+                    var right = ParsePrimaryValue();
+                    left = new ArithExpr { Left = left, Right = right, Op = '*' };
+                    continue;
+                }
+                if (TryConsume("/"))
+                {
+                    var right = ParsePrimaryValue();
+                    left = new ArithExpr { Left = left, Right = right, Op = '/' };
+                    continue;
+                }
+                if (TryConsume("%"))
+                {
+                    var right = ParsePrimaryValue();
+                    left = new ArithExpr { Left = left, Right = right, Op = '%' };
                     continue;
                 }
                 break;
@@ -490,14 +748,65 @@ public static partial class TextDsl
         private object ParsePrimaryValue()
         {
             SkipWs();
-            if (Match("true")) return true; if (Match("false")) return false;
+
+            // Parentheses for grouping
+            if (TryConsume("("))
+            {
+                var val = ParseValue();
+                Expect(')');
+                return val;
+            }
+
+            // Boolean literals
+            if (Match("true")) return true;
+            if (Match("false")) return false;
+
+            // Function calls: min(...), max(...), abs(...), etc.
+            var fn = TryParseFunctionCall();
+            if (fn is not null) return fn;
+
+            // Variable reference
             if (TryKeyword("var"))
             {
                 var key = ParseString(); RequireKeyword("of"); var ur = ParseUnitRef();
                 return new VarRef { Key = key, Unit = ur };
             }
+
+            // String literal
             if (Peek() == '"') return ParseString();
+
+            // Numeric literal
             return ParseNumber();
+        }
+
+        private FunctionCall? TryParseFunctionCall()
+        {
+            SkipWs();
+            string[] names = new[] { "min", "max", "abs", "floor", "ceil", "round" };
+            foreach (var n in names)
+            {
+                var save = _pos;
+                if (TryConsume(n))
+                {
+                    SkipWs();
+                    if (TryConsume("("))
+                    {
+                        var args = new List<object>();
+                        SkipWs();
+                        if (!TryConsume(")"))
+                        {
+                            while (true)
+                            {
+                                var v = ParseValue(); args.Add(v);
+                                SkipWs(); if (TryConsume(")")) break; Expect(',');
+                            }
+                        }
+                        return new FunctionCall { Name = n, Args = args };
+                    }
+                }
+                _pos = save;
+            }
+            return null;
         }
 
         private string ParseOp()
@@ -655,6 +964,11 @@ public static partial class TextDsl
 
         private Exception Error(string message)
         {
+            return ErrorWithSuggestion(message, null);
+        }
+
+        private Exception ErrorWithSuggestion(string message, string? suggestion)
+        {
             var (line, col, lineText) = GetLineCol(_pos);
             // Guard against over-long lines for display
             const int maxLen = 160;
@@ -669,6 +983,10 @@ public static partial class TextDsl
             }
             var caret = new string(' ', Math.Max(0, displayCol - 1)) + '^';
             var msg = $"DSL parse error at line {line}, column {col}: {message}\n  {lineText}\n  {caret}";
+            if (!string.IsNullOrEmpty(suggestion))
+            {
+                msg += $"\n\nSuggestion: {suggestion}";
+            }
             return new FormatException(msg);
         }
     }

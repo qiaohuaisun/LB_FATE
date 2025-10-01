@@ -14,7 +14,7 @@ public class ErrorMessageTests
         try
         {
             _ = LbrLoader.Load(text);
-            Assert.True(false, "Expected a FormatException");
+            Assert.Fail("Expected a FormatException");
         }
         catch (FormatException ex)
         {
@@ -32,7 +32,7 @@ public class ErrorMessageTests
         try
         {
             _ = TextDsl.FromText("S", script, opts);
-            Assert.True(false, "Expected a FormatException");
+            Assert.Fail("Expected a FormatException");
         }
         catch (FormatException ex)
         {
@@ -42,4 +42,3 @@ public class ErrorMessageTests
         }
     }
 }
-

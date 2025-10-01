@@ -73,7 +73,7 @@ public class ValidationAndDslTests
         var cfgBad = new ActionValidationConfig(CasterId: "C", TargetUnitId: "X", TeamOfUnit: new Dictionary<string, string> { { "C", "T" }, { "X", "T2" } }, CurrentTurn: 0);
         var valBad = ActionValidators.ForSkillWithExtras(skill, cfgBad, null);
         (s, _) = se.ExecutePlan(s, skill.BuildPlan(new Context(s)), validator: valBad);
-        Assert.False(s.Global.Vars.ContainsKey("ok"));
+        Assert.DoesNotContain("ok", s.Global.Vars.Keys);
     }
 
     [Fact]

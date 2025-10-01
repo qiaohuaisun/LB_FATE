@@ -440,9 +440,29 @@ partial class Game
                 {
                     // Broadcast turn start banner (not added to log to avoid duplication)
                     BroadcastBanner("", "╔═══════════════════════════════════════════════════════════════╗", $"║  ⚔️  【{bossName}】的回合开始  ⚔️  ", "╚═══════════════════════════════════════════════════════════════╝", "");
+                    // Play turn start quote
+                    if (roleOf.TryGetValue(pid, out var bossRole))
+                    {
+                        var quote = ETBBS.RoleQuotes.GetRandom(bossRole.Quotes.OnTurnStart, rng);
+                        if (!string.IsNullOrEmpty(quote))
+                        {
+                            AppendPublic(new[] { $"💬 【{bossName}】：\"{quote}\"" });
+                        }
+                    }
                     BroadcastBoard(day, phase);
                     bool done = TryExecuteBossAiScript(pid, phase, day);
                     if (!done) RunBossAiTurn(pid, phase, day);
+                    // Check HP threshold quotes after actions
+                    CheckHpThresholdQuotes(pid);
+                    // Play turn end quote
+                    if (roleOf.TryGetValue(pid, out bossRole))
+                    {
+                        var quote = ETBBS.RoleQuotes.GetRandom(bossRole.Quotes.OnTurnEnd, rng);
+                        if (!string.IsNullOrEmpty(quote))
+                        {
+                            AppendPublic(new[] { $"💬 【{bossName}】：\"{quote}\"" });
+                        }
+                    }
                     // Broadcast turn end banner
                     BroadcastBanner("", "╔═══════════════════════════════════════════════════════════════╗", $"║  ⚔️  【{bossName}】的回合结束  ⚔️  ", "╚═══════════════════════════════════════════════════════════════╝", "");
                     BroadcastBoard(day, phase);
@@ -897,6 +917,17 @@ partial class Game
         var se = new SkillExecutor();
 
         string targetDesc = tid is not null ? tid : (usePoint ? $"{point}" : "无目标");
+
+        // Play skill quote if available
+        if (role != null && role.Quotes.OnSkill.TryGetValue(s.Name, out var skillQuotes))
+        {
+            var quote = ETBBS.RoleQuotes.GetRandom(skillQuotes, rng);
+            if (!string.IsNullOrEmpty(quote))
+            {
+                AppendPublic(new[] { $"💬 【{bossName}】：\"{quote}\"" });
+            }
+        }
+
         AppendPublic(new[] { $"【{bossName}】{s.Name} → {targetDesc}" });
 
         (state, var log) = se.ExecutePlan(state, plan, validator);
@@ -1067,6 +1098,17 @@ partial class Game
                         if (validator(new Context(state), batch, out var _))
                         {
                             var se = new SkillExecutor();
+
+                            // Play skill quote if available
+                            if (role.Quotes.OnSkill.TryGetValue(s.Name, out var skillQuotes))
+                            {
+                                var quote = ETBBS.RoleQuotes.GetRandom(skillQuotes, rng);
+                                if (!string.IsNullOrEmpty(quote))
+                                {
+                                    AppendPublic(new[] { $"💬 【{bossName}】：\"{quote}\"" });
+                                }
+                            }
+
                             AppendPublic(new[] { $"【{bossName}】{s.Name} → {nearestId}" });
 
                             (state, var log) = se.ExecutePlan(state, plan, validator);
@@ -1224,5 +1266,49 @@ partial class Game
             if (d <= range) set.Add(pos);
         }
         return set;
+    }
+
+    /// <summary>
+    /// Check if HP has crossed any thresholds and trigger corresponding quotes.
+    /// Only triggers each threshold once per unit.
+    /// </summary>
+    private void CheckHpThresholdQuotes(string unitId)
+    {
+        if (!roleOf.TryGetValue(unitId, out var role)) return;
+        if (role.Quotes.OnHpBelow.IsEmpty) return;
+
+        int currentHp = GetInt(unitId, Keys.Hp, 0);
+        int maxHp = GetInt(unitId, Keys.MaxHp, 1);
+        if (maxHp <= 0) return;
+
+        double currentHpPct = (double)currentHp / maxHp;
+
+        // Get or create triggered set for this unit
+        if (!triggeredHpThresholds.TryGetValue(unitId, out var triggered))
+        {
+            triggered = new HashSet<double>();
+            triggeredHpThresholds[unitId] = triggered;
+        }
+
+        // Check all thresholds in descending order (highest first)
+        var thresholds = role.Quotes.OnHpBelow.Keys.OrderByDescending(t => t).ToList();
+        foreach (var threshold in thresholds)
+        {
+            // If HP is below threshold and we haven't triggered this threshold yet
+            if (currentHpPct <= threshold && !triggered.Contains(threshold))
+            {
+                var quotes = role.Quotes.OnHpBelow[threshold];
+                var quote = ETBBS.RoleQuotes.GetRandom(quotes, rng);
+                if (!string.IsNullOrEmpty(quote))
+                {
+                    var unitName = unitId == bossId ? bossName : unitId;
+                    AppendPublic(new[] { $"💬 【{unitName}】：\"{quote}\"" });
+                }
+                // Mark this threshold as triggered
+                triggered.Add(threshold);
+                // Only trigger one threshold per check
+                break;
+            }
+        }
     }
 }

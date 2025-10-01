@@ -152,11 +152,33 @@ public static class ActionValidators
                 }
             };
         }
+        // Non-unit targeting mode (tile/point) => disable team targeting rule
+        if (skill.Extras.TryGetValue("target_mode", out var tm) && tm is string tms)
+        {
+            var mode = tms.ToLowerInvariant();
+            if (mode == "tile" || mode == "point")
+            {
+                cfg = cfg with { Targeting = TargetingMode.None };
+            }
+        }
         if (skill.Extras.TryGetValue("cooldown", out var cdObj) && cdObj is int cd && cooldownStore is not null)
         {
             cfg = cfg with { CooldownTurns = cd };
         }
         var baseValidator = ForSkill(skill, cfg, cooldownStore);
+        // distance metric override
+        if (skill.Extras.TryGetValue("distance", out var distVal) && distVal is string dm)
+        {
+            var dml = dm.ToLowerInvariant();
+            var metric = dml switch
+            {
+                "manhattan" => DistanceMetric.Manhattan,
+                "chebyshev" => DistanceMetric.Chebyshev,
+                "euclidean" => DistanceMetric.Euclidean,
+                _ => cfg.DistanceMetric
+            };
+            cfg = cfg with { DistanceMetric = metric };
+        }
         // min_range: target must be at least this far
         if (skill.Extras.TryGetValue("min_range", out var mrObj) && mrObj is int minr && minr > 0)
         {
@@ -368,4 +390,3 @@ public static class ActionValidators
             _ => Math.Abs(a.X - b.X) + Math.Abs(a.Y - b.Y)
         };
 }
-

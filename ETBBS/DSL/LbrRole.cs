@@ -26,6 +26,9 @@ public sealed class RoleDefinition
 
     /// <summary>Skills defined for this role.</summary>
     public ImmutableArray<RoleSkill> Skills { get; init; } = ImmutableArray<RoleSkill>.Empty;
+
+    /// <summary>Character quotes/dialogues for various events.</summary>
+    public RoleQuotes Quotes { get; init; } = new RoleQuotes();
 }
 
 /// <summary>
@@ -41,6 +44,45 @@ public sealed class RoleSkill
 
     /// <summary>Pre-compiled skill ready for execution.</summary>
     public Skill Compiled { get; init; } = null!;
+}
+
+/// <summary>
+/// Contains character quotes/dialogues for various game events.
+/// Each event can have multiple quotes that are randomly selected.
+/// </summary>
+public sealed class RoleQuotes
+{
+    /// <summary>Quotes when turn starts.</summary>
+    public ImmutableArray<string> OnTurnStart { get; init; } = ImmutableArray<string>.Empty;
+
+    /// <summary>Quotes when turn ends.</summary>
+    public ImmutableArray<string> OnTurnEnd { get; init; } = ImmutableArray<string>.Empty;
+
+    /// <summary>Quotes when using specific skills. Key: skill name, Value: quote list.</summary>
+    public ImmutableDictionary<string, ImmutableArray<string>> OnSkill { get; init; }
+        = ImmutableDictionary<string, ImmutableArray<string>>.Empty;
+
+    /// <summary>Quotes when taking damage.</summary>
+    public ImmutableArray<string> OnDamage { get; init; } = ImmutableArray<string>.Empty;
+
+    /// <summary>Quotes when HP falls below threshold. Key: HP percentage (0-1), Value: quote list.</summary>
+    public ImmutableDictionary<double, ImmutableArray<string>> OnHpBelow { get; init; }
+        = ImmutableDictionary<double, ImmutableArray<string>>.Empty;
+
+    /// <summary>Quotes when winning.</summary>
+    public ImmutableArray<string> OnVictory { get; init; } = ImmutableArray<string>.Empty;
+
+    /// <summary>Quotes when defeated.</summary>
+    public ImmutableArray<string> OnDefeat { get; init; } = ImmutableArray<string>.Empty;
+
+    /// <summary>
+    /// Get a random quote from a list, or null if list is empty.
+    /// </summary>
+    public static string? GetRandom(ImmutableArray<string> quotes, Random rng)
+    {
+        if (quotes.IsEmpty) return null;
+        return quotes[rng.Next(quotes.Length)];
+    }
 }
 
 /// <summary>
@@ -101,6 +143,7 @@ internal sealed class RoleParser
         var tags = new HashSet<string>();
         var skills = new List<RoleSkill>();
         string description = string.Empty;
+        var quotes = new RoleQuotes();
         SkipWs(); Expect('{'); SkipWs();
         while (!Eof() && Peek() != '}')
         {
@@ -144,6 +187,12 @@ internal sealed class RoleParser
                 Expect('}'); SkipWs();
                 continue;
             }
+            if (Try("quotes"))
+            {
+                quotes = ParseQuotes();
+                SkipWs();
+                continue;
+            }
             throw Error("unknown section in role");
         }
         Expect('}');
@@ -154,7 +203,8 @@ internal sealed class RoleParser
             Description = description,
             Vars = vars.ToImmutableDictionary(),
             Tags = tags.ToImmutableHashSet(),
-            Skills = skills.ToImmutableArray()
+            Skills = skills.ToImmutableArray(),
+            Quotes = quotes
         };
     }
 
@@ -339,6 +389,108 @@ internal sealed class RoleParser
         var lineText = sb.ToString();
         var displayLine = lineText.Replace('\t', ' ');
         return (line, Math.Max(col, 1), displayLine);
+    }
+
+    private RoleQuotes ParseQuotes()
+    {
+        var onTurnStart = new List<string>();
+        var onTurnEnd = new List<string>();
+        var onSkill = new Dictionary<string, List<string>>();
+        var onDamage = new List<string>();
+        var onHpBelow = new Dictionary<double, List<string>>();
+        var onVictory = new List<string>();
+        var onDefeat = new List<string>();
+
+        Expect('{'); SkipWs();
+        while (!Eof() && Peek() != '}')
+        {
+            if (Try("on_turn_start"))
+            {
+                var list = ParseStringArray();
+                onTurnStart.AddRange(list);
+                SkipOptSep();
+                continue;
+            }
+            if (Try("on_turn_end"))
+            {
+                var list = ParseStringArray();
+                onTurnEnd.AddRange(list);
+                SkipOptSep();
+                continue;
+            }
+            if (Try("on_skill"))
+            {
+                var skillName = ParseString();
+                var list = ParseStringArray();
+                if (!onSkill.ContainsKey(skillName)) onSkill[skillName] = new List<string>();
+                onSkill[skillName].AddRange(list);
+                SkipOptSep();
+                continue;
+            }
+            if (Try("on_damage"))
+            {
+                var list = ParseStringArray();
+                onDamage.AddRange(list);
+                SkipOptSep();
+                continue;
+            }
+            if (Try("on_hp_below"))
+            {
+                var threshold = ParseNumber();
+                var list = ParseStringArray();
+                if (!onHpBelow.ContainsKey(threshold)) onHpBelow[threshold] = new List<string>();
+                onHpBelow[threshold].AddRange(list);
+                SkipOptSep();
+                continue;
+            }
+            if (Try("on_victory"))
+            {
+                var list = ParseStringArray();
+                onVictory.AddRange(list);
+                SkipOptSep();
+                continue;
+            }
+            if (Try("on_defeat"))
+            {
+                var list = ParseStringArray();
+                onDefeat.AddRange(list);
+                SkipOptSep();
+                continue;
+            }
+            throw Error("unknown quote event type");
+        }
+        Expect('}');
+
+        return new RoleQuotes
+        {
+            OnTurnStart = onTurnStart.ToImmutableArray(),
+            OnTurnEnd = onTurnEnd.ToImmutableArray(),
+            OnSkill = onSkill.ToImmutableDictionary(
+                kv => kv.Key,
+                kv => kv.Value.ToImmutableArray()
+            ),
+            OnDamage = onDamage.ToImmutableArray(),
+            OnHpBelow = onHpBelow.ToImmutableDictionary(
+                kv => kv.Key,
+                kv => kv.Value.ToImmutableArray()
+            ),
+            OnVictory = onVictory.ToImmutableArray(),
+            OnDefeat = onDefeat.ToImmutableArray()
+        };
+    }
+
+    private List<string> ParseStringArray()
+    {
+        var result = new List<string>();
+        SkipWs(); Expect('['); SkipWs();
+        while (!Eof() && Peek() != ']')
+        {
+            var s = ParseString();
+            result.Add(s);
+            SkipOptSep();
+        }
+        Expect(']');
+        return result;
     }
 
     private Exception Error(string msg)

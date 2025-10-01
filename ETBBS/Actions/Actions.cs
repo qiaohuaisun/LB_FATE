@@ -164,6 +164,7 @@ public sealed record PhysicalDamage(string AttackerId, string TargetId, int Powe
 
         var au = state.GetUnitOrNull(AttackerId);
         tu = state.GetUnitOrNull(TargetId); // refresh after state modification
+        if (tu is null) return state;
 
         // Stats
         int atk = au?.GetIntVar(Keys.Atk) ?? 0;
@@ -235,6 +236,7 @@ public sealed record MagicDamage(string AttackerId, string TargetId, int Power, 
 
         var au = state.GetUnitOrNull(AttackerId);
         tu = state.GetUnitOrNull(TargetId); // refresh after state modification
+        if (tu is null) return state;
 
         int matk = 0;
         if (au is not null && au.Vars.TryGetValue(Keys.MAtk, out var av))
@@ -493,7 +495,6 @@ public sealed record RemoveGlobalVar(string Key) : AtomicAction
     public override ImmutableHashSet<string> ReadVars => ImmutableHashSet<string>.Empty;
     public override ImmutableHashSet<string> WriteVars => ImmutableHashSet<string>.Empty.Add(GlobalVarKey(Key));
 }
-
 
 
 

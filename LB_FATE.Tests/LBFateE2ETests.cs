@@ -104,7 +104,7 @@ public class LBFateE2ETests
     }
 
     [Fact]
-    public void EndToEnd_ForceActNow_Triggers_TargetReady_For_ExtraTurn()
+    public async Task EndToEnd_ForceActNow_Triggers_TargetReady_For_ExtraTurn()
     {
         // Ensure server logs are enabled to help debugging (optional)
         Environment.SetEnvironmentVariable("LB_FATE_SERVER_LOGS", "1");
@@ -136,7 +136,7 @@ public class LBFateE2ETests
         using var c2 = new TestClient("P2", "127.0.0.1", port);
 
         // Get endpoints map from server
-        var endpointMap = waitTask.GetAwaiter().GetResult();
+        var endpointMap = await waitTask.ConfigureAwait(false);
 
         // Create Game with endpoints and roles dir, small map to keep units closer
         var game = Activator.CreateInstance(gameType, new object?[] { rolesDir, 2, endpointMap, 7, 5 })!;
@@ -213,7 +213,7 @@ public class LBFateE2ETests
 
         // Call one turn for P1 (phase 1 day 1)
         Invoke(game, "Turn", "P1", 1, 1);
-        Task.WaitAll(new Task[] { p1Worker }, 2000);
+        await Task.WhenAny(p1Worker, Task.Delay(2000)).ConfigureAwait(false);
 
         // Verify force_act_now set and target is P2
         state = GetField<WorldState>(game, "state");
@@ -224,7 +224,7 @@ public class LBFateE2ETests
 
         // Simulate forced action: call Turn for P2
         Invoke(game, "Turn", "P2", 1, 1);
-        Task.WaitAll(new Task[] { p2Worker }, 2000);
+        await Task.WhenAny(p2Worker, Task.Delay(2000)).ConfigureAwait(false);
         Assert.True(c2.PromptCount >= 1);
     }
 }

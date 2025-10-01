@@ -34,9 +34,9 @@ public class CombatTests
         var eff = new LineAoeDamage("A", TargetId: "T", Power: 5, Length: 3, Radius: 0, Flavor: DamageFlavor.Physical, IgnoreRatio: 0.0).Compile();
         s = eff(s);
         // Ally X should be unaffected
-        Assert.Equal(30, (int)s.Units["X"].Vars[Keys.Hp]);
+        Assert.Equal(30, s.Units["X"].GetIntVar(Keys.Hp));
         // Enemy E should take 5+5=10 damage
-        Assert.Equal(20, (int)s.Units["E"].Vars[Keys.Hp]);
+        Assert.Equal(20, s.Units["E"].GetIntVar(Keys.Hp));
     }
 
     private sealed class FixedRandom : Random
@@ -55,11 +55,11 @@ public class CombatTests
         var skill1 = TextDsl.FromTextUsingGlobals("Chance", thenScript);
         var se = new SkillExecutor();
         (s, _) = se.ExecutePlan(s, skill1.BuildPlan(new Context(s)), validator: null);
-        Assert.Equal(1, (int)Convert.ToInt32(s.Global.Vars["flag"]));
+        Assert.Equal(1, TypeConversion.GetIntFrom(s.Global.Vars, "flag", 0));
 
         s = WorldStateOps.WithGlobal(s, g => g with { Vars = g.Vars.SetItem(DslRuntime.RngKey, new FixedRandom(0.9)) });
         (s, _) = se.ExecutePlan(s, skill1.BuildPlan(new Context(s)), validator: null);
-        Assert.Equal(2, (int)Convert.ToInt32(s.Global.Vars["flag"]));
+        Assert.Equal(2, TypeConversion.GetIntFrom(s.Global.Vars, "flag", 0));
     }
 
     [Fact]
@@ -80,19 +80,19 @@ public class CombatTests
         var cfg1 = new ActionValidationConfig(CasterId: "A", CurrentTurn: 2);
         var val1 = ActionValidators.ForSkillWithExtras(skill, cfg1, store);
         (s, _) = se.ExecutePlan(s, skill.BuildPlan(new Context(s)), validator: val1);
-        Assert.Equal(0, (int)Convert.ToInt32(s.Units["A"].Vars["count"]));
+        Assert.Equal(0, TypeConversion.GetIntFrom(s.Units["A"].Vars, "count", 0));
 
         // At turn 3 => allowed
         var cfg2 = cfg1 with { CurrentTurn = 3 };
         var val2 = ActionValidators.ForSkillWithExtras(skill, cfg2, store);
         (s, _) = se.ExecutePlan(s, skill.BuildPlan(new Context(s)), validator: val2);
-        Assert.Equal(1, (int)Convert.ToInt32(s.Units["A"].Vars["count"]));
+        Assert.Equal(1, TypeConversion.GetIntFrom(s.Units["A"].Vars, "count", 0));
 
         // Simulate store record and retry same turn => blocked by cooldown
         store.SetLastUseTurn("A", skill.Metadata.Name, 3);
         var val3 = ActionValidators.ForSkillWithExtras(skill, cfg2, store);
         (s, _) = se.ExecutePlan(s, skill.BuildPlan(new Context(s)), validator: val3);
-        Assert.Equal(1, (int)Convert.ToInt32(s.Units["A"].Vars["count"]));
+        Assert.Equal(1, TypeConversion.GetIntFrom(s.Units["A"].Vars, "count", 0));
     }
 
     [Fact]
@@ -115,7 +115,7 @@ public class CombatTests
         var cfgOut = cfgIn with { TargetPos = new Coord(4, 1) };
         var valOut = ActionValidators.ForSkillWithExtras(skill, cfgOut, cooldownStore: null);
         (s, _) = se.ExecutePlan(s, skill.BuildPlan(new Context(s)), validator: valOut);
-        Assert.False(s.Global.Vars.ContainsKey("hit"));
+        Assert.DoesNotContain("hit", s.Global.Vars.Keys);
     }
 
     [Fact]
@@ -140,8 +140,8 @@ public class CombatTests
         var skill = TextDsl.FromTextUsingGlobals("Par", script);
         var se = new SkillExecutor();
         (s, _) = se.ExecutePlan(s, skill.BuildPlan(new Context(s)), validator: null);
-        Assert.Equal(1, (int)Convert.ToInt32(s.Global.Vars["a"]));
-        Assert.Equal(2, (int)Convert.ToInt32(s.Global.Vars["b"]));
+        Assert.Equal(1, TypeConversion.GetIntFrom(s.Global.Vars, "a", 0));
+        Assert.Equal(2, TypeConversion.GetIntFrom(s.Global.Vars, "b", 0));
     }
 
     [Fact]
@@ -160,7 +160,7 @@ public class CombatTests
         var skill = TextDsl.FromTextUsingGlobals("Rep", script);
         var se = new SkillExecutor();
         (s, _) = se.ExecutePlan(s, skill.BuildPlan(new Context(s)), validator: null);
-        Assert.Equal(7, (int)s.Units["B"].Vars[Keys.Hp]);
+        Assert.Equal(7, s.Units["B"].GetIntVar(Keys.Hp));
     }
 
     [Fact]
@@ -195,9 +195,9 @@ public class CombatTests
         var skill = TextDsl.FromTextUsingGlobals("FEParRange", script);
         var se = new SkillExecutor();
         (s, _) = se.ExecutePlan(s, skill.BuildPlan(new Context(s)), validator: null);
-        Assert.Equal(1, (int)Convert.ToInt32(s.Units["E1"].Vars["mark"]));
-        Assert.Equal(1, (int)Convert.ToInt32(s.Units["E2"].Vars["mark"]));
-        Assert.False(s.Units["E3"].Vars.ContainsKey("mark"));
+        Assert.Equal(1, TypeConversion.GetIntFrom(s.Units["E1"].Vars, "mark", 0));
+        Assert.Equal(1, TypeConversion.GetIntFrom(s.Units["E2"].Vars, "mark", 0));
+        Assert.DoesNotContain("mark", s.Units["E3"].Vars.Keys);
     }
     [Fact]
     public void PerTurnAdd_ClampToOne_ForResist()
@@ -206,7 +206,7 @@ public class CombatTests
         s = WithUnit(s, "U", new Dictionary<string, object> { [Keys.ResistMagic] = 0.9, ["per_turn_add:resist_magic"] = 0.2 });
         var ts = new TurnSystem();
         (s, _) = ts.AdvanceTurn(s);
-        var r = Convert.ToDouble(s.Units["U"].Vars[Keys.ResistMagic]);
+        var r = s.Units["U"].GetDoubleVar(Keys.ResistMagic, 0.0);
         Assert.Equal(1.0, r, 5);
     }
     [Fact]
@@ -220,7 +220,7 @@ public class CombatTests
         s = WithUnit(s, "T", new Dictionary<string, object> { [Keys.Pos] = new Coord(0, 4), [Keys.Hp] = 1 });
         // effRes = mdef*(1-0.5)=5; raw0=5+10-5=10; resistMagic 20% => 8
         s = new LineAoeDamage("A", TargetId: "T", Power: 5, Length: 3, Radius: 0, Flavor: DamageFlavor.Magic, IgnoreRatio: 0.5).Compile()(s);
-        Assert.Equal(22, (int)s.Units["E"].Vars[Keys.Hp]);
+        Assert.Equal(22, s.Units["E"].GetIntVar(Keys.Hp));
     }
 
     [Fact]
@@ -234,7 +234,7 @@ public class CombatTests
         s = WithUnit(s, "T", new Dictionary<string, object> { [Keys.Pos] = new Coord(0, 4), [Keys.Hp] = 1 });
         // True damage deals Power directly (7)
         s = new LineAoeDamage("A", TargetId: "T", Power: 7, Length: 3, Radius: 0, Flavor: DamageFlavor.True).Compile()(s);
-        Assert.Equal(23, (int)s.Units["E"].Vars[Keys.Hp]);
+        Assert.Equal(23, s.Units["E"].GetIntVar(Keys.Hp));
     }
 
     [Fact]
@@ -252,17 +252,17 @@ public class CombatTests
         var opts = new ExecutionOptions(TransactionalBatch: true, ConflictHandling: ConflictHandling.WarnOnly, EmitPerActionEventsInTransactional: true);
         (s, _) = se.Execute(s, actions, validator: null, events: null, options: opts);
         var u = s.Units["U"];
-        Assert.False(u.Tags.Contains(Tags.Stunned));
-        Assert.False(u.Tags.Contains(Tags.Silenced));
-        Assert.False(u.Tags.Contains(Tags.Rooted));
-        Assert.Equal(0, (int)u.Vars.GetValueOrDefault(Keys.StunnedTurns, 0));
-        Assert.Equal(0, (int)u.Vars.GetValueOrDefault(Keys.SilencedTurns, 0));
-        Assert.Equal(0, (int)u.Vars.GetValueOrDefault(Keys.RootedTurns, 0));
+        Assert.DoesNotContain(Tags.Stunned, u.Tags);
+        Assert.DoesNotContain(Tags.Silenced, u.Tags);
+        Assert.DoesNotContain(Tags.Rooted, u.Tags);
+        Assert.Equal(0, TypeConversion.GetIntFrom(u.Vars, Keys.StunnedTurns, 0));
+        Assert.Equal(0, TypeConversion.GetIntFrom(u.Vars, Keys.SilencedTurns, 0));
+        Assert.Equal(0, TypeConversion.GetIntFrom(u.Vars, Keys.RootedTurns, 0));
 
         // Tick immunity down by one turn
         var ts = new TurnSystem();
         (s, _) = ts.AdvanceTurn(s);
-        var im = (int)s.Units["U"].Vars.GetValueOrDefault(Keys.StatusImmuneTurns, 0);
+        var im = TypeConversion.GetIntFrom(s.Units["U"].Vars, Keys.StatusImmuneTurns, 0);
         Assert.Equal(0, im);
     }
     [Fact]
@@ -286,7 +286,7 @@ public class CombatTests
         s = WithUnit(s, "B", new Dictionary<string, object> { [Keys.Hp] = 40, [Keys.Def] = 0 }, tags: new[] { Tags.Duel });
         s = new PhysicalDamage("A", "B", Power: 5, IgnoreDefenseRatio: 0.0).Compile()(s);
         // base = 10 -> duel x3 => 30, 40-30=10
-        Assert.Equal(10, (int)s.Units["B"].Vars[Keys.Hp]);
+        Assert.Equal(10, s.Units["B"].GetIntVar(Keys.Hp));
     }
 
     [Fact]
@@ -298,7 +298,7 @@ public class CombatTests
         var se = new SkillExecutor();
         var opts = new ExecutionOptions(TransactionalBatch: true, ConflictHandling: ConflictHandling.BlockOnConflict, EmitPerActionEventsInTransactional: false);
         (s, var log) = se.Execute(s, actions, validator: null, events: null, options: opts);
-        Assert.Equal(10, (int)s.Units["U"].Vars[Keys.Hp]);
+        Assert.Equal(10, s.Units["U"].GetIntVar(Keys.Hp));
         Assert.Contains(log.Messages, m => m.Contains("conflict", StringComparison.OrdinalIgnoreCase));
     }
 
@@ -312,7 +312,7 @@ public class CombatTests
         var opts = new ExecutionOptions(TransactionalBatch: true, ConflictHandling: ConflictHandling.WarnOnly, EmitPerActionEventsInTransactional: true);
         (s, _) = se.Execute(s, actions, validator: null, events: null, options: opts);
         var u = s.Units["U"];
-        Assert.False(u.Tags.Contains(Tags.Stunned));
+        Assert.DoesNotContain(Tags.Stunned, u.Tags);
         Assert.True(u.Vars.TryGetValue(Keys.StunnedTurns, out var st));
         Assert.Equal(0, st is int i ? i : 0);
     }
@@ -328,10 +328,10 @@ public class CombatTests
         var ts = new TurnSystem();
         (s, _) = ts.AdvanceTurn(s);
         var u1 = s.Units["U1"]; var u2 = s.Units["U2"];
-        Assert.True(u1.Tags.Contains(Tags.Stunned));
-        Assert.Equal(1, (int)u1.Vars[Keys.StunnedTurns]);
-        Assert.False(u2.Tags.Contains(Tags.Stunned));
-        Assert.Equal(0, (int)u2.Vars[Keys.StunnedTurns]);
+        Assert.Contains(Tags.Stunned, u1.Tags);
+        Assert.Equal(1, u1.GetIntVar(Keys.StunnedTurns));
+        Assert.DoesNotContain(Tags.Stunned, u2.Tags);
+        Assert.Equal(0, u2.GetIntVar(Keys.StunnedTurns));
     }
 
     [Fact]
@@ -342,10 +342,10 @@ public class CombatTests
         var ts = new TurnSystem();
         (s, _) = ts.AdvanceTurn(s);
         var u = s.Units["U"];
-        Assert.Equal(17, (int)u.Vars[Keys.Hp]);
-        Assert.Equal(0, (int)u.Vars[Keys.BleedTurns]);
-        Assert.False(u.Vars.ContainsKey(Keys.BleedPerTurn));
-        Assert.False(u.Tags.Contains(Tags.Bleeding));
+        Assert.Equal(17, u.GetIntVar(Keys.Hp));
+        Assert.Equal(0, u.GetIntVar(Keys.BleedTurns));
+        Assert.DoesNotContain(Keys.BleedPerTurn, u.Vars.Keys);
+        Assert.DoesNotContain(Tags.Bleeding, u.Tags);
     }
 
     [Fact]
@@ -390,9 +390,9 @@ public class CombatTests
         s = WithUnit(s, "T", new Dictionary<string, object> { [Keys.Pos] = new Coord(0, 4), [Keys.Hp] = 1 });
 
         s = new LineAoeDamage("A", TargetId: "T", Power: 5, Length: 4, Radius: 1, Flavor: DamageFlavor.Physical, IgnoreRatio: 0.0).Compile()(s);
-        Assert.Equal(15, (int)s.Units["E1"].Vars[Keys.Hp]);
-        Assert.Equal(15, (int)s.Units["E2"].Vars[Keys.Hp]);
-        Assert.Equal(20, (int)s.Units["F"].Vars[Keys.Hp]);
+        Assert.Equal(15, s.Units["E1"].GetIntVar(Keys.Hp));
+        Assert.Equal(15, s.Units["E2"].GetIntVar(Keys.Hp));
+        Assert.Equal(20, s.Units["F"].GetIntVar(Keys.Hp));
     }
 
     [Fact]
@@ -423,9 +423,9 @@ public class CombatTests
         }).Build();
         var se = new SkillExecutor();
         (s, _) = se.ExecutePlan(s, skill1.BuildPlan(new Context(s)), validator: null);
-        Assert.Equal(1, (int)s.Units["E1"].Vars["mark"]);
-        Assert.Equal(1, (int)s.Units["E2"].Vars["mark"]);
-        Assert.False(s.Units["E3"].Vars.ContainsKey("mark"));
+        Assert.Equal(1, TypeConversion.GetIntFrom(s.Units["E1"].Vars, "mark", 0));
+        Assert.Equal(1, TypeConversion.GetIntFrom(s.Units["E2"].Vars, "mark", 0));
+        Assert.DoesNotContain("mark", s.Units["E3"].Vars.Keys);
 
         // Farthest 1 via SkillScript
         Func<Context, IEnumerable<string>> farthest1Enemy = ctx => Selection
@@ -438,9 +438,9 @@ public class CombatTests
             ss.ForEachUnits(farthest1Enemy, (sub, id) => sub.SetUnitVar(id, "far", 1));
         }).Build();
         (s, _) = se.ExecutePlan(s, skill2.BuildPlan(new Context(s)), validator: null);
-        Assert.Equal(1, (int)s.Units["E3"].Vars["far"]);
-        Assert.False(s.Units["E1"].Vars.ContainsKey("far"));
-        Assert.False(s.Units["E2"].Vars.ContainsKey("far"));
+        Assert.Equal(1, TypeConversion.GetIntFrom(s.Units["E3"].Vars, "far", 0));
+        Assert.DoesNotContain("far", s.Units["E1"].Vars.Keys);
+        Assert.DoesNotContain("far", s.Units["E2"].Vars.Keys);
     }
     [Fact]
     public void PhysicalDamage_Basic()
@@ -451,7 +451,7 @@ public class CombatTests
 
         var eff = new PhysicalDamage("A", "B", Power: 5).Compile();
         s = eff(s);
-        var hp = (int)s.Units["B"].Vars[Keys.Hp];
+        var hp = s.Units["B"].GetIntVar(Keys.Hp);
         // raw = 5 + 10 - 3 = 12; 20 - 12 = 8
         Assert.Equal(8, hp);
     }
@@ -465,7 +465,7 @@ public class CombatTests
 
         var eff = new PhysicalDamage("A", "B", Power: 10, IgnoreDefenseRatio: 0.5).Compile();
         s = eff(s);
-        var hp = (int)s.Units["B"].Vars[Keys.Hp];
+        var hp = s.Units["B"].GetIntVar(Keys.Hp);
         // effDef = 10*(1-0.5)=5; raw=10+10-5=15; resist 0.5 => 7 or 8 rounded => 8; 30-8=22
         Assert.Equal(22, hp);
     }
@@ -478,7 +478,7 @@ public class CombatTests
         s = WithUnit(s, "B", new Dictionary<string, object> { [Keys.MDef] = 3, [Keys.Hp] = 25 });
         var eff = new MagicDamage("A", "B", Power: 5).Compile();
         s = eff(s);
-        var hp = (int)s.Units["B"].Vars[Keys.Hp];
+        var hp = s.Units["B"].GetIntVar(Keys.Hp);
         // atk used as matk: raw = 5 + 8 - 3 = 10; 25-10=15
         Assert.Equal(15, hp);
     }
@@ -490,8 +490,8 @@ public class CombatTests
         s = WithUnit(s, "A", new Dictionary<string, object> { [Keys.Atk] = 5 });
         s = WithUnit(s, "B", new Dictionary<string, object> { [Keys.Hp] = 20, [Keys.Def] = 0, [Keys.ShieldValue] = 6.0 });
         s = new PhysicalDamage("A", "B", Power: 6).Compile()(s); // raw = 6+5-0=11 => shield 6 -> left 5 to HP
-        var u = s.Units["B"]; var hp = (int)u.Vars[Keys.Hp];
-        var shield = Convert.ToDouble(u.Vars[Keys.ShieldValue]);
+        var u = s.Units["B"]; var hp = u.GetIntVar(Keys.Hp);
+        var shield = TypeConversion.ToDouble(u.Vars.TryGetValue(Keys.ShieldValue, out var sv) ? sv : null, 0.0);
         Assert.Equal(15, hp);
         Assert.Equal(0.0, shield);
     }
@@ -503,13 +503,13 @@ public class CombatTests
         s = WithUnit(s, "A", new Dictionary<string, object> { [Keys.Atk] = 50 });
         s = WithUnit(s, "B", new Dictionary<string, object> { [Keys.Hp] = 10, [Keys.Def] = 0, [Keys.UndyingTurns] = 1 });
         s = new PhysicalDamage("A", "B", Power: 10).Compile()(s); // lethal but undying => stays at 1
-        Assert.Equal(1, (int)s.Units["B"].Vars[Keys.Hp]);
+        Assert.Equal(1, s.Units["B"].GetIntVar(Keys.Hp));
 
         var ts = new TurnSystem();
         (s, _) = ts.AdvanceTurn(s);
         // undying turns decreased, tag auto-removed if present
         var bVars = s.Units["B"].Vars;
-        var turns = (int)bVars[Keys.UndyingTurns];
+        var turns = TypeConversion.GetIntFrom(bVars, Keys.UndyingTurns, 0);
         Assert.True(turns >= 0);
     }
 
@@ -532,16 +532,16 @@ public class CombatTests
         var ts = new TurnSystem();
         (s, _) = ts.AdvanceTurn(s); // one tick
         var u = s.Units["U"];
-        Assert.Equal(8, (int)u.Vars[Keys.Hp]); // 5 + 3 = 8
-        Assert.Equal(2.0, Convert.ToDouble(u.Vars[Keys.Mp]));
-        Assert.Equal(0.2, Convert.ToDouble(u.Vars[Keys.ResistMagic]));
+        Assert.Equal(8, u.GetIntVar(Keys.Hp)); // 5 + 3 = 8
+        Assert.Equal(2.0, u.GetDoubleVar(Keys.Mp));
+        Assert.Equal(0.2, u.GetDoubleVar(Keys.ResistMagic));
 
         // advance many turns to test clamp at per_turn_max
         for (int i = 0; i < 3; i++) (s, _) = ts.AdvanceTurn(s);
         u = s.Units["U"];
-        Assert.Equal(10, (int)u.Vars[Keys.Hp]); // clamped to max_hp
-        Assert.Equal(5.0, Convert.ToDouble(u.Vars[Keys.Mp])); // clamped to max_mp
-        Assert.True(Convert.ToDouble(u.Vars[Keys.ResistMagic]) <= 0.6 + 1e-9);
+        Assert.Equal(10, u.GetIntVar(Keys.Hp)); // clamped to max_hp
+        Assert.Equal(5.0, u.GetDoubleVar(Keys.Mp)); // clamped to max_mp
+        Assert.True(u.GetDoubleVar(Keys.ResistMagic) <= 0.6 + 1e-9);
     }
 
     [Fact]
@@ -556,11 +556,11 @@ public class CombatTests
         });
         // First damage dips to <= 20 from above -> heals 10 (30-15=15, then +10 => 25)
         s = new Damage("B", 15).Compile()(s);
-        var hp1 = (int)s.Units["B"].Vars[Keys.Hp];
+        var hp1 = s.Units["B"].GetIntVar(Keys.Hp);
         Assert.Equal(25, hp1);
         // Second time should not trigger
         s = new Damage("B", 5).Compile()(s);
-        var hp2 = (int)s.Units["B"].Vars[Keys.Hp];
+        var hp2 = s.Units["B"].GetIntVar(Keys.Hp);
         Assert.Equal(20, hp2);
     }
 

@@ -372,14 +372,21 @@ role "角色名称" id "unique_id" {
 - `enemies of caster in range 100 of caster order by var "hp" asc limit 1` - HP 最低的敌人
 - `nearest 3 enemies of caster` - 最近的 3 个敌人
 
-**⚠️ 常见语法错误**：
+**💡 灵活语法** (v2.0+)：
 
-| ❌ 错误 | ✅ 正确 |
-|--------|--------|
-| `for each enemies in range 2 of caster do {` | `for each enemies of caster in range 2 of caster do {` |
-| `for each enemies of caster order by var "hp" desc in range 10 of caster do {` | `for each enemies of caster in range 10 of caster order by var "hp" desc do {` |
+选择器子句现在可以**任意顺序**出现：
 
-**子句顺序**：`of <单位>` → `in range` → `order by` → `limit` → `do`
+```lbr
+# 都是合法的！
+for each enemies of caster in range 4 of caster limit 2 do { ... }
+for each enemies limit 2 in range 4 of caster of caster do { ... }
+for each enemies in range 4 of caster order by var "hp" asc limit 1 do { ... }
+```
+
+**增强的错误消息**：
+- 重复子句检测
+- 常见错误的有用建议
+- 带插入符指示器的清晰语法错误位置
 
 📖 **完整 DSL 指南**：[docs/lbr.zh-CN.md](docs/lbr.zh-CN.md) | [docs/lbr.en.md](docs/lbr.en.md)
 

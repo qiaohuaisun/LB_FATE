@@ -451,3 +451,41 @@ A：某些终端不支持 ANSI 颜色。请尝试更换终端，或使用 `-q` �
 - [LBR 语法指南](../docs/LBR_SYNTAX.md)  
 - [角色创建教程](../docs/ROLE_CREATION.md)  
 - [ETBBS 核心文档](../ETBBS/README.md)
+
+## 新增选项
+
+- `--json`：以 JSON 输出结果（无标题/无颜色），便于 CI 解析
+- `--lang=<en|zh-CN>`：本地化消息（默认英文）
+
+示例：
+```bash
+ETBBS.LbrValidator roles --json
+ETBBS.LbrValidator roles --lang=zh-CN
+```
+
+### JSON 输出示例
+```json
+{
+  "summary": { "total": 10, "passed": 9, "failed": 1, "seconds": 0.15 },
+  "results": [
+    {
+      "file": "broken_role.lbr",
+      "path": "roles/broken_role.lbr",
+      "success": false,
+      "error": "DSL parse error at line 15, column 8: keyword 'do' expected\n  for each enemies of caster in range 2 {\n         ^",
+      "role": null,
+      "id": null,
+      "skills": 0,
+      "warnings": []
+    }
+  ]
+}
+```
+
+## 语义检查
+
+除语法错误外，验证器还会报告常见语义问题：
+
+- 角色 `name` 或 `id` 为空（警告）
+- 角色内部技能名称重复（警告）
+- 不同文件中角色 ID 重复（作为错误处理）

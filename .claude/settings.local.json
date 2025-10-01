@@ -10,7 +10,8 @@
       "Bash(reportgenerator:*)",
       "Bash(dotnet build:*)",
       "Bash(cat:*)",
-      "Bash(awk:*)"
+      "Bash(awk:*)",
+      "Bash(dotnet run:*)"
     ],
     "deny": [],
     "ask": []

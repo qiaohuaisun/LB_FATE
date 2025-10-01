@@ -9,7 +9,7 @@
 
 ## 1. 文件结构
 
-一个角色文件包含一个 `role` 块，内含以下可选子段：`description`（或 `desc`）、`vars`、`tags`、`skills`。
+一个角色文件包含一个 `role` 块，内含以下可选子段：`description`（或 `desc`）、`vars`、`tags`、`skills`、`quotes`。
 
 ```
 role "<名称>" id "<id>" {
@@ -18,6 +18,11 @@ role "<名称>" id "<id>" {
   tags { "tag1", "tag2", ... }
   skills {
     skill "<技能名>" { <技能脚本> }
+    ...
+  }
+  quotes {
+    on_turn_start ["台词1", "台词2", ...]
+    on_skill "<技能名>" ["台词1", "台词2", ...]
     ...
   }
 }
@@ -113,17 +118,48 @@ role "<名称>" id "<id>" {
 
 ## 5. 选择器与条件
 
-- 选择器：
-  - `enemies|allies of <unit> [in range <R> of <unit>] [with tag "<tag>"] [with var "<key>" OP <int>] [order by var "<key>" asc|desc] [limit <N>]`
-    - **注意**：`of <unit>` 是**必需的**（通常是 `of caster` 或 `of target`）
-    - `in range <R> of <unit>` 指定范围筛选
-    - `order by var "<key>" asc|desc` 用于排序（**必须在 `in range` 之后**）
-    - `limit <N>` 限制数量
-  - `units with tag "<tag>"` / `units with var "<key>" OP <int>`
-  - `nearest|farthest [N] enemies|allies of <unit>`
-- 条件：
-  - `<unit> has tag "<tag>"`
-  - `<unit> mp OP <int>`（OP: `>=, >, <=, <, ==, !=`）
+### 选择器
+
+**基础语法：**
+- `enemies [子句...]` - 选择敌方单位
+- `allies [子句...]` - 选择友方单位
+- `nearest [N] enemies|allies of <unit|point>` - 选择最近的 N 个单位
+- `farthest [N] enemies|allies of <unit|point>` - 选择最远的 N 个单位
+- `units with tag "<tag>"` / `units with var "<key>" OP <int>` - 选择所有符合条件的单位
+
+**可用子句**（可以**任意顺序**出现）：
+- `of <unit>` - 指定参照单位（通常是 `caster` 或 `target`）。对于基于范围的选择器是**可选的**。
+- `in range <R> of <unit|point>` - 筛选范围 R 内的单位
+- `with tag "<tag>"` - 筛选带有特定标签的单位
+- `with var "<key>" OP <value>` - 根据变量条件筛选单位
+- `order by var "<key>" [asc|desc]` - 按变量排序（默认：asc 升序）
+- `limit <N>` - 限制结果数量为 N 个单位
+
+**示例：**
+```lbr
+# 所有子句 - 任意顺序都可以！
+enemies of caster in range 4 of caster with tag "stunned" limit 2
+
+# 与上面相同，不同顺序
+enemies in range 4 of caster of caster limit 2 with tag "stunned"
+
+# 按 HP 排序，最低的优先
+enemies of caster in range 10 of caster order by var "hp" asc limit 1
+
+# 简化写法：使用范围时可以省略 "of caster"
+enemies in range 3 of target
+
+# 最近的单位（of 子句在 enemies 后的 "of" 中隐含）
+nearest 3 enemies of caster
+
+# 范围内的所有盟友
+allies in range 5 of caster
+```
+
+### 条件
+
+- `<unit> has tag "<tag>"` - 检查单位是否有标签
+- `<unit> mp OP <int>` - 比较 MP 值（OP: `>=, >, <=, <, ==, !=`）
 
 ## 6. 值与表达式（新增）
 
@@ -138,7 +174,83 @@ role "<名称>" id "<id>" {
 - 任意 `vars` 中的 `per_turn_add:<key>` 每回合结算时会把 `<key>` 增加指定值。
 - 上限优先顺序：`per_turn_max:<key>` 或 `max_<key>`；若 `<key>` 为 `hp`/`mp`，也会使用 `max_hp`/`max_mp`；以 `resist_` 开头的变量默认夹取 [0,1]。
 
-## 7. 运行时上下文
+## 7. 台词系统（quotes）
+
+角色可以定义在特定事件发生时播放的台词，增强游戏沉浸感。每个事件类型可以定义多条台词，系统会随机选择一条播放。
+
+### 支持的事件类型
+
+```
+quotes {
+  # 回合开始时
+  on_turn_start ["台词1", "台词2", ...]
+
+  # 回合结束时
+  on_turn_end ["台词1", "台词2", ...]
+
+  # 使用特定技能时（可为每个技能单独定义）
+  on_skill "<技能名>" ["台词1", "台词2", ...]
+
+  # 受到伤害时
+  on_damage ["台词1", "台词2", ...]
+
+  # HP低于指定百分比时（0-1之间的小数）
+  on_hp_below 0.5 ["台词1", "台词2", ...]
+  on_hp_below 0.2 ["台词1", "台词2", ...]
+
+  # 胜利时
+  on_victory ["台词1", "台词2", ...]
+
+  # 失败时
+  on_defeat ["台词1", "台词2", ...]
+}
+```
+
+### 注意事项
+
+- HP阈值台词只会触发一次（每个阈值）
+- 从高到低检查阈值，首次满足条件时触发
+- 台词为可选项，不定义台词块不会影响角色功能
+- 当前版本主要支持Boss角色的台词显示
+
+### 示例
+
+```
+role "兽之王" id "boss_beast" {
+  vars { "hp" = 105; "max_hp" = 105; }
+
+  skills {
+    skill "毁灭咆哮" {
+      range 4; targeting enemies;
+      deal magic 6 damage to target from caster;
+    }
+  }
+
+  quotes {
+    on_turn_start [
+      "愚蠢的人类，颤抖吧！",
+      "毁灭的时刻到来了..."
+    ]
+
+    on_skill "毁灭咆哮" [
+      "聆听毁灭的咆哮！",
+      "湮灭吧——毁灭咆哮！"
+    ]
+
+    on_hp_below 0.5 [
+      "哼...还不错，但还不够！",
+      "你们成功激怒我了！"
+    ]
+
+    on_hp_below 0.2 [
+      "不可能...我怎么会...",
+      "可恶...区区人类..."
+    ]
+  }
+}
+```
+
+## 8. 运行时上下文
 
 脚本执行时会自动绑定：
 - `$caster`（string）：施法者 id
@@ -263,5 +375,70 @@ dotnet run --project ETBBS.LbrValidator -- roles -v
 ```
 
 详见 `ETBBS.LbrValidator/README.md`。
+
+## 9. 常见语法错误
+
+### 错误 1：无效的单位引用
+
+**错误写法：**
+```lbr
+deal physical 10 damage to enemy
+```
+
+**错误消息：**
+```
+DSL parse error: unknown unit reference
+Suggestion: Expected one of: caster, target, it, unit id "..."
+```
+
+**正确写法：**
+```lbr
+deal physical 10 damage to target from caster
+```
+
+### 错误 2：选择器中的重复子句
+
+**错误写法：**
+```lbr
+for each enemies of caster in range 2 of caster limit 3 limit 5 do { ... }
+```
+
+**错误消息：**
+```
+DSL parse error: duplicate 'limit' clause in selector
+```
+
+**正确写法：**
+```lbr
+for each enemies of caster in range 2 of caster limit 3 do { ... }
+```
+
+### 错误 3：`in parallel` 位置错误
+
+**错误写法：**
+```lbr
+for each enemies in parallel of caster in range 2 of caster do { ... }
+```
+
+**正确写法：**
+```lbr
+for each enemies of caster in range 2 of caster in parallel do { ... }
+```
+
+**说明：** `in parallel` 修饰符必须在所有选择器子句之后，紧接在 `do` 之前。
+
+### 改进提示
+
+从 v2.0 开始，选择器子句可以**任意顺序**出现，不再强制要求固定顺序。以下两种写法都是合法的：
+
+```lbr
+# 传统顺序
+for each enemies of caster in range 4 of caster with tag "stunned" limit 2 do { ... }
+
+# 任意顺序
+for each enemies limit 2 with tag "stunned" in range 4 of caster of caster do { ... }
+```
+
+这使得 DSL 更加灵活和易用。
 
 —— 完 ——

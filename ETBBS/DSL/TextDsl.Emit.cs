@@ -2,6 +2,127 @@ namespace ETBBS;
 
 public static partial class TextDsl
 {
+    // Lightweight static analysis for scripts. Returns human-readable warnings.
+    public static List<string> AnalyzeText(string script)
+    {
+        var warnings = new List<string>();
+        ProgramNode prog;
+        try
+        {
+            var parser = new Parser(script);
+            prog = parser.ParseProgram();
+        }
+        catch
+        {
+            // If it doesn't parse, validator will report syntax; skip analysis.
+            return warnings;
+        }
+
+        // Helper: compute 1-based line/col from source index
+        static (int line, int col) GetLineCol(string src, int pos)
+        {
+            int line = 1, col = 1;
+            for (int i = 0; i < src.Length && i < pos; i++)
+            {
+                var c = src[i];
+                if (c == '\r') continue;
+                if (c == '\n') { line++; col = 1; }
+                else col++;
+            }
+            if (col < 1) col = 1; return (line, col);
+        }
+
+        // Program-level checks
+        if (prog.MinRange is int mn && prog.Range is int rn && mn > rn)
+        {
+            warnings.Add($"min_range ({mn}) exceeds range ({rn}); targets won't be valid");
+        }
+        if ((prog.Targeting?.Equals("self", StringComparison.OrdinalIgnoreCase) ?? false) && (prog.Range ?? 0) > 0)
+        {
+            warnings.Add("targeting self with non-zero range; range is ignored");
+        }
+
+        void Visit(IStmt st)
+        {
+            switch (st)
+            {
+                case ChanceStmt c:
+                    if (c.Probability <= 0.0)
+                    {
+                        var (ln, co) = GetLineCol(script, c.Pos);
+                        warnings.Add($"line {ln}, col {co}: chance 0%: then-branch is unreachable");
+                    }
+                    else if (c.Probability >= 1.0)
+                    {
+                        var (ln, co) = GetLineCol(script, c.Pos);
+                        warnings.Add($"line {ln}, col {co}: chance 100%: else-branch is unreachable");
+                    }
+                    Visit(c.Then);
+                    if (c.Else is not null) Visit(c.Else);
+                    break;
+                case RepeatStmt r:
+                    if (r.Times <= 0)
+                    {
+                        var (ln, co) = GetLineCol(script, r.Pos);
+                        warnings.Add($"line {ln}, col {co}: repeat {r.Times} times has no effect");
+                    }
+                    Visit(r.Body);
+                    break;
+                case ParallelStmt p:
+                    if (p.Branches.Count == 0)
+                    {
+                        var (ln, co) = GetLineCol(script, p.Pos);
+                        warnings.Add($"line {ln}, col {co}: parallel block is empty");
+                    }
+                    foreach (var b in p.Branches) Visit(b);
+                    break;
+                case BlockStmt b:
+                    if (b.Items.Count == 0)
+                    {
+                        var (ln, co) = GetLineCol(script, b.Pos);
+                        warnings.Add($"line {ln}, col {co}: empty block has no effect");
+                    }
+                    foreach (var i in b.Items) Visit(i);
+                    break;
+                case ForEachStmt f:
+                    if (f.Selector is CombinedSelector cs)
+                    {
+                        if (cs.Range is int rr && rr < 0)
+                        {
+                            var (ln, co) = GetLineCol(script, f.Pos);
+                            warnings.Add($"line {ln}, col {co}: selector range is negative");
+                        }
+                        if (cs.Limit is int lim && lim < 0)
+                        {
+                            var (ln, co) = GetLineCol(script, f.Pos);
+                            warnings.Add($"line {ln}, col {co}: selector limit is negative");
+                        }
+                        // Shape checks
+                        if (cs.Shape == CombinedSelector.ShapeKind.Line)
+                        {
+                            var (ln, co) = GetLineCol(script, f.Pos);
+                            if ((cs.Length ?? 0) <= 0) warnings.Add($"line {ln}, col {co}: line length must be > 0");
+                            if ((cs.Width ?? 0) < 0) warnings.Add($"line {ln}, col {co}: line width is negative");
+                            if (string.IsNullOrEmpty(cs.Dir)) warnings.Add($"line {ln}, col {co}: line dir not specified (using $dir)");
+                        }
+                        if (cs.Shape == CombinedSelector.ShapeKind.Cone)
+                        {
+                            var (ln, co) = GetLineCol(script, f.Pos);
+                            if (!(cs.Range is int r2) || r2 <= 0) warnings.Add($"line {ln}, col {co}: cone radius must be > 0");
+                            if (!(cs.AngleDeg is int a) || a <= 0) warnings.Add($"line {ln}, col {co}: cone angle not specified (default ~90)");
+                            if (string.IsNullOrEmpty(cs.Dir)) warnings.Add($"line {ln}, col {co}: cone dir not specified (using $dir)");
+                        }
+                    }
+                    Visit(f.Body);
+                    break;
+                case ActionStmt:
+                    break;
+            }
+        }
+
+        foreach (var st in prog.Statements) Visit(st);
+        return warnings;
+    }
     public static Skill FromText(string name, string script, TextDslOptions options)
     {
         var parser = new Parser(script);
@@ -17,6 +138,8 @@ public static partial class TextDsl
         if (prog.Range.HasValue) builder = builder.Range(prog.Range.Value);
         if (prog.Cooldown.HasValue) builder = builder.WithExtra("cooldown", prog.Cooldown.Value);
         if (!string.IsNullOrEmpty(prog.Targeting)) builder = builder.WithExtra("targeting", prog.Targeting!);
+        if (!string.IsNullOrEmpty(prog.TargetMode)) builder = builder.WithExtra("target_mode", prog.TargetMode!);
+        if (!string.IsNullOrEmpty(prog.Distance)) builder = builder.WithExtra("distance", prog.Distance!);
         if (prog.MinRange.HasValue) builder = builder.WithExtra("min_range", prog.MinRange.Value);
         if (prog.SealedUntilDay.HasValue)
         {
@@ -58,10 +181,32 @@ public static partial class TextDsl
             var r = ResolveValue(ctx, opts, getIt, ae.Right);
             double ld = ToNumber(l);
             double rd = ToNumber(r);
-            double res = ae.Op == '-' ? ld - rd : ld + rd;
-            if (IsIntegral(l) && IsIntegral(r) && Math.Abs(res - Math.Round(res)) < 1e-9)
+            double res = ae.Op switch
+            {
+                '+' => ld + rd,
+                '-' => ld - rd,
+                '*' => ld * rd,
+                '/' => Math.Abs(rd) > 1e-9 ? ld / rd : 0.0,
+                '%' => Math.Abs(rd) > 1e-9 ? ld % rd : 0.0,
+                _ => 0.0
+            };
+            if (IsIntegral(l) && IsIntegral(r) && (ae.Op == '+' || ae.Op == '-' || ae.Op == '*') && Math.Abs(res - Math.Round(res)) < 1e-9)
                 return (int)Math.Round(res);
             return res;
+        }
+        if (value is FunctionCall fc)
+        {
+            var resolvedArgs = fc.Args.Select(a => ResolveValue(ctx, opts, getIt, a)).ToList();
+            return fc.Name switch
+            {
+                "min" => resolvedArgs.Count > 0 ? resolvedArgs.Min(ToNumber) : 0.0,
+                "max" => resolvedArgs.Count > 0 ? resolvedArgs.Max(ToNumber) : 0.0,
+                "abs" => resolvedArgs.Count > 0 ? Math.Abs(ToNumber(resolvedArgs[0])) : 0.0,
+                "floor" => resolvedArgs.Count > 0 ? Math.Floor(ToNumber(resolvedArgs[0])) : 0.0,
+                "ceil" => resolvedArgs.Count > 0 ? Math.Ceiling(ToNumber(resolvedArgs[0])) : 0.0,
+                "round" => resolvedArgs.Count > 0 ? Math.Round(ToNumber(resolvedArgs[0])) : 0.0,
+                _ => 0.0
+            };
         }
         return value;
     }

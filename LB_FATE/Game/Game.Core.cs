@@ -37,6 +37,8 @@ public partial class Game
     private string bossName = "BOSS";
     private BossAiConfig? bossAi = null;
     private readonly Dictionary<string, int> phaseDamageTo = new();
+    // Track HP thresholds that have been triggered for quotes (unitId -> set of triggered thresholds)
+    private readonly Dictionary<string, HashSet<double>> triggeredHpThresholds = new();
     // 日志：public 面向所有玩家；private 面向各自玩家（仅在 debug 模式下追加内部执行细节）
     private readonly List<string> publicLog = new();
     private readonly Dictionary<string, List<string>> privateLog = new();

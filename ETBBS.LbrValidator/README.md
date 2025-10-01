@@ -48,6 +48,8 @@ ETBBS.LbrValidator [directory] [options]
 - `-v, --verbose` - Show detailed progress for each file
 - `-d, --details` - Show role details (implies --verbose)
 - `-q, --quiet` - Minimal output (only summary)
+- `--json` - Output results as JSON only (no header/colors)
+- `--lang=<en|zh-CN>` - Localize messages (default: `en`)
 - `-h, --help` - Show help message
 
 ### Examples
@@ -70,6 +72,16 @@ ETBBS.LbrValidator roles -r -v
 **Show detailed role information:**
 ```bash
 ETBBS.LbrValidator D:\path\to\roles --details
+```
+
+**JSON output:**
+```bash
+ETBBS.LbrValidator roles --json
+```
+
+**Chinese UI:**
+```bash
+ETBBS.LbrValidator roles --lang=zh-CN
 ```
 
 **Quiet mode (summary only):**
@@ -125,6 +137,26 @@ FAILED FILES:
   DSL parse error at 15: keyword 'do' expected
 
 ✗ VALIDATION FAILED (1 file(s) with errors)
+```
+
+### Failure (JSON Mode)
+
+```json
+{
+  "summary": { "total": 10, "passed": 9, "failed": 1, "seconds": 0.15 },
+  "results": [
+    {
+      "file": "broken_role.lbr",
+      "path": "roles/broken_role.lbr",
+      "success": false,
+      "error": "DSL parse error at line 15, column 8: keyword 'do' expected\n  for each enemies of caster in range 2 {\n         ^",
+      "role": null,
+      "id": null,
+      "skills": 0,
+      "warnings": []
+    }
+  ]
+}
 ```
 
 ### Details Mode
@@ -246,3 +278,11 @@ A: Some terminals don't support ANSI colors. Try a different terminal or use `-q
 - [LBR Syntax Guide](../docs/LBR_SYNTAX.md)
 - [Role Creation Tutorial](../docs/ROLE_CREATION.md)
 - [ETBBS Core Documentation](../ETBBS/README.md)
+
+## Semantic Checks
+
+In addition to syntax errors, the validator emits warnings for common issues:
+
+- Empty role `name` or `id`
+- Duplicate skill names within a role
+- Duplicate role IDs across files (treated as errors in summary)

@@ -38,7 +38,7 @@ public class DSLSelectorSyntaxTests
 
         Assert.Equal(1, (int)Convert.ToInt32(s.Units["E1"].Vars["near"]));
         Assert.Equal(1, (int)Convert.ToInt32(s.Units["E2"].Vars["near"]));
-        Assert.False(s.Units["E3"].Vars.ContainsKey("near"));
+        Assert.DoesNotContain("near", s.Units["E3"].Vars.Keys);
     }
 
     [Fact]
@@ -64,8 +64,91 @@ public class DSLSelectorSyntaxTests
         (s, _) = se.ExecutePlan(s, skill.BuildPlan(new Context(s)), validator: null);
 
         Assert.Equal(1, (int)Convert.ToInt32(s.Units["A3"].Vars["far"]));
-        Assert.False(s.Units["A1"].Vars.ContainsKey("far"));
-        Assert.False(s.Units["A2"].Vars.ContainsKey("far"));
+        Assert.DoesNotContain("far", s.Units["A1"].Vars.Keys);
+        Assert.DoesNotContain("far", s.Units["A2"].Vars.Keys);
+    }
+
+    [Fact]
+    public void Random_2_Enemies_Selects_Two()
+    {
+        var s = EmptyWorld();
+        s = WithUnit(s, "C", new Dictionary<string, object> { [Keys.Pos] = new Coord(1, 1) });
+        s = WithUnit(s, "E1", new Dictionary<string, object> { [Keys.Pos] = new Coord(2, 1) });
+        s = WithUnit(s, "E2", new Dictionary<string, object> { [Keys.Pos] = new Coord(3, 1) });
+        s = WithUnit(s, "E3", new Dictionary<string, object> { [Keys.Pos] = new Coord(4, 1) });
+        var teams = new Dictionary<string, string> { ["C"] = "T1", ["E1"] = "T2", ["E2"] = "T2", ["E3"] = "T2" };
+        s = WorldStateOps.WithGlobal(s, g => g with
+        {
+            Vars = g.Vars
+            .SetItem(DslRuntime.CasterKey, "C")
+            .SetItem(DslRuntime.TeamsKey, teams)
+            .SetItem(DslRuntime.RngKey, new Random(42)) // Fixed seed for determinism
+        });
+
+        var script = "for each random 2 enemies do { set unit(it) var \"selected\" = 1 }";
+        var skill = TextDsl.FromTextUsingGlobals("Random2Enemies", script);
+        var se = new SkillExecutor();
+        (s, _) = se.ExecutePlan(s, skill.BuildPlan(new Context(s)), validator: null);
+
+        // Exactly 2 should be selected
+        int count = 0;
+        if (s.Units["E1"].Vars.ContainsKey("selected")) count++;
+        if (s.Units["E2"].Vars.ContainsKey("selected")) count++;
+        if (s.Units["E3"].Vars.ContainsKey("selected")) count++;
+        Assert.Equal(2, count);
+    }
+
+    [Fact]
+    public void Healthiest_Enemies_Selects_Highest_HP()
+    {
+        var s = EmptyWorld();
+        s = WithUnit(s, "C", new Dictionary<string, object> { [Keys.Pos] = new Coord(1, 1), [Keys.Hp] = 100 });
+        s = WithUnit(s, "E1", new Dictionary<string, object> { [Keys.Pos] = new Coord(2, 1), [Keys.Hp] = 30 });
+        s = WithUnit(s, "E2", new Dictionary<string, object> { [Keys.Pos] = new Coord(3, 1), [Keys.Hp] = 80 }); // highest
+        s = WithUnit(s, "E3", new Dictionary<string, object> { [Keys.Pos] = new Coord(4, 1), [Keys.Hp] = 50 });
+        var teams = new Dictionary<string, string> { ["C"] = "T1", ["E1"] = "T2", ["E2"] = "T2", ["E3"] = "T2" };
+        s = WorldStateOps.WithGlobal(s, g => g with
+        {
+            Vars = g.Vars
+            .SetItem(DslRuntime.CasterKey, "C")
+            .SetItem(DslRuntime.TeamsKey, teams)
+        });
+
+        var script = "for each healthiest enemies do { set unit(it) var \"targeted\" = 1 }";
+        var skill = TextDsl.FromTextUsingGlobals("HealthiestEnemy", script);
+        var se = new SkillExecutor();
+        (s, _) = se.ExecutePlan(s, skill.BuildPlan(new Context(s)), validator: null);
+
+        // Only E2 (highest HP) should be selected
+        Assert.DoesNotContain("targeted", s.Units["E1"].Vars.Keys);
+        Assert.Equal(1, (int)Convert.ToInt32(s.Units["E2"].Vars["targeted"]));
+        Assert.DoesNotContain("targeted", s.Units["E3"].Vars.Keys);
+    }
+
+    [Fact]
+    public void Weakest_2_Enemies_Selects_Lowest_HP()
+    {
+        var s = EmptyWorld();
+        s = WithUnit(s, "C", new Dictionary<string, object> { [Keys.Pos] = new Coord(1, 1), [Keys.Hp] = 100 });
+        s = WithUnit(s, "E1", new Dictionary<string, object> { [Keys.Pos] = new Coord(2, 1), [Keys.Hp] = 30 }); // 2nd lowest
+        s = WithUnit(s, "E2", new Dictionary<string, object> { [Keys.Pos] = new Coord(3, 1), [Keys.Hp] = 80 });
+        s = WithUnit(s, "E3", new Dictionary<string, object> { [Keys.Pos] = new Coord(4, 1), [Keys.Hp] = 10 }); // lowest
+        var teams = new Dictionary<string, string> { ["C"] = "T1", ["E1"] = "T2", ["E2"] = "T2", ["E3"] = "T2" };
+        s = WorldStateOps.WithGlobal(s, g => g with
+        {
+            Vars = g.Vars
+            .SetItem(DslRuntime.CasterKey, "C")
+            .SetItem(DslRuntime.TeamsKey, teams)
+        });
+
+        var script = "for each weakest 2 enemies do { set unit(it) var \"targeted\" = 1 }";
+        var skill = TextDsl.FromTextUsingGlobals("Weakest2Enemies", script);
+        var se = new SkillExecutor();
+        (s, _) = se.ExecutePlan(s, skill.BuildPlan(new Context(s)), validator: null);
+
+        // E1 and E3 (lowest HP) should be selected
+        Assert.Equal(1, (int)Convert.ToInt32(s.Units["E1"].Vars["targeted"]));
+        Assert.DoesNotContain("targeted", s.Units["E2"].Vars.Keys);
+        Assert.Equal(1, (int)Convert.ToInt32(s.Units["E3"].Vars["targeted"]));
     }
 }
-
