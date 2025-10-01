@@ -70,7 +70,7 @@ partial class Game
                     WriteLineTo(pid, "hint move|hm     : highlight reachable tiles");
                     WriteLineTo(pid, "pass | p         : end your turn");
                     WriteLineTo(pid, $"Costs           : Move {GameConstants.MovementCost} MP; Attack {GameConstants.BasicAttackCost} MP");
-                    WriteLineTo(pid, "Note            : Each player acts once per phase.");
+                    WriteLineTo(pid, "Note            : Each action (move/attack/skill) ends your turn.");
                     WriteLineTo(pid, "Tip             : Press TAB for auto-completion");
                     continue;
                 }
@@ -141,7 +141,7 @@ partial class Game
                     AppendDebugFor(pid, log.Messages);
                     BroadcastBoard(day, phase);
                     highlightCells = null;
-                    continue;
+                    break; // End turn after movement
                 }
                 if (cmd is "skills" or "s")
                 {
@@ -311,9 +311,7 @@ partial class Game
                     BroadcastBoard(day, phase);
                     cooldowns.SetLastUseTurn(pid, skill.Name, state.Global.Turn);
                     highlightCells = null;
-                    // If skill is marked as ending the turn, break the command loop
-                    if (skill.Compiled.Extras.TryGetValue("ends_turn", out var et) && et is bool b && b)
-                        break;
+
                     // If inspection outputs exist, log and clear them
                     object? ihp = null, imp = null, ipos = null;
                     bool gotHp = state.Global.Vars.TryGetValue("inspect_hp", out ihp);
@@ -352,7 +350,7 @@ partial class Game
                         }
                         state = WorldStateOps.WithGlobal(state, g => g with { Vars = g.Vars.Remove("inspect_hp").Remove("inspect_mp").Remove("inspect_pos") });
                     }
-                    continue;
+                    break; // End turn after using skill
                 }
                 if (cmd is "attack" or "a")
                 {
@@ -405,9 +403,6 @@ partial class Game
                         (state, var log2) = se2.Execute(state, new AtomicAction[] { new ModifyUnitVar(pid, Keys.Mp, v => (v is double d0 ? d0 : Convert.ToDouble(v)) - basicCost) });
                         AppendDebugFor(pid, log2.Messages);
                         BroadcastBoard(day, phase);
-                        // If basic attack had ends_turn (unlikely), honor it
-                        if (basic.Compiled.Extras.TryGetValue("ends_turn", out var et2) && et2 is bool bb && bb)
-                            break;
                         cooldowns.SetLastUseTurn(pid, basic.Name, state.Global.Turn);
                     }
                     else
@@ -429,7 +424,7 @@ partial class Game
                         BroadcastBoard(day, phase);
                     }
                     highlightCells = null;
-                    continue;
+                    break; // End turn after attack
                 }
                 WriteLineTo(pid, "Unknown command. Type 'help'.");
             }
