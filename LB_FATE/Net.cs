@@ -1,13 +1,45 @@
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
+using System.Text.Json;
 
 namespace LB_FATE;
+
+/// <summary>
+/// 客户端协议类型
+/// </summary>
+public enum ClientProtocol
+{
+    /// <summary>
+    /// 文本协议（原有ASCII棋盘格式，用于控制台客户端）
+    /// </summary>
+    Text,
+
+    /// <summary>
+    /// JSON协议（用于MAUI/Web客户端，支持增量更新）
+    /// </summary>
+    Json
+}
 
 public interface IPlayerEndpoint : IDisposable
 {
     string Id { get; }
+
+    /// <summary>
+    /// 当前客户端使用的协议类型
+    /// </summary>
+    ClientProtocol Protocol { get; }
+
+    /// <summary>
+    /// 发送文本行（文本协议）
+    /// </summary>
     void SendLine(string text);
+
+    /// <summary>
+    /// 发送JSON对象（JSON协议）
+    /// </summary>
+    void SendJson(object data);
+
     string? ReadLine();
     bool IsAlive { get; }
 }
@@ -15,6 +47,8 @@ public interface IPlayerEndpoint : IDisposable
 public class ConsoleEndpoint : IPlayerEndpoint
 {
     public string Id { get; }
+    public ClientProtocol Protocol => ClientProtocol.Text; // 控制台始终使用文本协议
+
     private Func<string?>? _autoCompleteReader = null;
 
     public ConsoleEndpoint(string id) { Id = id; }
@@ -25,6 +59,13 @@ public class ConsoleEndpoint : IPlayerEndpoint
     }
 
     public void SendLine(string text) { Console.WriteLine(text); }
+
+    public void SendJson(object data)
+    {
+        // 控制台客户端不支持JSON协议，降级到文本显示
+        var json = JsonSerializer.Serialize(data, new JsonSerializerOptions { WriteIndented = true });
+        Console.WriteLine($"[JSON] {json}");
+    }
 
     public string? ReadLine()
     {
@@ -44,7 +85,9 @@ class TcpPlayerEndpoint : IPlayerEndpoint
     private readonly StreamWriter _writer;
     private readonly object _lock = new();
     private volatile bool _closed = false;
+
     public string Id { get; }
+    public ClientProtocol Protocol { get; private set; } = ClientProtocol.Text;
 
     public TcpPlayerEndpoint(string id, TcpClient client)
     {
@@ -55,6 +98,54 @@ class TcpPlayerEndpoint : IPlayerEndpoint
         _writer = new StreamWriter(stream, new UTF8Encoding(false)) { AutoFlush = true, NewLine = "\n" };
     }
 
+    /// <summary>
+    /// 协商客户端协议（在握手阶段调用）
+    /// </summary>
+    public void NegotiateProtocol(string? handshake)
+    {
+        Console.WriteLine($"[TcpPlayerEndpoint] 收到握手消息: '{handshake ?? "null"}'");
+
+        if (string.IsNullOrEmpty(handshake))
+        {
+            Protocol = ClientProtocol.Text;
+            Console.WriteLine($"[TcpPlayerEndpoint] 握手为空，使用文本协议");
+            return;
+        }
+
+        if (handshake.StartsWith("JSON_PROTOCOL", StringComparison.OrdinalIgnoreCase))
+        {
+            Protocol = ClientProtocol.Json;
+            var ack = "{\"type\":\"PROTOCOL_ACK\",\"protocol\":\"JSON\",\"version\":\"v1\"}";
+            SendLine(ack);
+            Console.WriteLine($"[TcpPlayerEndpoint] 发送JSON协议确认: {ack}");
+        }
+        else
+        {
+            Protocol = ClientProtocol.Text;
+            Console.WriteLine($"[TcpPlayerEndpoint] 非JSON握手，使用文本协议");
+        }
+    }
+
+    /// <summary>
+    /// 尝试读取握手消息（带超时，超时不关闭连接）
+    /// </summary>
+    public string? TryReadHandshake(int timeoutMs)
+    {
+        try
+        {
+            _client.Client.ReceiveTimeout = timeoutMs;
+            var s = _reader.ReadLine();
+            _client.Client.ReceiveTimeout = 0;
+            return s;
+        }
+        catch
+        {
+            // 超时是正常情况（旧客户端不发送握手），不关闭连接
+            _client.Client.ReceiveTimeout = 0;
+            return null;
+        }
+    }
+
     public void SendLine(string text)
     {
         if (_closed) return;
@@ -62,6 +153,44 @@ class TcpPlayerEndpoint : IPlayerEndpoint
         {
             try { _writer.WriteLine(text); }
             catch { try { _client.Close(); } catch { } _closed = true; }
+        }
+    }
+
+    public void SendJson(object data)
+    {
+        if (_closed)
+        {
+            Console.WriteLine($"[TcpPlayerEndpoint] SendJson 跳过（连接已关闭）: {Id}");
+            return;
+        }
+        if (Protocol != ClientProtocol.Json)
+        {
+            // 如果客户端不支持JSON，降级到文本协议
+            Console.WriteLine($"[TcpPlayerEndpoint] SendJson 跳过（协议不匹配）: {Id}, Protocol={Protocol}");
+            return;
+        }
+
+        lock (_lock)
+        {
+            try
+            {
+                Console.WriteLine($"[TcpPlayerEndpoint] 开始JSON序列化: {Id}");
+                // 使用优化的序列化选项
+                var json = JsonSerializer.Serialize(data, GameMessages.JsonOptions);
+                Console.WriteLine($"[TcpPlayerEndpoint] JSON序列化成功，长度: {json.Length} 字节");
+                // 记录JSON前100个字符用于调试
+                var preview = json.Length > 100 ? json.Substring(0, 100) + "..." : json;
+                Console.WriteLine($"[TcpPlayerEndpoint] JSON预览: {preview}");
+                _writer.WriteLine(json);
+                Console.WriteLine($"[TcpPlayerEndpoint] 已发送JSON到 {Id}");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[TcpPlayerEndpoint] JSON序列化/发送失败 ({Id}): {ex.Message}");
+                Console.WriteLine($"[TcpPlayerEndpoint] 堆栈: {ex.StackTrace}");
+                try { _client.Close(); } catch { }
+                _closed = true;
+            }
         }
     }
 
@@ -118,9 +247,22 @@ class NetServer : IDisposable
             var client = _listener.AcceptTcpClient();
             var pid = $"P{i}";
             var ep = new TcpPlayerEndpoint(pid, client);
+
+            // 协议协商：尝试读取握手消息（带1秒超时）
+            var handshake = ep.TryReadHandshake(1000);
+            ep.NegotiateProtocol(handshake);
+
+            if (handshake != null)
+                Console.WriteLine($"[NET] {pid} 使用协议: {ep.Protocol}");
+            else
+                Console.WriteLine($"[NET] {pid} 使用协议: {ep.Protocol} (无握手，默认文本)");
+
             map[pid] = ep;
+            Console.WriteLine($"[NET] 准备发送欢迎消息到 {pid}");
             ep.SendLine($"欢迎 {pid}");
+            Console.WriteLine($"[NET] 已发送: 欢迎 {pid}");
             ep.SendLine("你已连接。等待回合开始。");
+            Console.WriteLine($"[NET] 已发送: 你已连接。等待回合开始。");
             try { Console.WriteLine($"[NET] 玩家已连接并分配：{pid} 来自 {(client.Client.RemoteEndPoint?.ToString() ?? "?")}"); } catch { }
         }
         return map;

@@ -33,9 +33,11 @@ public partial class GamePage
         // 字号
         double fontSize = DeviceInfo.Platform == DevicePlatform.Android ? 16 : 24;
 
-        // 随机位置，保证与上次位置有足够距离
+        // 随机位置，保证与所有活跃台词位置有足够距离
         double xPercent, yPercent;
-        int retry = 0, maxRetry = 10;
+        int retry = 0, maxRetry = 20;
+        bool positionFound = false;
+
         do
         {
             if (_isLandscape)
@@ -49,17 +51,38 @@ public partial class GamePage
                 yPercent = _random.NextDouble() * 0.7 + 0.10; // 10%~80%
             }
 
-            if (_lastQuotePosition is { } last)
+            // 检查与所有活跃台词位置的距离
+            positionFound = true;
+            foreach (var pos in _activeQuotePositions)
             {
-                double dx = xPercent - last.x;
-                double dy = yPercent - last.y;
-                if (Math.Sqrt(dx * dx + dy * dy) >= 0.25) break;
+                double dx = xPercent - pos.x;
+                double dy = yPercent - pos.y;
+                double distance = Math.Sqrt(dx * dx + dy * dy);
+
+                // 要求至少0.3的距离（更大的间隔）
+                if (distance < 0.3)
+                {
+                    positionFound = false;
+                    break;
+                }
             }
-            else break;
+
+            if (positionFound) break;
             retry++;
         } while (retry < maxRetry);
 
-        _lastQuotePosition = (xPercent, yPercent);
+        // 记录新位置（稍后会在台词结束时移除）
+        var currentPosition = (xPercent, yPercent);
+        lock (_activeQuotePositions)
+        {
+            _activeQuotePositions.Add(currentPosition);
+
+            // 如果超过最大并发数，移除最早的位置（让位给新台词）
+            if (_activeQuotePositions.Count > MaxConcurrentQuotes)
+            {
+                _activeQuotePositions.RemoveAt(0);
+            }
+        }
 
         // 轻微旋转
         double maxRotation = DeviceInfo.Platform == DevicePlatform.Android ? 28 : 22;
@@ -102,10 +125,9 @@ public partial class GamePage
 
         await MainThread.InvokeOnMainThreadAsync(() => BossQuoteLayer.Children.Add(label));
 
-        // 取消前一条台词动画，创建新的取消源
-        _quoteCts?.Cancel();
-        _quoteCts = new CancellationTokenSource();
-        var ct = _quoteCts.Token;
+        // 每个台词有独立的取消源（不互相干扰）
+        var cts = new CancellationTokenSource();
+        var ct = cts.Token;
 
         // 入场动画（并行进行打字）
         label.Scale = 0.92;
@@ -121,7 +143,7 @@ public partial class GamePage
         var sw = Stopwatch.StartNew();
         // Slow down typing so the effect is actually visible on devices
         // Android phones a bit faster, desktop slightly slower for readability
-        int cps = DeviceInfo.Platform == DevicePlatform.Android ? 22 : 18; // chars per second
+        int cps = DeviceInfo.Platform == DevicePlatform.Android ? 12 : 10; // chars per second
 
         // Manual typewriter loop for better cross-platform reliability
         while (!ct.IsCancellationRequested)
@@ -135,6 +157,13 @@ public partial class GamePage
         if (ct.IsCancellationRequested)
         {
             await MainThread.InvokeOnMainThreadAsync(() => BossQuoteLayer.Children.Remove(label));
+
+            // 被取消时也要从位置列表中移除
+            lock (_activeQuotePositions)
+            {
+                _activeQuotePositions.Remove(currentPosition);
+            }
+            cts.Dispose();
             return;
         }
 
@@ -154,5 +183,13 @@ public partial class GamePage
                 BossQuoteLayer.Children.Remove(label);
             });
         }
+
+        // 台词结束，从活跃位置列表中移除
+        lock (_activeQuotePositions)
+        {
+            _activeQuotePositions.Remove(currentPosition);
+        }
+
+        cts.Dispose();
     }
 }

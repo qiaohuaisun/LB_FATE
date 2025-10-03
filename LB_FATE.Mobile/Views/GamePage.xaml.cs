@@ -13,10 +13,10 @@ public partial class GamePage : ContentPage
 
     // 台词显示需要的状态（供 BossQuote 部分类使用）
     private readonly Random _random = new();
-    private (double x, double y)? _lastQuotePosition = null;
+    private readonly List<(double x, double y)> _activeQuotePositions = new(); // 活跃台词位置列表
     private string? _lastQuote = null;
     private DateTime _lastQuoteTime = DateTime.MinValue;
-    private CancellationTokenSource? _quoteCts = null; // 并发台词的取消源
+    private const int MaxConcurrentQuotes = 4; // 最多同时显示4个台词
 
     public GamePage(GameViewModel viewModel)
     {

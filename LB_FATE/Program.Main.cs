@@ -51,6 +51,15 @@ class Program
         {
             switch (args[i])
             {
+                case "server": // 简写: server <port> <players>
+                    host = true;
+                    if (i + 1 < args.Length && int.TryParse(args[i + 1], out var sp)) { port = sp; i++; }
+                    if (i + 1 < args.Length && int.TryParse(args[i + 1], out var sn)) { players = Math.Max(1, Math.Min(7, sn)); i++; }
+                    break;
+                case "client": // 简写: client <host> <port>
+                    client = true;
+                    if (i + 1 < args.Length && !args[i + 1].StartsWith("--")) { var addr = args[++i]; var parts = addr.Split(':'); hostName = parts[0]; if (parts.Length > 1 && int.TryParse(parts[1], out var cp)) port = cp; }
+                    break;
                 case "--roles": if (i + 1 < args.Length) { rolesDir = args[++i]; } break;
                 case "--host": host = true; break;
                 case "--client": client = true; if (i + 1 < args.Length && !args[i + 1].StartsWith("--")) { var addr = args[++i]; var parts = addr.Split(':'); hostName = parts[0]; if (parts.Length > 1 && int.TryParse(parts[1], out var pp)) port = pp; } break;

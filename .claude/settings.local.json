@@ -6,7 +6,14 @@
       "Bash(awk:*)",
       "Read(//d/Data/设定/**)",
       "Bash(dotnet build:*)",
-      "Bash(dotnet clean:*)"
+      "Bash(dotnet clean:*)",
+      "Bash(git checkout:*)",
+      "Bash(cat:*)",
+      "Bash(powershell:*)",
+      "Bash(dotnet run:*)",
+      "Bash(Select-String -Pattern \"error|warning\")",
+      "Bash(Select-Object -First 20)",
+      "Bash(dotnet restore:*)"
     ],
     "deny": [],
     "ask": []

@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Text.RegularExpressions;
 
 namespace LB_FATE.Mobile.Services;
@@ -16,14 +17,18 @@ public class GameProtocolHandler
     public event Action<List<SkillInfo>>? SkillsUpdated;
     public event Action<string>? TelegraphWarning;
     public event Action<BossQuoteInfo>? BossQuote;
+    public event Action<int>? NextGameCountdown; // 新游戏倒计时（秒数）
 
     private readonly List<string> _messageBuffer = new();
     private readonly Dictionary<string, List<string>> _unitTags = new();
     private readonly Dictionary<string, int> _unitMaxMp = new(); // 追踪每个单位的真实MaxMP
+    private readonly Dictionary<string, UnitInfo> _cachedUnits = new(); // JSON协议：缓存单位状态用于增量更新
     private string? _lastBossQuote = null;  // 用于在协议层去重（提取后的纯台词）
     private DateTime _lastBossQuoteTime = DateTime.MinValue;  // 最近一次台词时间
     private int _lastDay = 1;
     private int _lastPhase = 1;
+    private int _gridWidth = 25;
+    private int _gridHeight = 15;
 
     // 图例格式：Symbol: ID ClassName    HP[...](hp/maxhp) MP=mp Pos=(x,y)
     // ID可能包含空格（如"【Beast of Ruin】"），ClassName是单个词
@@ -63,7 +68,6 @@ public class GameProtocolHandler
         if (string.IsNullOrWhiteSpace(message))
             return;
 
-
         _messageBuffer.Add(message);
 
         if (_messageBuffer.Count > 100)
@@ -71,44 +75,59 @@ public class GameProtocolHandler
             _messageBuffer.RemoveAt(0);
         }
 
-        ParseStatusEffects(message);
-        ParseSkills(message);
-        CheckTelegraphWarning(message);
-        CheckBossQuote(message);
+        // 缓存一次 StripAnsi 结果，避免重复调用
+        var cleanMessage = StripAnsi(message);
 
-        var gameState = TryParseGameState();
-        if (gameState != null)
+        // 只在必要时解析游戏状态：看到棋盘边框或Day/Phase标题时
+        bool shouldParseState = cleanMessage.StartsWith("===") ||
+                                cleanMessage.Contains("LB_FATE") ||
+                                cleanMessage.StartsWith("+---") ||
+                                cleanMessage.Contains("图例");
+
+        if (shouldParseState)
         {
-            GameStateUpdated?.Invoke(gameState);
+            var gameState = TryParseGameState();
+            if (gameState != null)
+            {
+                GameStateUpdated?.Invoke(gameState);
+            }
         }
 
-        if (message.Contains("游戏结束") ||
-            message.Contains("胜利") ||
-            message.Contains("失败") ||
-            message.Contains("==========="))
+        // 使用缓存的 cleanMessage 进行快速检查
+        ParseStatusEffects(message, cleanMessage);
+        ParseSkills(message, cleanMessage);
+        CheckTelegraphWarning(cleanMessage);
+        CheckBossQuote(cleanMessage);
+        CheckNextGameCountdown(cleanMessage);
+
+        if (cleanMessage.Contains("游戏结束") ||
+            cleanMessage.Contains("胜利") ||
+            cleanMessage.Contains("失败") ||
+            cleanMessage.Contains("==========="))
         {
             GameEnded?.Invoke();
         }
 
-        if (message.StartsWith("你的角色:") || message.Contains("HP:") || message.Contains("MP:"))
+        if (message.StartsWith("你的角色:") || cleanMessage.Contains("HP:") || cleanMessage.Contains("MP:"))
         {
             PlayerInfo?.Invoke(message);
         }
 
         // 过滤掉Boss台词协议消息，避免重复显示
-        if (!message.Contains("[BOSS_QUOTE:"))
+        if (!cleanMessage.Contains("[BOSS_QUOTE:"))
         {
             GameMessage?.Invoke(message);
         }
     }
 
-    private void ParseStatusEffects(string message)
+    private void ParseStatusEffects(string message, string? cleanMsg = null)
     {
-        var cleanMsg = StripAnsi(message).ToLowerInvariant();
+        cleanMsg ??= StripAnsi(message);
+        var lowerMsg = cleanMsg.ToLowerInvariant();
 
         foreach (var (keyword, tag) in StatusKeywords)
         {
-            if (cleanMsg.Contains(keyword.ToLowerInvariant()))
+            if (lowerMsg.Contains(keyword.ToLowerInvariant()))
             {
                 var unitIdMatch = Regex.Match(message, @"(P\d+|BOSS|B)");
                 if (unitIdMatch.Success)
@@ -124,9 +143,9 @@ public class GameProtocolHandler
         }
     }
 
-    private void ParseSkills(string message)
+    private void ParseSkills(string message, string? cleanMsg = null)
     {
-        var cleanMsg = StripAnsi(message);
+        cleanMsg ??= StripAnsi(message);
         var match = SkillPattern.Match(cleanMsg);
 
         if (match.Success)
@@ -161,10 +180,8 @@ public class GameProtocolHandler
         }
     }
 
-    private void CheckTelegraphWarning(string message)
+    private void CheckTelegraphWarning(string cleanMsg)
     {
-        var cleanMsg = StripAnsi(message);
-
         if ((cleanMsg.Contains("⚠️") || cleanMsg.Contains("警告") || cleanMsg.Contains("预警")) &&
             (cleanMsg.Contains("BOSS") || cleanMsg.Contains("Boss") || cleanMsg.Contains("boss")))
         {
@@ -172,10 +189,9 @@ public class GameProtocolHandler
         }
     }
 
-    private void CheckBossQuote(string message)
+    private void CheckBossQuote(string cleanLine)
     {
         // 检测Boss台词协议标记: [BOSS_QUOTE:eventType:context] 内容
-        var cleanLine = StripAnsi(message);
         if (!cleanLine.StartsWith("[BOSS_QUOTE:")) return;
         var match = Regex.Match(cleanLine, @"^\[BOSS_QUOTE:([^:]+):([^\]]*)\]\s*(.+)");
         if (match.Success)
@@ -236,11 +252,405 @@ public class GameProtocolHandler
     }
 
     /// <summary>
+    /// 检测新游戏倒计时消息
+    /// </summary>
+    private void CheckNextGameCountdown(string cleanLine)
+    {
+        // 检测"新游戏即将开始"
+        if (cleanLine.Contains("新游戏即将开始") || cleanLine.Contains("新一局"))
+        {
+            System.Diagnostics.Debug.WriteLine("[CheckNextGameCountdown] 检测到新游戏开始");
+            NextGameCountdown?.Invoke(0); // 0表示准备阶段
+            return;
+        }
+
+        // 检测倒计时："X 秒后开始..."
+        var countdownMatch = Regex.Match(cleanLine, @"(\d+)\s*秒后开始");
+        if (countdownMatch.Success && int.TryParse(countdownMatch.Groups[1].Value, out var seconds))
+        {
+            System.Diagnostics.Debug.WriteLine($"[CheckNextGameCountdown] 倒计时: {seconds}秒");
+            NextGameCountdown?.Invoke(seconds);
+        }
+    }
+
+    /// <summary>
     /// 处理输入提示（这是回合开始的可靠信号）
     /// </summary>
     public void HandlePrompt()
     {
         // PROMPT是回合开始的可靠指示器
+        TurnStarted?.Invoke();
+        NeedInput?.Invoke();
+    }
+
+    /// <summary>
+    /// 处理JSON协议消息
+    /// </summary>
+    public void HandleJsonMessage(JsonDocument doc)
+    {
+        try
+        {
+            if (!doc.RootElement.TryGetProperty("type", out var typeElement))
+            {
+                System.Diagnostics.Debug.WriteLine("[GameProtocolHandler] JSON消息缺少 'type' 属性");
+                return;
+            }
+
+            var messageType = typeElement.GetString();
+            if (messageType == null)
+            {
+                System.Diagnostics.Debug.WriteLine("[GameProtocolHandler] JSON消息 'type' 为null");
+                return;
+            }
+
+            System.Diagnostics.Debug.WriteLine($"[GameProtocolHandler] 处理JSON消息类型: {messageType}");
+
+            switch (messageType)
+            {
+                case "GAME_STATE":
+                    HandleGameStateMessage(doc);
+                    break;
+
+                case "COMBAT_EVENT":
+                    HandleCombatEventMessage(doc);
+                    break;
+
+                case "TURN_EVENT":
+                    HandleTurnEventMessage(doc);
+                    break;
+
+                case "SKILL_UPDATE":
+                    HandleSkillUpdateMessage(doc);
+                    break;
+
+                case "BOSS_QUOTE":
+                    HandleBossQuoteMessage(doc);
+                    break;
+
+                case "INPUT_REQUEST":
+                    HandleInputRequestMessage(doc);
+                    break;
+
+                default:
+                    System.Diagnostics.Debug.WriteLine($"[GameProtocolHandler] 未知JSON消息类型: {messageType}");
+                    break;
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[GameProtocolHandler] JSON消息处理错误: {ex.Message}");
+        }
+    }
+
+    private void HandleGameStateMessage(JsonDocument doc)
+    {
+        if (!doc.RootElement.TryGetProperty("data", out var dataElement))
+        {
+            System.Diagnostics.Debug.WriteLine("[GameProtocolHandler] GAME_STATE 消息缺少 'data' 属性");
+            return;
+        }
+
+        // 提取基础信息
+        var mode = doc.RootElement.TryGetProperty("mode", out var modeEl) ? modeEl.GetString() : "delta";
+        System.Diagnostics.Debug.WriteLine($"[GameProtocolHandler] 处理 GAME_STATE 消息，模式: {mode}");
+        var day = dataElement.TryGetProperty("day", out var dayEl) ? dayEl.GetInt32() : _lastDay;
+        var phase = dataElement.TryGetProperty("phase", out var phaseEl) ? phaseEl.GetInt32() : _lastPhase;
+
+        _lastDay = day;
+        _lastPhase = phase;
+
+        // 解析网格尺寸（仅在完整模式下提供）
+        if (dataElement.TryGetProperty("grid", out var gridEl))
+        {
+            _gridWidth = gridEl.TryGetProperty("width", out var wEl) ? wEl.GetInt32() : _gridWidth;
+            _gridHeight = gridEl.TryGetProperty("height", out var hEl) ? hEl.GetInt32() : _gridHeight;
+        }
+
+        // 解析高亮格子
+        var highlights = new List<(int X, int Y)>();
+        if (dataElement.TryGetProperty("highlights", out var highlightsEl) && highlightsEl.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var hlEl in highlightsEl.EnumerateArray())
+            {
+                var x = hlEl.TryGetProperty("x", out var xEl) ? xEl.GetInt32() : 0;
+                var y = hlEl.TryGetProperty("y", out var yEl) ? yEl.GetInt32() : 0;
+                highlights.Add((x, y));
+            }
+        }
+
+        if (mode == "full")
+        {
+            // 完整模式：清空缓存并加载所有单位
+            _cachedUnits.Clear();
+
+            if (dataElement.TryGetProperty("units", out var unitsEl) && unitsEl.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var unitEl in unitsEl.EnumerateArray())
+                {
+                    var unit = ParseJsonUnit(unitEl);
+                    if (unit != null)
+                    {
+                        _cachedUnits[unit.Id] = unit;
+                    }
+                }
+            }
+        }
+        else if (mode == "delta")
+        {
+            // 增量模式：应用变化到缓存
+            if (dataElement.TryGetProperty("unitUpdates", out var updatesEl) && updatesEl.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var updateEl in updatesEl.EnumerateArray())
+                {
+                    var unitId = updateEl.TryGetProperty("id", out var idEl) ? idEl.GetString() : null;
+                    if (string.IsNullOrEmpty(unitId))
+                        continue;
+
+                    var changesEl = updateEl.TryGetProperty("changes", out var chEl) ? chEl : (JsonElement?)null;
+                    if (!changesEl.HasValue)
+                        continue;
+
+                    // 获取或创建单位
+                    if (!_cachedUnits.TryGetValue(unitId, out var existingUnit))
+                    {
+                        // 新单位：从changes创建完整对象
+                        existingUnit = new UnitInfo { Id = unitId, Name = unitId };
+                    }
+
+                    // 应用变化
+                    var updatedUnit = ApplyChangesToUnit(existingUnit, changesEl.Value);
+                    _cachedUnits[unitId] = updatedUnit;
+                }
+            }
+        }
+
+        // 触发游戏状态更新事件
+        if (_cachedUnits.Count > 0 || mode == "full")
+        {
+            var gameState = new GameStateInfo
+            {
+                GridWidth = _gridWidth,
+                GridHeight = _gridHeight,
+                Units = _cachedUnits.Values.ToList(),
+                HighlightedCells = highlights,
+                Day = day,
+                Phase = phase
+            };
+
+            System.Diagnostics.Debug.WriteLine($"[GameProtocolHandler] JSON游戏状态更新: Day {day} Phase {phase}, {_cachedUnits.Count} 个单位");
+            GameStateUpdated?.Invoke(gameState);
+        }
+    }
+
+    /// <summary>
+    /// 从JSON元素解析单位信息
+    /// </summary>
+    private UnitInfo? ParseJsonUnit(JsonElement unitEl)
+    {
+        try
+        {
+            var id = unitEl.TryGetProperty("id", out var idEl) ? idEl.GetString() : null;
+            if (string.IsNullOrEmpty(id))
+                return null;
+
+            var name = unitEl.TryGetProperty("name", out var nameEl) ? (nameEl.GetString() ?? id) : id;
+            var className = unitEl.TryGetProperty("class", out var classEl) ? (classEl.GetString() ?? "Unknown") : "Unknown";
+            var symbol = unitEl.TryGetProperty("symbol", out var symEl) ? (symEl.GetString() ?? "") : "";
+            var isAlly = unitEl.TryGetProperty("isAlly", out var allyEl) && allyEl.GetBoolean();
+            var isOffline = unitEl.TryGetProperty("isOffline", out var offlineEl) && offlineEl.GetBoolean();
+
+            var hp = unitEl.TryGetProperty("hp", out var hpEl) ? hpEl.GetInt32() : 0;
+            var maxHp = unitEl.TryGetProperty("maxHp", out var maxHpEl) ? maxHpEl.GetInt32() : hp;
+            var mp = unitEl.TryGetProperty("mp", out var mpEl) ? (int)Math.Ceiling(mpEl.GetDouble()) : 0;
+            var maxMp = unitEl.TryGetProperty("maxMp", out var maxMpEl) ? (int)Math.Ceiling(maxMpEl.GetDouble()) : mp;
+
+            var x = 0;
+            var y = 0;
+            if (unitEl.TryGetProperty("position", out var posEl))
+            {
+                x = posEl.TryGetProperty("x", out var xEl) ? xEl.GetInt32() : 0;
+                y = posEl.TryGetProperty("y", out var yEl) ? yEl.GetInt32() : 0;
+            }
+
+            var tags = new List<string>();
+            if (unitEl.TryGetProperty("tags", out var tagsEl) && tagsEl.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var tagEl in tagsEl.EnumerateArray())
+                {
+                    var tag = tagEl.GetString();
+                    if (!string.IsNullOrEmpty(tag))
+                        tags.Add(tag);
+                }
+            }
+
+            return new UnitInfo
+            {
+                Id = id,
+                Name = name,
+                ClassName = className,
+                X = x,
+                Y = y,
+                HP = hp,
+                MaxHP = maxHp,
+                MP = mp,
+                MaxMP = maxMp,
+                IsAlly = isAlly,
+                Symbol = symbol,
+                Tags = tags,
+                IsOffline = isOffline
+            };
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[ParseJsonUnit] 解析失败: {ex.Message}");
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// 应用增量变化到单位
+    /// </summary>
+    private UnitInfo ApplyChangesToUnit(UnitInfo unit, JsonElement changes)
+    {
+        var hp = changes.TryGetProperty("hp", out var hpEl) ? hpEl.GetInt32() : unit.HP;
+        var maxHp = changes.TryGetProperty("maxHp", out var maxHpEl) ? maxHpEl.GetInt32() : unit.MaxHP;
+        var mp = changes.TryGetProperty("mp", out var mpEl) ? (int)Math.Ceiling(mpEl.GetDouble()) : unit.MP;
+        var maxMp = changes.TryGetProperty("maxMp", out var maxMpEl) ? (int)Math.Ceiling(maxMpEl.GetDouble()) : unit.MaxMP;
+
+        var x = unit.X;
+        var y = unit.Y;
+        if (changes.TryGetProperty("position", out var posEl))
+        {
+            x = posEl.TryGetProperty("x", out var xEl) ? xEl.GetInt32() : unit.X;
+            y = posEl.TryGetProperty("y", out var yEl) ? yEl.GetInt32() : unit.Y;
+        }
+
+        var tags = unit.Tags;
+        if (changes.TryGetProperty("tags", out var tagsEl) && tagsEl.ValueKind == JsonValueKind.Array)
+        {
+            tags = new List<string>();
+            foreach (var tagEl in tagsEl.EnumerateArray())
+            {
+                var tag = tagEl.GetString();
+                if (!string.IsNullOrEmpty(tag))
+                    tags.Add(tag);
+            }
+        }
+
+        var className = changes.TryGetProperty("class", out var classEl) ? (classEl.GetString() ?? unit.ClassName) : unit.ClassName;
+        var symbol = changes.TryGetProperty("symbol", out var symEl) ? (symEl.GetString() ?? unit.Symbol) : unit.Symbol;
+        var isOffline = changes.TryGetProperty("isOffline", out var offlineEl) ? offlineEl.GetBoolean() : unit.IsOffline;
+
+        return unit with
+        {
+            HP = hp,
+            MaxHP = maxHp,
+            MP = mp,
+            MaxMP = maxMp,
+            X = x,
+            Y = y,
+            Tags = tags,
+            ClassName = className,
+            Symbol = symbol,
+            IsOffline = isOffline
+        };
+    }
+
+    private void HandleCombatEventMessage(JsonDocument doc)
+    {
+        if (!doc.RootElement.TryGetProperty("data", out var dataElement))
+            return;
+
+        var message = dataElement.TryGetProperty("message", out var msgEl) ? msgEl.GetString() : "";
+        if (!string.IsNullOrEmpty(message))
+        {
+            GameMessage?.Invoke(message);
+        }
+    }
+
+    private void HandleTurnEventMessage(JsonDocument doc)
+    {
+        if (!doc.RootElement.TryGetProperty("data", out var dataElement))
+            return;
+
+        var eventType = dataElement.TryGetProperty("eventType", out var typeEl) ? typeEl.GetString() : "";
+
+        if (eventType == "turn_start")
+        {
+            TurnStarted?.Invoke();
+        }
+        else if (eventType == "turn_end")
+        {
+            // 可以添加回合结束事件处理
+        }
+    }
+
+    private void HandleSkillUpdateMessage(JsonDocument doc)
+    {
+        if (!doc.RootElement.TryGetProperty("data", out var dataElement))
+            return;
+
+        if (!dataElement.TryGetProperty("skills", out var skillsElement))
+            return;
+
+        var skills = new List<SkillInfo>();
+        foreach (var skillEl in skillsElement.EnumerateArray())
+        {
+            var skill = new SkillInfo
+            {
+                Index = skillEl.TryGetProperty("index", out var idxEl) ? idxEl.GetInt32() : 0,
+                Name = skillEl.TryGetProperty("name", out var nameEl) ? (nameEl.GetString() ?? "") : "",
+                MpCost = skillEl.TryGetProperty("mpCost", out var mpEl) ? mpEl.GetDouble() : 0,
+                Range = skillEl.TryGetProperty("range", out var rangeEl) ? rangeEl.GetInt32() : 0,
+                CooldownMax = skillEl.TryGetProperty("cooldownMax", out var cdMaxEl) ? cdMaxEl.GetInt32() : 0,
+                CooldownLeft = skillEl.TryGetProperty("cooldownLeft", out var cdLeftEl) ? cdLeftEl.GetInt32() : 0
+            };
+            skills.Add(skill);
+        }
+
+        if (skills.Count > 0)
+        {
+            SkillsUpdated?.Invoke(skills);
+        }
+    }
+
+    private void HandleBossQuoteMessage(JsonDocument doc)
+    {
+        if (!doc.RootElement.TryGetProperty("data", out var dataElement))
+            return;
+
+        var quote = dataElement.TryGetProperty("quote", out var quoteEl) ? quoteEl.GetString() : "";
+        var eventType = dataElement.TryGetProperty("eventType", out var typeEl) ? typeEl.GetString() : "";
+        var context = dataElement.TryGetProperty("context", out var ctxEl) ? ctxEl.GetString() : "";
+
+        if (string.IsNullOrEmpty(quote))
+            return;
+
+        // 协议层去重
+        var now = DateTime.Now;
+        var timeSinceLastQuote = now - _lastBossQuoteTime;
+
+        if (_lastBossQuote == quote && timeSinceLastQuote.TotalMilliseconds < 15000)
+        {
+            System.Diagnostics.Debug.WriteLine($"[HandleBossQuoteMessage] 跳过重复台词: {quote}");
+            return;
+        }
+
+        _lastBossQuote = quote;
+        _lastBossQuoteTime = now;
+
+        BossQuote?.Invoke(new BossQuoteInfo
+        {
+            Quote = quote,
+            EventType = eventType ?? "",
+            Context = context ?? "",
+            RawMessage = quote
+        });
+    }
+
+    private void HandleInputRequestMessage(JsonDocument doc)
+    {
+        // 输入请求表示轮到玩家回合
         TurnStarted?.Invoke();
         NeedInput?.Invoke();
     }

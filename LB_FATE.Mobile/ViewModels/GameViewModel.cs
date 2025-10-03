@@ -167,6 +167,8 @@ public partial class GameViewModel : ObservableObject, IQueryAttributable
         _dialogService = dialogService;
         _protocolHandler = new GameProtocolHandler();
         _protocolHandler.GameMessage += OnGameMessage;
+        // PlayerInfo事件已由交互式收集处理，不需要单独订阅
+        // _protocolHandler.PlayerInfo += OnPlayerInfo;
         _protocolHandler.NeedInput += OnNeedInput;
         _protocolHandler.TurnStarted += OnTurnStarted;
         _protocolHandler.GameEnded += OnGameEnded;
@@ -174,6 +176,7 @@ public partial class GameViewModel : ObservableObject, IQueryAttributable
         _protocolHandler.SkillsUpdated += OnSkillsUpdated;
         _protocolHandler.TelegraphWarning += OnTelegraphWarning;
         _protocolHandler.BossQuote += OnBossQuote;
+        _protocolHandler.NextGameCountdown += OnNextGameCountdown;
 
         // 设置初始状态文本
         PlayerStatus = "等待游戏数据...";
@@ -194,6 +197,7 @@ public partial class GameViewModel : ObservableObject, IQueryAttributable
         {
             _networkService = netService;
             _networkService.MessageReceived += OnMessageReceived;
+            _networkService.JsonMessageReceived += OnJsonMessageReceived;
             _networkService.PromptReceived += OnPromptReceived;
             _networkService.Disconnected += OnDisconnected;
 
@@ -268,6 +272,14 @@ public partial class GameViewModel : ObservableObject, IQueryAttributable
         MainThread.BeginInvokeOnMainThread(() =>
         {
             _protocolHandler.HandleMessage(message);
+        });
+    }
+
+    private void OnJsonMessageReceived(System.Text.Json.JsonDocument doc)
+    {
+        MainThread.BeginInvokeOnMainThread(() =>
+        {
+            _protocolHandler.HandleJsonMessage(doc);
         });
     }
 
@@ -346,6 +358,62 @@ public partial class GameViewModel : ObservableObject, IQueryAttributable
         CanSendCommand = false;
         AppendToLog("========== 游戏结束 ==========");
         AppendToLog("对局已结束");
+    }
+
+    private void OnNextGameCountdown(int seconds)
+    {
+        MainThread.BeginInvokeOnMainThread(() =>
+        {
+            if (seconds == 0)
+            {
+                // 新游戏准备阶段
+                AppendToLog("========== 新游戏即将开始 ==========");
+                DayPhaseDisplay = "准备中...";
+            }
+            else
+            {
+                // 倒计时
+                AppendToLog($"⏰ {seconds} 秒后开始新一局...");
+                DayPhaseDisplay = $"新游戏倒计时: {seconds}秒";
+
+                // 当倒计时到1秒时，重置游戏状态
+                if (seconds == 1)
+                {
+                    System.Diagnostics.Debug.WriteLine("[OnNextGameCountdown] 准备重置游戏状态");
+                    ResetGameState();
+                }
+            }
+        });
+    }
+
+    /// <summary>
+    /// 重置游戏状态准备新一局
+    /// </summary>
+    private void ResetGameState()
+    {
+        System.Diagnostics.Debug.WriteLine("[ResetGameState] 开始重置");
+
+        // 重置游戏状态
+        GameState.IsGameActive = true;
+        GameState.IsMyTurn = false;
+        CanSendCommand = false;
+
+        // 清空技能列表
+        Skills.Clear();
+
+        // 清空网格数据
+        GridData = new GridData { Width = 25, Height = 15 };
+
+        // 重置状态显示
+        PlayerStatus = "等待游戏数据...";
+        BossStatus = "";
+        IsBossMode = false;
+
+        // 清空交互状态
+        InteractionState.HighlightedCells.Clear();
+        InteractionState.Mode = InteractionMode.Normal;
+
+        System.Diagnostics.Debug.WriteLine("[ResetGameState] 重置完成，等待新游戏数据");
     }
 
     private void OnSkillsUpdated(List<Services.SkillInfo> skillList)
@@ -450,8 +518,9 @@ public partial class GameViewModel : ObservableObject, IQueryAttributable
                 // 调试日志：显示每个单位详细信息
                 System.Diagnostics.Debug.WriteLine($"[GameViewModel] 单位: Id={unitInfo.Id}, Symbol={unitInfo.Symbol}, HP={unitInfo.HP}, IsAlly={unitInfo.IsAlly}, Pos=({unitInfo.X},{unitInfo.Y})");
 
-                // Skip dead units (HP <= 0)
-                if (unitInfo.HP <= 0)
+                // Skip dead units (HP <= 0 且 MaxHP > 0表示真实死亡)
+                // HP=0 且 MaxHP=0 表示"未知"状态（其他玩家的隐私信息），仍需显示
+                if (unitInfo.HP <= 0 && unitInfo.MaxHP > 0)
                 {
                     // Check if it's the player who died
                     if (unitInfo.IsAlly && unitInfo.Symbol == "1")
@@ -728,7 +797,7 @@ public partial class GameViewModel : ObservableObject, IQueryAttributable
         // 批量处理日志，减少 UI 刷新次数
         MainThread.BeginInvokeOnMainThread(async () =>
         {
-            await Task.Delay(50); // 50ms 批处理延迟
+            await Task.Delay(16); // 16ms 批处理延迟 (约60fps，减少延迟感)
 
             List<string> messagesToProcess;
             lock (_logLock)

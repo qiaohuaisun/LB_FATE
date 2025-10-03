@@ -1,9 +1,13 @@
 using ETBBS;
+using static LB_FATE.GameMessages;
 
 namespace LB_FATE;
 
 partial class Game
 {
+    // 上次广播的单位状态缓存（用于增量更新）
+    private Dictionary<string, UnitData> _lastUnitStates = new();
+
     // ANSI color codes for network clients
     private static class AnsiColor
     {
@@ -256,32 +260,239 @@ partial class Game
     }
 
     /// <summary>
+    /// 收集当前所有单位的状态
+    /// </summary>
+    private Dictionary<string, UnitData> CollectCurrentUnits()
+    {
+        var units = new Dictionary<string, UnitData>();
+        foreach (var (id, u) in state.Units)
+        {
+            try
+            {
+                if (GetInt(id, Keys.Hp, 0) <= 0) continue; // 跳过已死亡单位
+
+                bool isOffline = endpoints.Count > 0 && !endpoints.ContainsKey(id) && id != bossId;
+                bool isCurrentPlayer = id != bossId;
+
+                // 安全获取 class 和 symbol
+                string className = classOf.ContainsKey(id) ? classOf[id].ToString() : "Unknown";
+                char symbol = symbolOf.ContainsKey(id) ? symbolOf[id] : '?';
+
+                var unitData = GameMessages.ExtractUnitData(
+                    id, u, className, symbol,
+                    isCurrentPlayer, isOffline);
+
+                units[id] = unitData;
+            }
+            catch (Exception ex)
+            {
+                ServerLog($"[CollectCurrentUnits] 处理单位 {id} 时出错: {ex.Message}");
+                ServerLog($"[CollectCurrentUnits] 堆栈: {ex.StackTrace}");
+            }
+        }
+        return units;
+    }
+
+    /// <summary>
+    /// 计算单位状态变化（增量更新）
+    /// 隐私策略：只发送当前玩家和Boss的详细信息变化
+    /// </summary>
+    private Dictionary<string, Dictionary<string, object>> CalculateChanges(
+        string viewerPid,
+        Dictionary<string, UnitData> currentUnits)
+    {
+        var changes = new Dictionary<string, Dictionary<string, object>>();
+
+        foreach (var (id, current) in currentUnits)
+        {
+            bool isCurrentPlayerOrBoss = (id == viewerPid || id == bossId);
+
+            if (!_lastUnitStates.TryGetValue(id, out var last))
+            {
+                // 新单位: 发送数据（根据隐私策略决定详细程度）
+                var unitData = new Dictionary<string, object>
+                {
+                    ["position"] = current.Position,
+                    ["symbol"] = current.Symbol,
+                    ["name"] = current.Name,
+                    ["class"] = current.Class,
+                    ["isAlly"] = current.IsAlly,
+                    ["isOffline"] = current.IsOffline
+                };
+
+                // 只为当前玩家和Boss发送详细信息
+                if (isCurrentPlayerOrBoss)
+                {
+                    unitData["hp"] = current.Hp;
+                    unitData["maxHp"] = current.MaxHp;
+                    unitData["mp"] = current.Mp;
+                    unitData["maxMp"] = current.MaxMp;
+                    unitData["tags"] = current.Tags;
+                }
+                else
+                {
+                    // 其他玩家：使用0表示"未知"
+                    unitData["hp"] = 0;
+                    unitData["maxHp"] = 0;
+                    unitData["mp"] = 0;
+                    unitData["maxMp"] = 0;
+                    unitData["tags"] = Array.Empty<string>();
+                }
+
+                changes[id] = unitData;
+                continue;
+            }
+
+            // 计算变化的字段
+            var delta = new Dictionary<string, object>();
+
+            // 位置变化（所有玩家可见）
+            if (current.Position.X != last.Position.X || current.Position.Y != last.Position.Y)
+                delta["position"] = current.Position;
+
+            // 离线状态变化（所有玩家可见）
+            if (current.IsOffline != last.IsOffline)
+                delta["isOffline"] = current.IsOffline;
+
+            // HP/MP/Tags变化（仅当前玩家和Boss）
+            if (isCurrentPlayerOrBoss)
+            {
+                if (current.Hp != last.Hp) delta["hp"] = current.Hp;
+                if (current.Mp != last.Mp) delta["mp"] = current.Mp;
+                if (!current.Tags.SequenceEqual(last.Tags)) delta["tags"] = current.Tags;
+            }
+
+            if (delta.Count > 0)
+                changes[id] = delta;
+        }
+
+        return changes;
+    }
+
+    // 追踪每个客户端是否已接收完整状态
+    private readonly HashSet<string> _clientsWithFullState = new();
+
+    /// <summary>
     /// 向所有已连接的客户端广播当前棋盘状态
     /// 这个方法会在每次重要的游戏状态变更后自动调用
     /// </summary>
     private void BroadcastBoard(int day, int phase)
     {
         if (endpoints.Count == 0) return;
+
+        try
+        {
+            ServerLog($"[BroadcastBoard] 开始广播 Day {day} Phase {phase}");
+
+            // 收集当前所有单位状态
+            var currentUnits = CollectCurrentUnits();
+            ServerLog($"[BroadcastBoard] 收集到 {currentUnits.Count} 个单位");
+            bool isFirstBroadcast = _lastUnitStates.Count == 0;
+
         foreach (var kv in endpoints)
         {
             var pid = kv.Key;
             var ep = kv.Value;
             try
             {
-                // 每个玩家只能看到自己的详细信息，但地图上会显示所有单位的位置
-                var lines = GetBoardLines(day, phase, includeHighlights: false, viewerPid: pid);
-                foreach (var line in lines) ep.SendLine(line);
+                if (ep.Protocol == ClientProtocol.Json)
+                {
+                    ServerLog($"[BroadcastBoard] 处理JSON客户端: {pid}");
+                    // 判断是否需要发送完整状态
+                    bool needFullState = !_clientsWithFullState.Contains(pid) || isFirstBroadcast;
+
+                    if (needFullState)
+                    {
+                        ServerLog($"[BroadcastBoard] {pid} 需要完整状态");
+                        try
+                        {
+                            // 首次连接或首次广播：发送完整状态
+                            // 隐私策略：只发送当前玩家和Boss的详细信息，其他玩家只发送位置和基础信息
+                            var visibleUnits = new Dictionary<string, UnitData>();
+
+                            foreach (var (id, unit) in currentUnits)
+                            {
+                                bool isCurrentPlayerOrBoss = (id == pid || id == bossId);
+
+                                if (isCurrentPlayerOrBoss)
+                                {
+                                    // 当前玩家和Boss：完整信息
+                                    visibleUnits[id] = unit;
+                                }
+                                else
+                                {
+                                    // 其他玩家：只发送位置和基础信息（不发送HP/MP/Tags，客户端会使用默认值0）
+                                    visibleUnits[id] = unit with
+                                    {
+                                        Hp = 0,      // 客户端会识别为"未知"
+                                        MaxHp = 0,
+                                        Mp = 0,
+                                        MaxMp = 0,
+                                        Tags = Array.Empty<string>()
+                                    };
+                                }
+                            }
+
+                            ServerLog($"[BroadcastBoard] 准备发送 {visibleUnits.Count} 个单位到 {pid}");
+                            var msg = GameMessages.BuildFullState(
+                                day, phase, width, height, visibleUnits);
+                            ServerLog($"[BroadcastBoard] 已构建完整状态消息，准备发送");
+                            ep.SendJson(msg);
+                            ServerLog($"[BroadcastBoard] 已发送完整状态到 {pid}");
+
+                            _clientsWithFullState.Add(pid);
+                            ServerLog($"[BroadcastBoard] Sent full state to {pid} (JSON) - {visibleUnits.Count} units");
+                        }
+                        catch (Exception ex)
+                        {
+                            ServerLog($"[BroadcastBoard] 发送完整状态到 {pid} 时出错: {ex.Message}");
+                            ServerLog($"[BroadcastBoard] 堆栈: {ex.StackTrace}");
+                            throw; // 重新抛出，让外层catch处理
+                        }
+                    }
+                    else
+                    {
+                        // 增量更新（传递viewerPid以实现隐私策略）
+                        var changes = CalculateChanges(pid, currentUnits);
+
+                        if (changes.Count > 0)
+                        {
+                            var msg = GameMessages.BuildDeltaUpdate(day, phase, changes);
+                            ep.SendJson(msg);
+                        }
+                    }
+                }
+                else
+                {
+                    // 文本客户端: 保持原有逻辑
+                    ServerLog($"[BroadcastBoard] 处理文本客户端: {pid}");
+                    var lines = GetBoardLines(day, phase, includeHighlights: false, viewerPid: pid);
+                    ServerLog($"[BroadcastBoard] GetBoardLines 返回 {lines.Count} 行");
+                    foreach (var line in lines) ep.SendLine(line);
+                    ServerLog($"[BroadcastBoard] 已发送 {lines.Count} 行到 {pid}");
+                }
             }
             catch (Exception ex)
             {
                 ServerLog($"[BroadcastBoard] Failed to send to {pid}: {ex.Message}");
             }
         }
+
+            // 更新上次状态缓存
+            _lastUnitStates = currentUnits;
+            ServerLog($"[BroadcastBoard] 广播完成");
+        }
+        catch (Exception ex)
+        {
+            ServerLog($"[BroadcastBoard] 严重错误: {ex.Message}");
+            ServerLog($"[BroadcastBoard] 堆栈跟踪: {ex.StackTrace}");
+        }
     }
 
     private void ShowBoard(int day, int phase)
     {
-        Console.Clear();
+        // 临时禁用清屏，保留调试日志
+        // Console.Clear();
         Console.WriteLine($"=== LB_FATE | Day {day} | Phase {phase} ===");
         var grid = new char[height, width];
         for (int y = 0; y < height; y++) for (int x = 0; x < width; x++) grid[y, x] = '.';

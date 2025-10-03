@@ -47,8 +47,11 @@ partial class Game
             bool isSilenced = state.Units[pid].Tags.Contains(Tags.Silenced);
             if (ep is not null)
             {
+                ServerLog($"[Turn] 发送PROMPT到 {pid}，协议: {ep.Protocol}");
                 ep.SendLine("PROMPT");
+                ServerLog($"[Turn] 等待 {pid} 输入...");
                 var line = ep.ReadLine() ?? string.Empty;
+                ServerLog($"[Turn] 收到 {pid} 输入: '{line}'");
                 if (!ep.IsAlive)
                 {
                     endpoints.Remove(pid);
