@@ -229,11 +229,46 @@ public sealed record PhysicalDamage(string AttackerId, string TargetId, int Powe
         }
 
         // Apply damage with full pipeline
-        return WorldStateOps.WithUnit(state, TargetId, t =>
+        var targetBefore = state.GetUnitOrNull(TargetId);
+        if (targetBefore is null) return state;
+
+        var damageResult = DamageCalculation.ApplyDamage(targetBefore, raw);
+        state = WorldStateOps.WithUnit(state, TargetId, _ => damageResult.ModifiedUnit);
+
+        // Calculate actual damage dealt (for lifesteal calculation)
+        int actualDamage = Math.Max(0, raw - damageResult.DamageBlocked);
+
+        // Thorn damage reflection (if defender has thorn shield)
+        var targetAfter = state.GetUnitOrNull(TargetId);
+        if (targetAfter is not null && au is not null)
         {
-            var result = DamageCalculation.ApplyDamage(t, raw);
-            return result.ModifiedUnit;
-        });
+            int thornDamage = DamageCalculation.CalculateThornReflection(targetAfter);
+            if (thornDamage > 0)
+            {
+                // Apply thorn damage to attacker
+                state = WorldStateOps.WithUnit(state, AttackerId, a =>
+                {
+                    var thornResult = DamageCalculation.ApplyDamage(a, thornDamage);
+                    return thornResult.ModifiedUnit;
+                });
+            }
+        }
+
+        // Lifesteal (based on actual damage dealt)
+        if (au is not null && actualDamage > 0)
+        {
+            var attackerCurrent = state.GetUnitOrNull(AttackerId);
+            if (attackerCurrent is not null)
+            {
+                var (healAmount, modifiedAttacker) = DamageCalculation.ApplyLifesteal(attackerCurrent, actualDamage);
+                if (healAmount > 0)
+                {
+                    state = WorldStateOps.WithUnit(state, AttackerId, _ => modifiedAttacker);
+                }
+            }
+        }
+
+        return state;
     };
 
     public override ImmutableHashSet<string> ReadVars => ImmutableHashSet<string>.Empty
@@ -309,11 +344,46 @@ public sealed record MagicDamage(string AttackerId, string TargetId, int Power, 
         }
 
         // Apply damage with full pipeline
-        return WorldStateOps.WithUnit(state, TargetId, t =>
+        var targetBefore = state.GetUnitOrNull(TargetId);
+        if (targetBefore is null) return state;
+
+        var damageResult = DamageCalculation.ApplyDamage(targetBefore, raw);
+        state = WorldStateOps.WithUnit(state, TargetId, _ => damageResult.ModifiedUnit);
+
+        // Calculate actual damage dealt (for lifesteal calculation)
+        int actualDamage = Math.Max(0, raw - damageResult.DamageBlocked);
+
+        // Thorn damage reflection (if defender has thorn shield)
+        var targetAfter = state.GetUnitOrNull(TargetId);
+        if (targetAfter is not null && au is not null)
         {
-            var result = DamageCalculation.ApplyDamage(t, raw);
-            return result.ModifiedUnit;
-        });
+            int thornDamage = DamageCalculation.CalculateThornReflection(targetAfter);
+            if (thornDamage > 0)
+            {
+                // Apply thorn damage to attacker
+                state = WorldStateOps.WithUnit(state, AttackerId, a =>
+                {
+                    var thornResult = DamageCalculation.ApplyDamage(a, thornDamage);
+                    return thornResult.ModifiedUnit;
+                });
+            }
+        }
+
+        // Lifesteal (based on actual damage dealt)
+        if (au is not null && actualDamage > 0)
+        {
+            var attackerCurrent = state.GetUnitOrNull(AttackerId);
+            if (attackerCurrent is not null)
+            {
+                var (healAmount, modifiedAttacker) = DamageCalculation.ApplyLifesteal(attackerCurrent, actualDamage);
+                if (healAmount > 0)
+                {
+                    state = WorldStateOps.WithUnit(state, AttackerId, _ => modifiedAttacker);
+                }
+            }
+        }
+
+        return state;
     };
 
     public override ImmutableHashSet<string> ReadVars => ImmutableHashSet<string>.Empty
@@ -482,6 +552,127 @@ public sealed record DashTowards(string Id, string TargetId, int MaxSteps) : Ato
         .Add(UnitVarKey(Id, Keys.Pos))
         .Add(UnitVarKey(TargetId, Keys.Pos));
     public override ImmutableHashSet<string> WriteVars => ImmutableHashSet<string>.Empty.Add(UnitVarKey(Id, Keys.Pos));
+}
+
+/// <summary>
+/// Knockback: Push target away from source by specified distance.
+/// Stops if blocked by another unit or edge of map.
+/// </summary>
+public sealed record Knockback(string SourceId, string TargetId, int Distance) : AtomicAction
+{
+    public override Effect Compile() => state =>
+    {
+        if (!state.Units.TryGetValue(SourceId, out var source) || !state.Units.TryGetValue(TargetId, out var target))
+            return state;
+        if (!source.Vars.TryGetValue(Keys.Pos, out var sp) || sp is not Coord sourcePos)
+            return state;
+        if (!target.Vars.TryGetValue(Keys.Pos, out var tp) || tp is not Coord targetPos)
+            return state;
+
+        int distance = Math.Max(0, Distance);
+        if (distance == 0) return state;
+
+        // Calculate knockback direction (away from source)
+        int dx = Math.Sign(targetPos.X - sourcePos.X);
+        int dy = Math.Sign(targetPos.Y - sourcePos.Y);
+
+        // If target is at same position as source, no knockback direction
+        if (dx == 0 && dy == 0) return state;
+
+        var finalPos = targetPos;
+        for (int i = 0; i < distance; i++)
+        {
+            Coord nextPos = finalPos;
+            // Move along the direction vector
+            if (dx != 0) nextPos = new Coord(finalPos.X + dx, finalPos.Y);
+            else if (dy != 0) nextPos = new Coord(finalPos.X, finalPos.Y + dy);
+
+            // Check if blocked by another alive unit
+            bool blocked = false;
+            foreach (var (id, u) in state.Units)
+            {
+                if (id == TargetId) continue;
+                if (u.Vars.TryGetValue(Keys.Hp, out var hv) && hv is int hi && hi <= 0) continue;
+                if (u.Vars.TryGetValue(Keys.Pos, out var pv) && pv is Coord pos && pos.Equals(nextPos))
+                {
+                    blocked = true;
+                    break;
+                }
+            }
+
+            if (blocked) break;
+            finalPos = nextPos;
+        }
+
+        return WorldStateOps.WithUnit(state, TargetId, t => t with { Vars = t.Vars.SetItem(Keys.Pos, finalPos) });
+    };
+
+    public override ImmutableHashSet<string> ReadVars => ImmutableHashSet<string>.Empty
+        .Add(UnitVarKey(SourceId, Keys.Pos))
+        .Add(UnitVarKey(TargetId, Keys.Pos));
+    public override ImmutableHashSet<string> WriteVars => ImmutableHashSet<string>.Empty.Add(UnitVarKey(TargetId, Keys.Pos));
+}
+
+/// <summary>
+/// Pull: Pull target towards source by specified distance.
+/// Stops if blocked by another unit.
+/// </summary>
+public sealed record Pull(string SourceId, string TargetId, int Distance) : AtomicAction
+{
+    public override Effect Compile() => state =>
+    {
+        if (!state.Units.TryGetValue(SourceId, out var source) || !state.Units.TryGetValue(TargetId, out var target))
+            return state;
+        if (!source.Vars.TryGetValue(Keys.Pos, out var sp) || sp is not Coord sourcePos)
+            return state;
+        if (!target.Vars.TryGetValue(Keys.Pos, out var tp) || tp is not Coord targetPos)
+            return state;
+
+        int distance = Math.Max(0, Distance);
+        if (distance == 0) return state;
+
+        // Calculate pull direction (towards source)
+        int dx = Math.Sign(sourcePos.X - targetPos.X);
+        int dy = Math.Sign(sourcePos.Y - targetPos.Y);
+
+        // If target is at same position as source, no pull needed
+        if (dx == 0 && dy == 0) return state;
+
+        var finalPos = targetPos;
+        for (int i = 0; i < distance; i++)
+        {
+            Coord nextPos = finalPos;
+            // Move along the direction vector towards source
+            if (dx != 0) nextPos = new Coord(finalPos.X + dx, finalPos.Y);
+            else if (dy != 0) nextPos = new Coord(finalPos.X, finalPos.Y + dy);
+
+            // Stop if we've reached the source position
+            if (nextPos.Equals(sourcePos)) break;
+
+            // Check if blocked by another alive unit
+            bool blocked = false;
+            foreach (var (id, u) in state.Units)
+            {
+                if (id == TargetId || id == SourceId) continue;
+                if (u.Vars.TryGetValue(Keys.Hp, out var hv) && hv is int hi && hi <= 0) continue;
+                if (u.Vars.TryGetValue(Keys.Pos, out var pv) && pv is Coord pos && pos.Equals(nextPos))
+                {
+                    blocked = true;
+                    break;
+                }
+            }
+
+            if (blocked) break;
+            finalPos = nextPos;
+        }
+
+        return WorldStateOps.WithUnit(state, TargetId, t => t with { Vars = t.Vars.SetItem(Keys.Pos, finalPos) });
+    };
+
+    public override ImmutableHashSet<string> ReadVars => ImmutableHashSet<string>.Empty
+        .Add(UnitVarKey(SourceId, Keys.Pos))
+        .Add(UnitVarKey(TargetId, Keys.Pos));
+    public override ImmutableHashSet<string> WriteVars => ImmutableHashSet<string>.Empty.Add(UnitVarKey(TargetId, Keys.Pos));
 }
 
 public sealed record AddGlobalTag(string Tag) : AtomicAction

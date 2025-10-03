@@ -384,3 +384,4 @@ secrets.json
 *.msix
 *.apk
 *.aab
+/LB_FATE.Mobile/todo.md

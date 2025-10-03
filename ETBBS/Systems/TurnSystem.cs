@@ -162,6 +162,104 @@ public sealed class TurnSystem
                 cur = WorldStateOps.WithUnit(cur, id, u => u with { Vars = u.Vars.SetItem(Keys.DamageReductionTurns, newTurns) });
             }
 
+            // Slow debuff tick (restores original speed when expires)
+            int slowTurns = unit.GetIntVar(Keys.SlowTurns);
+            if (slowTurns > 0)
+            {
+                var newTurns = slowTurns - 1;
+                cur = WorldStateOps.WithUnit(cur, id, u => u with { Vars = u.Vars.SetItem(Keys.SlowTurns, newTurns) });
+                if (newTurns <= 0)
+                {
+                    // Restore original speed if stored
+                    cur = WorldStateOps.WithUnit(cur, id, u =>
+                    {
+                        if (u.Vars.TryGetValue(Keys.OriginalSpeed, out var origSpeed))
+                            return u with { Vars = u.Vars.SetItem(Keys.Speed, origSpeed).Remove(Keys.OriginalSpeed).Remove(Keys.SlowTurns) };
+                        return u with { Vars = u.Vars.Remove(Keys.SlowTurns) };
+                    });
+                    log.Info($"Slow debuff expired for {id}, speed restored");
+                }
+            }
+
+            // Weakened attack tick (restores original attack when expires)
+            int weakenedAttackTurns = unit.GetIntVar(Keys.WeakenedAttackTurns);
+            if (weakenedAttackTurns > 0)
+            {
+                var newTurns = weakenedAttackTurns - 1;
+                cur = WorldStateOps.WithUnit(cur, id, u => u with { Vars = u.Vars.SetItem(Keys.WeakenedAttackTurns, newTurns) });
+                if (newTurns <= 0)
+                {
+                    // Restore attack by adding back the debuff amount
+                    cur = WorldStateOps.WithUnit(cur, id, u =>
+                    {
+                        int debuffAmount = u.GetIntVar(Keys.AttackDebuffAmount, 0);
+                        int currentAtk = u.GetIntVar(Keys.Atk, 0);
+                        return u with { Vars = u.Vars.SetItem(Keys.Atk, currentAtk + debuffAmount).Remove(Keys.WeakenedAttackTurns).Remove(Keys.AttackDebuffAmount) };
+                    });
+                    log.Info($"Weakened attack expired for {id}, attack restored");
+                }
+            }
+
+            // Weakened magic attack tick (restores original magic attack when expires)
+            int weakenedMagicAttackTurns = unit.GetIntVar(Keys.WeakenedMagicAttackTurns);
+            if (weakenedMagicAttackTurns > 0)
+            {
+                var newTurns = weakenedMagicAttackTurns - 1;
+                cur = WorldStateOps.WithUnit(cur, id, u => u with { Vars = u.Vars.SetItem(Keys.WeakenedMagicAttackTurns, newTurns) });
+                if (newTurns <= 0)
+                {
+                    // Restore magic attack by adding back the debuff amount
+                    cur = WorldStateOps.WithUnit(cur, id, u =>
+                    {
+                        int debuffAmount = u.GetIntVar(Keys.MagicAttackDebuffAmount, 0);
+                        int currentMAtk = u.GetIntVar(Keys.MAtk, 0);
+                        return u with { Vars = u.Vars.SetItem(Keys.MAtk, currentMAtk + debuffAmount).Remove(Keys.WeakenedMagicAttackTurns).Remove(Keys.MagicAttackDebuffAmount) };
+                    });
+                    log.Info($"Weakened magic attack expired for {id}, magic attack restored");
+                }
+            }
+
+            // Intimidated debuff tick (affects both attack and magic attack)
+            int intimidatedTurns = unit.GetIntVar(Keys.IntimidatedTurns);
+            if (intimidatedTurns > 0)
+            {
+                var newTurns = intimidatedTurns - 1;
+                cur = WorldStateOps.WithUnit(cur, id, u => u with { Vars = u.Vars.SetItem(Keys.IntimidatedTurns, newTurns) });
+                log.Info($"Intimidated tick for {id}: {intimidatedTurns} -> {newTurns}");
+            }
+
+            // Weakened defense tick (restores original defense when expires)
+            int weakenedDefenseTurns = unit.GetIntVar(Keys.WeakenedDefenseTurns);
+            if (weakenedDefenseTurns > 0)
+            {
+                var newTurns = weakenedDefenseTurns - 1;
+                cur = WorldStateOps.WithUnit(cur, id, u => u with { Vars = u.Vars.SetItem(Keys.WeakenedDefenseTurns, newTurns) });
+                if (newTurns <= 0)
+                {
+                    // Restore defense by adding back the debuff amount
+                    cur = WorldStateOps.WithUnit(cur, id, u =>
+                    {
+                        int debuffAmount = u.GetIntVar(Keys.DefenseDebuffAmount, 0);
+                        int currentDef = u.GetIntVar(Keys.Def, 0);
+                        return u with { Vars = u.Vars.SetItem(Keys.Def, currentDef + debuffAmount).Remove(Keys.WeakenedDefenseTurns).Remove(Keys.DefenseDebuffAmount) };
+                    });
+                    log.Info($"Weakened defense expired for {id}, defense restored");
+                }
+            }
+
+            // Thorn shield duration tick (damage reflection handled in DamageCalculation)
+            int thornShieldTurns = unit.GetIntVar(Keys.ThornShieldTurns);
+            if (thornShieldTurns > 0)
+            {
+                var newTurns = thornShieldTurns - 1;
+                cur = WorldStateOps.WithUnit(cur, id, u => u with { Vars = u.Vars.SetItem(Keys.ThornShieldTurns, newTurns) });
+                if (newTurns <= 0)
+                {
+                    cur = WorldStateOps.WithUnit(cur, id, u => u with { Vars = u.Vars.Remove(Keys.ThornShieldTurns).Remove(Keys.ThornDamage) });
+                    log.Info($"Thorn shield expired for {id}");
+                }
+            }
+
             // mp regen
             if (unit.Vars.TryGetValue(Keys.MpRegenPerTurn, out var rv))
             {
@@ -299,6 +397,56 @@ public sealed class TurnSystem
                 });
                 events?.Publish(EventTopics.ActionExecuted, new ActionExecutedEvent(state, cur, new Damage(id, damagePerTurn)));
                 log.Info($"Burn tick on {id}: -{damagePerTurn}");
+            }
+
+            // Generic *_turns countdown: handle any custom *_turns variables not explicitly handled above
+            // This allows role designers to create custom timed effects without modifying TurnSystem
+            var knownTurnsVars = new HashSet<string>
+            {
+                Keys.UndyingTurns, Keys.StunnedTurns, Keys.SilencedTurns, Keys.RootedTurns,
+                Keys.StatusImmuneTurns, Keys.NoHealTurns, Keys.TempEvasionBonusTurns,
+                Keys.ForceIgnoreDefTurns, Keys.DamageReductionTurns, Keys.SlowTurns,
+                Keys.WeakenedAttackTurns, Keys.WeakenedMagicAttackTurns, Keys.WeakenedDefenseTurns,
+                Keys.IntimidatedTurns, Keys.ThornShieldTurns, Keys.OnDamageHealTurns,
+                Keys.UntargetableTurns, Keys.CannotActTurns, Keys.BleedTurns, Keys.BurnTurns
+            };
+
+            var customTurnsVars = unit.Vars
+                .Where(kv => kv.Key.EndsWith("_turns") && !knownTurnsVars.Contains(kv.Key))
+                .ToList();
+
+            foreach (var (key, value) in customTurnsVars)
+            {
+                int turns = value switch
+                {
+                    int i => i,
+                    long l => (int)l,
+                    double d => (int)Math.Round(d),
+                    _ => 0
+                };
+
+                if (turns > 0)
+                {
+                    int newTurns = turns - 1;
+                    cur = WorldStateOps.WithUnit(cur, id, u =>
+                    {
+                        if (newTurns <= 0)
+                        {
+                            // Remove the *_turns variable when it reaches 0
+                            // Also remove corresponding tag if it exists (e.g., exposed_turns -> exposed)
+                            var tagName = key.Replace("_turns", "");
+                            return u with
+                            {
+                                Vars = u.Vars.Remove(key),
+                                Tags = u.Tags.Contains(tagName) ? u.Tags.Remove(tagName) : u.Tags
+                            };
+                        }
+                        else
+                        {
+                            return u with { Vars = u.Vars.SetItem(key, newTurns) };
+                        }
+                    });
+                }
             }
         }
 

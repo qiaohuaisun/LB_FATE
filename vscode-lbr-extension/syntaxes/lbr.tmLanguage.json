@@ -45,7 +45,7 @@
         },
         {
           "name": "keyword.action.lbr",
-          "match": "\\b(deal|heal|set|add|remove|move|dash|physical|magic|damage|tag|var|global|tile|unit)\\b"
+          "match": "\\b(deal|heal|set|add|remove|move|dash|knockback|pull|physical|magic|damage|tag|var|global|tile|unit)\\b"
         },
         {
           "name": "keyword.selector.lbr",

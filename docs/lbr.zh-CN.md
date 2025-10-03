@@ -474,6 +474,36 @@ dash towards target up to 3
 dash towards unit id "boss" up to 5
 ```
 
+#### 击退
+
+```lbr
+# 将目标从施法者位置击退2格
+knockback target 2
+
+# 从特定单位位置击退目标
+knockback target 3 from unit id "boss"
+```
+
+**说明**:
+- 击退方向由源单位指向目标单位计算
+- 如果路径上有其他单位阻挡，提前停止
+- 击退距离为实际移动的格数
+
+#### 拉取
+
+```lbr
+# 将目标拉向施法者2格
+pull target 2
+
+# 将目标拉向特定单位
+pull target 3 towards unit id "boss"
+```
+
+**说明**:
+- 拉取方向由目标单位指向源单位计算
+- 如果路径上有其他单位阻挡，提前停止
+- 拉取距离为实际移动的格数
+
 ### 6.5 标签操作
 
 #### 单位标签

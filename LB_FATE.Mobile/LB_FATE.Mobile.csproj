@@ -68,6 +68,13 @@
 	</ItemGroup>
 
 	<ItemGroup>
+	  <None Remove="create-certificate.ps1" />
+	  <None Remove="diagnose_cert.ps1" />
+	  <None Remove="export_certificate.ps1" />
+	  <None Remove="todo.md" />
+	</ItemGroup>
+
+	<ItemGroup>
 		<PackageReference Include="Microsoft.Maui.Controls" Version="10.0.0-rc.1.25452.6" />
 		<PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="10.0.0-rc.1.25451.107" />
 		<PackageReference Include="CommunityToolkit.Mvvm" Version="8.3.2" />

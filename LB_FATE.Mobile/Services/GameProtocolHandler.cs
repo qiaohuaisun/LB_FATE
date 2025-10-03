@@ -191,39 +191,26 @@ public class GameProtocolHandler
 
     private void CheckBossQuote(string cleanLine)
     {
-        // 检测Boss台词协议标记: [BOSS_QUOTE:eventType:context] 内容
+        // 检测Boss台词协议标记: [BOSS_QUOTE:eventType:context]|台词内容
+        // 使用|分隔符，避免台词中的引号等特殊字符干扰解析
         if (!cleanLine.StartsWith("[BOSS_QUOTE:")) return;
-        var match = Regex.Match(cleanLine, @"^\[BOSS_QUOTE:([^:]+):([^\]]*)\]\s*(.+)");
+
+        // 查找]|分隔符位置
+        int separatorIndex = cleanLine.IndexOf("]|");
+        if (separatorIndex == -1) return;
+
+        // 提取协议头和台词内容
+        string header = cleanLine.Substring(0, separatorIndex + 1);
+        string quote = cleanLine.Substring(separatorIndex + 2); // 跳过]|
+
+        // 解析协议头: [BOSS_QUOTE:eventType:context]
+        var match = Regex.Match(header, @"^\[BOSS_QUOTE:([^:]+):([^\]]*)\]");
         if (match.Success)
         {
             var eventType = match.Groups[1].Value;
             var context = match.Groups[2].Value;
-            var content = match.Groups[3].Value;
 
-            // 提取台词文本（去除 "💬 【XXX】："" 的格式）
-            // 支持多种格式：💬 【Boss名】："台词" 或 💬 【Boss名】: "台词" 或直接 "台词"
-            string quote = content;
-
-            // 尝试匹配 💬 【XXX】："台词" 或 💬 【XXX】: "台词"
-            var quoteMatch1 = Regex.Match(content, @"💬\s*【[^】]+】\s*[：:]\s*[\""]([^\""]+)[\""]");
-            if (quoteMatch1.Success)
-            {
-                quote = quoteMatch1.Groups[1].Value;
-            }
-            else
-            {
-                // 尝试匹配直接的引号内容 "台词"
-                var quoteMatch2 = Regex.Match(content, @"[\""]([^\""]+)[\""]");
-                if (quoteMatch2.Success)
-                {
-                    quote = quoteMatch2.Groups[1].Value;
-                }
-                else
-                {
-                    // 移除可能的前缀标记
-                    quote = Regex.Replace(content, @"^💬\s*【[^】]+】\s*[：:]\s*", "").Trim();
-                }
-            }
+            // quote已经是纯净的台词内容，无需进一步处理
 
             // 协议层去重：检查提取后的纯台词内容和时间间隔
             var now = DateTime.Now;
@@ -246,7 +233,7 @@ public class GameProtocolHandler
                 Quote = quote,
                 EventType = eventType,
                 Context = context,
-                RawMessage = content
+                RawMessage = cleanLine
             });
         }
     }

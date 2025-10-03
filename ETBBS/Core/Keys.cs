@@ -213,6 +213,60 @@ public static class Keys
 
     /// <summary>Amount of healing triggered per damage instance. Type: int</summary>
     public const string OnDamageHealValue = "on_damage_heal_value";
+
+    /// <summary>Number of turns the thorn shield is active (reflects damage to attacker). Type: int</summary>
+    public const string ThornShieldTurns = "thorn_shield_turns";
+
+    /// <summary>Amount of damage reflected back to attackers per hit. Type: int</summary>
+    public const string ThornDamage = "thorn_damage";
+
+    // ===== Attribute Debuff Durations =====
+
+    /// <summary>Number of turns the unit's speed is reduced. Type: int</summary>
+    public const string SlowTurns = "slow_turns";
+
+    /// <summary>Original speed value before debuff (for restoration). Type: int</summary>
+    public const string OriginalSpeed = "original_speed";
+
+    /// <summary>Number of turns the unit's attack power is reduced. Type: int</summary>
+    public const string WeakenedAttackTurns = "weakened_attack_turns";
+
+    /// <summary>Attack power reduction amount. Type: int</summary>
+    public const string AttackDebuffAmount = "attack_debuff_amount";
+
+    /// <summary>Number of turns the unit's magic attack is reduced. Type: int</summary>
+    public const string WeakenedMagicAttackTurns = "weakened_magic_attack_turns";
+
+    /// <summary>Magic attack reduction amount. Type: int</summary>
+    public const string MagicAttackDebuffAmount = "magic_attack_debuff_amount";
+
+    /// <summary>Number of turns the unit is intimidated (attack/magic attack reduced). Type: int</summary>
+    public const string IntimidatedTurns = "intimidated_turns";
+
+    /// <summary>Number of turns the unit's defense is reduced. Type: int</summary>
+    public const string WeakenedDefenseTurns = "weakened_defense_turns";
+
+    /// <summary>Defense reduction amount. Type: int</summary>
+    public const string DefenseDebuffAmount = "defense_debuff_amount";
+
+    // ===== Positioning and Movement =====
+
+    /// <summary>Distance to knock back the target. Type: int (tiles)</summary>
+    public const string KnockbackDistance = "knockback_distance";
+
+    /// <summary>Direction of knockback (away from source). Type: string or Coord</summary>
+    public const string KnockbackDirection = "knockback_direction";
+
+    // ===== HP Threshold Triggers =====
+
+    /// <summary>HP percentage threshold for triggering passive abilities. Type: double (0.0-1.0)</summary>
+    public const string HpThreshold = "hp_threshold";
+
+    /// <summary>Skill ID to trigger when HP falls below threshold. Type: string</summary>
+    public const string ThresholdSkillId = "threshold_skill_id";
+
+    /// <summary>Flag indicating if threshold ability has been triggered. Type: bool</summary>
+    public const string ThresholdTriggered = "threshold_triggered";
 }
 
 /// <summary>

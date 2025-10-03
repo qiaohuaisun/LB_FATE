@@ -16,7 +16,7 @@ public partial class GamePage : ContentPage
     private readonly List<(double x, double y)> _activeQuotePositions = new(); // 活跃台词位置列表
     private string? _lastQuote = null;
     private DateTime _lastQuoteTime = DateTime.MinValue;
-    private const int MaxConcurrentQuotes = 4; // 最多同时显示4个台词
+    private const int MaxConcurrentQuotes = 7; // 最多同时显示7个台词（提高沉浸感）
 
     public GamePage(GameViewModel viewModel)
     {

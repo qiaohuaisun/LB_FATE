@@ -54,6 +54,8 @@ role "<Name>" id "<id>" {
 - Position/AoE:
   - `move <unit> to (<x>,<y>)`
   - `dash towards <unit> up to <N>`
+  - `knockback <unit> <N>` - Push target N tiles away from caster (stops early if blocked by other units)
+  - `pull <unit> <N>` - Pull target N tiles towards caster (stops early if blocked by other units)
   - `line [physical|magic] <P> to <unit> length <L> [radius <R>] [ignore ... <X>%]`
   - `line <P> to <unit> length <L> [radius <R>]` (true damage)
 - Tags/vars/resources:

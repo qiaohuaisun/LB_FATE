@@ -314,6 +314,30 @@ public static partial class TextDsl
                 case ActionKind.RemoveGlobalVar:
                     s.RemoveGlobalVar(KeyArg);
                     break;
+                case ActionKind.Knockback:
+                    s.TargetUnit(Target.BuildSelector(opts, getIt), (sub, tid) =>
+                    {
+                        sub.Do(ctx =>
+                        {
+                            var src = FromUnit?.ResolveId(ctx, opts, getIt()) ?? opts.ResolveCasterId(ctx);
+                            var trace = TraceExtensions.CurrentTrace;
+                            trace?.LogAction("knockback", $"{tid} away from {src} by {IntArg}");
+                            return new ETBBS.Knockback(src, tid, IntArg);
+                        });
+                    });
+                    break;
+                case ActionKind.Pull:
+                    s.TargetUnit(Target.BuildSelector(opts, getIt), (sub, tid) =>
+                    {
+                        sub.Do(ctx =>
+                        {
+                            var src = FromUnit?.ResolveId(ctx, opts, getIt()) ?? opts.ResolveCasterId(ctx);
+                            var trace = TraceExtensions.CurrentTrace;
+                            trace?.LogAction("pull", $"{tid} towards {src} by {IntArg}");
+                            return new ETBBS.Pull(src, tid, IntArg);
+                        });
+                    });
+                    break;
                 case ActionKind.LinePhysicalAoe:
                     s.TargetUnit(Target.BuildSelector(opts, getIt), (sub, tid) =>
                     {
@@ -360,6 +384,8 @@ public static partial class TextDsl
         , RemoveUnitVar
         , RemoveTileVar
         , RemoveGlobalVar
+        , Knockback
+        , Pull
     }
 
     private abstract class CondExpr

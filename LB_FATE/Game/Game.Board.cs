@@ -55,8 +55,9 @@ partial class Game
     /// </summary>
     private void BroadcastBossQuote(string quote, string eventType, string? context = null)
     {
-        // 为网络客户端添加特殊协议标记，让客户端能识别并应用特效
-        var networkMessage = $"[BOSS_QUOTE:{eventType}:{context ?? ""}] 💬 【{bossName}】：\"{quote}\"";
+        // 为网络客户端添加特殊协议标记，使用|分隔符避免引号冲突
+        // 格式：[BOSS_QUOTE:eventType:context]|台词内容
+        var networkMessage = $"[BOSS_QUOTE:{eventType}:{context ?? ""}]|{quote}";
 
         // 控制台显示增强效果
         var consoleMessage = $"{AnsiColor.Bold}{AnsiColor.BrightRed}💬 【{bossName}】{AnsiColor.Reset}{AnsiColor.BrightYellow}：\"{quote}\"{AnsiColor.Reset}";

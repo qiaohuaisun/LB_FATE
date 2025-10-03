@@ -15,7 +15,12 @@
       "Bash(Select-Object -First 20)",
       "Bash(dotnet restore:*)",
       "Bash(dotnet publish:*)",
-      "Bash(test:*)"
+      "Bash(test:*)",
+      "Bash(dotnet test:*)",
+      "Bash(Select-Object -First 50)",
+      "Bash(npm run compile:*)",
+      "Bash(Select-String -Pattern \"pedro|error|warning\" -Context 2)",
+      "Bash(PowerShell.exe:*)"
     ],
     "deny": [],
     "ask": []

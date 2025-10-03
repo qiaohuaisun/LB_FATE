@@ -224,7 +224,9 @@ sealed class LspServer
         else if (prefix.EndsWith("add ")) Add("tag ", "global tag ");
         else if (prefix.EndsWith("remove ")) Add("tag ", "global tag ", "global var ", "unit var ", "tile var ");
         else if (prefix.EndsWith("distance ")) Add("manhattan", "chebyshev", "euclidean");
-        else Add("role", "description", "vars", "tags", "skills", "skill", "range", "min_range", "cooldown", "distance", "targeting", "ends_turn", "sealed_until", "for", "each", "deal", "heal", "set", "add", "remove", "move", "dash");
+        else if (prefix.EndsWith("knockback ")) Add("target ", "it ");
+        else if (prefix.EndsWith("pull ")) Add("target ", "it ");
+        else Add("role", "description", "vars", "tags", "skills", "skill", "range", "min_range", "cooldown", "distance", "targeting", "ends_turn", "sealed_until", "for", "each", "deal", "heal", "set", "add", "remove", "move", "dash", "knockback", "pull");
 
         // Contextual suggestions for point/tile modes
         if (prefix.Contains("targeting point"))
@@ -610,6 +612,8 @@ sealed class LspServer
                 "each" => "选择要遍历的单位集合",
                 "nearest" => "选择器：按距离最近排序",
                 "farthest" => "选择器：按距离最远排序",
+                "knockback" => "动作：击退目标 N 格 - 将单位推离源单位。被其他单位阻挡。",
+                "pull" => "动作：拉取目标 N 格 - 将单位拉向源单位。被其他单位阻挡。",
                 _ => eng
             };
         }
@@ -713,6 +717,8 @@ sealed class LspServer
         ["for"] = "Loop over selected units: `for each enemies ... do { ... }`",
         ["each"] = "Select units to iterate",
         ["nearest"] = "Selector: nearest units by distance",
-        ["farthest"] = "Selector: farthest units by distance"
+        ["farthest"] = "Selector: farthest units by distance",
+        ["knockback"] = "Action: knockback target N (distance) - push unit away from source. Blocked by other units.",
+        ["pull"] = "Action: pull target N (distance) - pull unit towards source. Blocked by other units."
     };
 }

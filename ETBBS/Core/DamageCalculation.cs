@@ -157,4 +157,53 @@ public static class DamageCalculation
             return (remaining, newUnit);
         }
     }
+
+    /// <summary>
+    /// Calculates and applies lifesteal healing to the attacker based on damage dealt.
+    /// Respects max HP limits and no-heal restrictions.
+    /// </summary>
+    /// <param name="attacker">The attacking unit</param>
+    /// <param name="damageDealt">Actual damage dealt (after shields/reduction)</param>
+    /// <returns>(healAmount, modifiedAttacker)</returns>
+    public static (int HealAmount, UnitState ModifiedAttacker) ApplyLifesteal(UnitState attacker, int damageDealt)
+    {
+        double lifestealRate = attacker.GetDoubleVar(Keys.Lifesteal);
+        if (lifestealRate <= 0 || damageDealt <= 0)
+            return (0, attacker);
+
+        // Calculate heal amount
+        int healAmount = (int)Math.Round(damageDealt * lifestealRate);
+        if (healAmount <= 0)
+            return (0, attacker);
+
+        // Check no-heal restriction
+        int noHealTurns = attacker.GetIntVar(Keys.NoHealTurns);
+        if (noHealTurns > 0)
+            return (0, attacker);
+
+        // Apply healing with max HP cap
+        int currentHp = attacker.GetIntVar(Keys.Hp);
+        int maxHp = attacker.GetIntVar(Keys.MaxHp, int.MaxValue);
+        int newHp = Math.Min(maxHp, currentHp + healAmount);
+        int actualHeal = newHp - currentHp;
+
+        var modifiedAttacker = attacker with { Vars = attacker.Vars.SetItem(Keys.Hp, newHp) };
+        return (actualHeal, modifiedAttacker);
+    }
+
+    /// <summary>
+    /// Calculates thorn damage reflection from a defender.
+    /// Returns the amount of damage that should be dealt back to the attacker.
+    /// </summary>
+    /// <param name="defender">The defending unit with potential thorn shield</param>
+    /// <returns>Thorn damage amount (0 if no thorn shield active)</returns>
+    public static int CalculateThornReflection(UnitState defender)
+    {
+        int thornShieldTurns = defender.GetIntVar(Keys.ThornShieldTurns);
+        if (thornShieldTurns <= 0)
+            return 0;
+
+        int thornDamage = defender.GetIntVar(Keys.ThornDamage);
+        return Math.Max(0, thornDamage);
+    }
 }

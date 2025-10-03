@@ -608,6 +608,18 @@ public static partial class TextDsl
                 RequireKeyword("towards"); var ur = ParseUnitRef(); RequireKeyword("up"); RequireKeyword("to"); var n = ParseInt();
                 return new ActionStmt { Kind = ActionKind.DashTowards, Target = ur, IntArg = n };
             }
+            // knockback <unit> N
+            if (TryKeyword("knockback"))
+            {
+                var ur = ParseUnitRef(); var distance = ParseInt();
+                return new ActionStmt { Kind = ActionKind.Knockback, Target = ur, IntArg = distance };
+            }
+            // pull <unit> N
+            if (TryKeyword("pull"))
+            {
+                var ur = ParseUnitRef(); var distance = ParseInt();
+                return new ActionStmt { Kind = ActionKind.Pull, Target = ur, IntArg = distance };
+            }
             // line physical N to <unit> length L [radius R]
             if (TryKeyword("line"))
             {
@@ -656,7 +668,7 @@ public static partial class TextDsl
                 }
             }
             throw ErrorWithSuggestion("unknown action",
-                "Expected one of: deal, heal, add, remove, move, dash, line, consume, set");
+                "Expected one of: deal, heal, add, remove, move, dash, knockback, pull, line, consume, set");
         }
 
         private UnitRef ParseUnitRefInParensOptional()

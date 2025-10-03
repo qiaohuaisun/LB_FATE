@@ -11,10 +11,10 @@ public partial class GamePage
         if (BossQuoteLayer == null || string.IsNullOrWhiteSpace(quote))
             return;
 
-        // UI 去重：短时间内相同台词不重复
+        // UI 去重：短时间内相同台词不重复（缩短时间以提高出现频率）
         var now = DateTime.Now;
         var timeSinceLast = now - _lastQuoteTime;
-        if (_lastQuote == quote && timeSinceLast.TotalMilliseconds < 3000)
+        if (_lastQuote == quote && timeSinceLast.TotalMilliseconds < 1500)
             return;
 
         _lastQuote = quote;
@@ -167,11 +167,11 @@ public partial class GamePage
             return;
         }
 
-        // 打完字后保证停留（包含已用时间），然后淡出
-        int baseMs = 1200, perCharMs = 35, maxMs = 3000;
+        // 打完字后保证停留（包含已用时间），然后淡出（延长停留时间以增强沉浸感）
+        int baseMs = 1800, perCharMs = 45, maxMs = 4500;
         int targetTotal = Math.Min(maxMs, baseMs + Math.Min(quote.Length, 80) * perCharMs);
         int typedMs = (int)sw.ElapsedMilliseconds;
-        int holdMs = Math.Max(900, targetTotal - typedMs);
+        int holdMs = Math.Max(1200, targetTotal - typedMs);
         if (!ct.IsCancellationRequested && holdMs > 0)
             await Task.Delay(holdMs);
 
