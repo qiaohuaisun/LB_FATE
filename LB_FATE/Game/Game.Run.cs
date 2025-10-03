@@ -20,6 +20,13 @@ partial class Game
         }
         int day = 1;
         lastDay = day; lastPhase = 1;
+
+        // 游戏开始前广播初始地图状态，让客户端能看到初始布局
+        if (endpoints.Count > 0)
+        {
+            BroadcastBoard(day, lastPhase);
+        }
+
         while (Alive().Count > 1)
         {
             for (int phase = 1; phase <= 5; phase++)
@@ -27,6 +34,8 @@ partial class Game
                 lastDay = day; lastPhase = phase;
                 ServerLog($"-- Day {day} Phase {phase} --");
                 if (phase == 1) { RefillAllMpToMax(); AppendPublic(new[] { "MP 已回满" }); }
+
+                // 显示当前阶段的棋盘（控制台 + 网络客户端）
                 ShowBoard(day, phase);
                 BroadcastBoard(day, phase);
                 var order = Alive().OrderBy(_ => rng.Next()).ToList();

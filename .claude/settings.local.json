@@ -1,23 +1,12 @@
 {
   "permissions": {
     "allow": [
-      "Bash(python3:*)",
-      "Bash(grep:*)",
-      "Bash(dotnet tool install:*)",
-      "Bash(dotnet test)",
-      "Bash(dotnet build)",
-      "Bash(dotnet test:*)",
-      "Bash(reportgenerator:*)",
-      "Bash(dotnet build:*)",
-      "Bash(cat:*)",
-      "Bash(awk:*)",
-      "Bash(dotnet run:*)",
-      "Bash(pwsh:*)",
+      "Bash(find:*)",
       "Bash(tree:*)",
-      "Bash(npm run compile:*)",
-      "Bash(for:*)",
-      "Bash(do echo \"=== $f ===\")",
-      "Bash(done)"
+      "Bash(awk:*)",
+      "Read(//d/Data/设定/**)",
+      "Bash(dotnet build:*)",
+      "Bash(dotnet clean:*)"
     ],
     "deny": [],
     "ask": []

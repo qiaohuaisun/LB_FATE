@@ -46,6 +46,44 @@ partial class Game
         }
     }
 
+    /// <summary>
+    /// 广播Boss台词，带特殊视觉效果和协议标记
+    /// </summary>
+    private void BroadcastBossQuote(string quote, string eventType, string? context = null)
+    {
+        // 为网络客户端添加特殊协议标记，让客户端能识别并应用特效
+        var networkMessage = $"[BOSS_QUOTE:{eventType}:{context ?? ""}] 💬 【{bossName}】：\"{quote}\"";
+
+        // 控制台显示增强效果
+        var consoleMessage = $"{AnsiColor.Bold}{AnsiColor.BrightRed}💬 【{bossName}】{AnsiColor.Reset}{AnsiColor.BrightYellow}：\"{quote}\"{AnsiColor.Reset}";
+
+        // 根据事件类型添加额外装饰
+        switch (eventType)
+        {
+            case "turn_start":
+                consoleMessage = $"{AnsiColor.BrightRed}⚔️  {consoleMessage}  ⚔️{AnsiColor.Reset}";
+                break;
+            case "skill":
+                consoleMessage = $"{AnsiColor.BrightMagenta}✨ {consoleMessage} ✨{AnsiColor.Reset}";
+                break;
+            case "hp_threshold":
+                consoleMessage = $"{AnsiColor.BrightRed}🔥 {consoleMessage} 🔥{AnsiColor.Reset}";
+                break;
+        }
+
+        // 添加到公共日志（用于后续显示）
+        AppendPublic(new[] { networkMessage });
+
+        // 控制台显示
+        Console.WriteLine(consoleMessage);
+
+        // 发送到所有网络客户端
+        foreach (var ep in endpoints.Values)
+        {
+            try { ep.SendLine(networkMessage); } catch { }
+        }
+    }
+
     private List<string> GetBoardLines(int day, int phase, bool includeHighlights = true, string? viewerPid = null)
     {
         var lines = new List<string>();
@@ -116,6 +154,7 @@ partial class Game
         }
         lines.Add(border);
         lines.Add($"{AnsiColor.Bold}{AnsiColor.Yellow}图例 / 状态：{AnsiColor.Reset}");
+        // 只显示当前观看者的详细信息（保持游戏设计：不能看到其他玩家的HP/MP）
         var idsToShow = viewerPid is null ? playerIds.AsEnumerable() : new[] { viewerPid };
         // In boss mode, also show boss status
         if (bossMode && state.Units.ContainsKey(bossId) && GetInt(bossId, Keys.Hp, 0) > 0)
@@ -216,6 +255,10 @@ partial class Game
         foreach (var line in GetBoardLines(day, phase, includeHighlights: true, viewerPid: pid)) ep.SendLine(line);
     }
 
+    /// <summary>
+    /// 向所有已连接的客户端广播当前棋盘状态
+    /// 这个方法会在每次重要的游戏状态变更后自动调用
+    /// </summary>
     private void BroadcastBoard(int day, int phase)
     {
         if (endpoints.Count == 0) return;
@@ -223,8 +266,16 @@ partial class Game
         {
             var pid = kv.Key;
             var ep = kv.Value;
-            var lines = GetBoardLines(day, phase, includeHighlights: false, viewerPid: pid);
-            foreach (var line in lines) ep.SendLine(line);
+            try
+            {
+                // 每个玩家只能看到自己的详细信息，但地图上会显示所有单位的位置
+                var lines = GetBoardLines(day, phase, includeHighlights: false, viewerPid: pid);
+                foreach (var line in lines) ep.SendLine(line);
+            }
+            catch (Exception ex)
+            {
+                ServerLog($"[BroadcastBoard] Failed to send to {pid}: {ex.Message}");
+            }
         }
     }
 

@@ -1,0 +1,15 @@
+    private void AddGameMessage(string message)
+    {
+        var clean = StripAnsi(message).Trim();
+        if (string.IsNullOrEmpty(clean)) return;
+
+        // 优先尝试交互式处理（技能列表、info、help等）
+        if (TryHandleInteractiveMessage(clean))
+        {
+            return;
+        }
+
+        // 全部添加到日志，不再弹窗
+        AppendToLog(clean);
+    }
+

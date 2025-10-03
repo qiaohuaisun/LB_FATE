@@ -1,0 +1,238 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:viewmodels="clr-namespace:LB_FATE.Mobile.ViewModels"
+             x:Class="LB_FATE.Mobile.MainPage"
+             x:DataType="viewmodels:MainViewModel"
+             Title="LB_FATE"
+             BackgroundColor="#F6F8FA">
+
+    <ScrollView>
+        <Grid RowDefinitions="Auto,*,Auto"
+              Padding="{OnIdiom Phone=20, Tablet=30, Desktop=60}"
+              RowSpacing="{OnIdiom Phone=20, Desktop=30}"
+              MaximumWidthRequest="1400"
+              HorizontalOptions="Center">
+
+            <!-- 头部区域 - 渐变背景卡片 -->
+            <Border Grid.Row="0"
+                    Stroke="Transparent"
+                    StrokeThickness="0"
+                    Margin="0,10,0,0"
+                    Padding="30,40">
+                <Border.Background>
+                    <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                        <GradientStop Color="#0969DA" Offset="0.0"/>
+                        <GradientStop Color="#1F6FEB" Offset="1.0"/>
+                    </LinearGradientBrush>
+                </Border.Background>
+                <Border.StrokeShape>
+                    <RoundRectangle CornerRadius="20"/>
+                </Border.StrokeShape>
+                <Border.Shadow>
+                    <Shadow Brush="#000000" Opacity="0.4" Radius="20" Offset="0,8"/>
+                </Border.Shadow>
+
+                <VerticalStackLayout Spacing="12">
+                    <!-- Logo图标 -->
+                    <Label Text="⚔️"
+                           FontSize="64"
+                           HorizontalOptions="Center"/>
+
+                    <Label Text="LB_FATE"
+                           FontSize="{OnIdiom Phone=36, Tablet=44, Default=38}"
+                           FontAttributes="Bold"
+                           TextColor="White"
+                           HorizontalOptions="Center"/>
+
+                    <Label Text="战术回合制游戏"
+                           FontSize="{OnIdiom Phone=16, Tablet=20, Default=17}"
+                           TextColor="White"
+                           Opacity="0.9"
+                           HorizontalOptions="Center"/>
+                </VerticalStackLayout>
+            </Border>
+
+            <!-- 主内容区域 -->
+            <VerticalStackLayout Grid.Row="1"
+                                Spacing="18"
+                                VerticalOptions="Center"
+                                MaximumWidthRequest="500">
+
+                <!-- 使用说明卡片 -->
+                <Border Stroke="#D0D7DE"
+                        StrokeThickness="1"
+                        BackgroundColor="White"
+                        Padding="20"
+                        Margin="0,0,0,5">
+                    <Border.StrokeShape>
+                        <RoundRectangle CornerRadius="12"/>
+                    </Border.StrokeShape>
+                    <Border.Shadow>
+                        <Shadow Brush="Black" Opacity="0.1" Radius="8" Offset="0,2"/>
+                    </Border.Shadow>
+                    <VerticalStackLayout Spacing="8">
+                        <HorizontalStackLayout Spacing="8">
+                            <Label Text="💡" FontSize="18" VerticalOptions="Center"/>
+                            <Label Text="快速开始"
+                                   FontSize="15"
+                                   FontAttributes="Bold"
+                                   TextColor="#1F2328"
+                                   VerticalOptions="Center"/>
+                        </HorizontalStackLayout>
+                        <BoxView Color="#D0D7DE" HeightRequest="1" Margin="0,5"/>
+                        <Label TextColor="#57606A" FontSize="13" LineHeight="1.4">
+                            <Label.FormattedText>
+                                <FormattedString>
+                                    <Span Text="1. 启动 LB_FATE 游戏服务器&#10;"/>
+                                    <Span Text="2. 输入服务器地址（本机: 127.0.0.1）&#10;"/>
+                                    <Span Text="3. 确认端口号（默认: 35500）&#10;"/>
+                                    <Span Text="4. 点击连接按钮开始游戏"/>
+                                </FormattedString>
+                            </Label.FormattedText>
+                        </Label>
+                    </VerticalStackLayout>
+                </Border>
+
+                <!-- 服务器地址输入 -->
+                <VerticalStackLayout Spacing="8">
+                    <Label Text="🌐 服务器地址"
+                           FontSize="14"
+                           FontAttributes="Bold"
+                           TextColor="#1F2328"/>
+                    <Border Stroke="#D0D7DE"
+                            StrokeThickness="1"
+                            BackgroundColor="White">
+                        <Border.StrokeShape>
+                            <RoundRectangle CornerRadius="8"/>
+                        </Border.StrokeShape>
+                        <Entry Text="{Binding ServerHost}"
+                               Placeholder="127.0.0.1 或局域网IP"
+                               PlaceholderColor="#8C959F"
+                               TextColor="#1F2328"
+                               IsEnabled="{Binding IsConnecting, Converter={StaticResource InvertedBoolConverter}}"
+                               ClearButtonVisibility="WhileEditing"
+                               FontSize="15"
+                               BackgroundColor="Transparent"/>
+                    </Border>
+                </VerticalStackLayout>
+
+                <!-- 端口输入 -->
+                <VerticalStackLayout Spacing="8">
+                    <Label Text="🔌 服务器端口"
+                           FontSize="14"
+                           FontAttributes="Bold"
+                           TextColor="#1F2328"/>
+                    <Border Stroke="#D0D7DE"
+                            StrokeThickness="1"
+                            BackgroundColor="White">
+                        <Border.StrokeShape>
+                            <RoundRectangle CornerRadius="8"/>
+                        </Border.StrokeShape>
+                        <Entry Text="{Binding ServerPort}"
+                               Keyboard="Numeric"
+                               Placeholder="35500"
+                               PlaceholderColor="#8C959F"
+                               TextColor="#1F2328"
+                               IsEnabled="{Binding IsConnecting, Converter={StaticResource InvertedBoolConverter}}"
+                               ClearButtonVisibility="WhileEditing"
+                               FontSize="15"
+                               BackgroundColor="Transparent"/>
+                    </Border>
+                </VerticalStackLayout>
+
+                <!-- 快速连接 -->
+                <HorizontalStackLayout Spacing="10" Margin="0,5,0,0">
+                    <Button Text="🏠 本机连接"
+                            Clicked="OnLocalhostClicked"
+                            FontSize="13"
+                            Padding="16,12"
+                            BackgroundColor="White"
+                            TextColor="#1F2328"
+                            BorderColor="#D0D7DE"
+                            BorderWidth="1"
+                            MinimumHeightRequest="44"
+                            CornerRadius="8">
+                        <Button.Shadow>
+                            <Shadow Brush="Black" Opacity="0.3" Radius="6" Offset="0,2"/>
+                        </Button.Shadow>
+                    </Button>
+                </HorizontalStackLayout>
+
+                <!-- 状态消息 -->
+                <Border Stroke="#D0D7DE"
+                        StrokeThickness="1"
+                        BackgroundColor="White"
+                        Padding="15"
+                        Margin="0,10,0,0"
+                        IsVisible="{Binding StatusMessage, Converter={StaticResource StringToBoolConverter}}">
+                    <Border.StrokeShape>
+                        <RoundRectangle CornerRadius="8"/>
+                    </Border.StrokeShape>
+                    <Border.Shadow>
+                        <Shadow Brush="Black" Opacity="0.08" Radius="6" Offset="0,2"/>
+                    </Border.Shadow>
+                    <Label Text="{Binding StatusMessage}"
+                           FontSize="14"
+                           FontAttributes="Bold"
+                           TextColor="{Binding IsConnected, Converter={StaticResource BoolToColorConverter}}"
+                           HorizontalOptions="Center"
+                           HorizontalTextAlignment="Center"/>
+                </Border>
+
+                <!-- 连接按钮 -->
+                <Button Text="🚀 连接到游戏服务器"
+                        Command="{Binding ConnectCommand}"
+                        IsEnabled="{Binding IsConnecting, Converter={StaticResource InvertedBoolConverter}}"
+                        FontSize="17"
+                        FontAttributes="Bold"
+                        Padding="20,16"
+                        Margin="0,10,0,0"
+                        TextColor="White"
+                        MinimumHeightRequest="56"
+                        CornerRadius="12">
+                    <Button.Background>
+                        <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                            <GradientStop Color="#1A7F37" Offset="0.0"/>
+                            <GradientStop Color="#2DA44E" Offset="1.0"/>
+                        </LinearGradientBrush>
+                    </Button.Background>
+                    <Button.Shadow>
+                        <Shadow Brush="#1A7F37" Opacity="0.3" Radius="12" Offset="0,4"/>
+                    </Button.Shadow>
+                </Button>
+
+                <!-- 加载指示器 -->
+                <HorizontalStackLayout Spacing="10"
+                                      HorizontalOptions="Center"
+                                      Margin="0,10,0,0"
+                                      IsVisible="{Binding IsConnecting}">
+                    <ActivityIndicator IsRunning="{Binding IsConnecting}"
+                                     Color="#0969DA"
+                                     WidthRequest="24"
+                                     HeightRequest="24"/>
+                    <Label Text="连接中..."
+                           FontSize="14"
+                           TextColor="#0969DA"
+                           VerticalOptions="Center"/>
+                </HorizontalStackLayout>
+            </VerticalStackLayout>
+
+            <!-- 底部信息 -->
+            <VerticalStackLayout Grid.Row="2"
+                                Spacing="8"
+                                Margin="0,20,0,20">
+                <BoxView Color="#D0D7DE" HeightRequest="1" Margin="0,0,0,15"/>
+                <Label Text="ETBBS Framework · v1.0"
+                       FontSize="12"
+                       TextColor="#656D76"
+                       HorizontalOptions="Center"/>
+                <Label Text="Powered by .NET MAUI"
+                       FontSize="11"
+                       TextColor="#656D76"
+                       HorizontalOptions="Center"/>
+            </VerticalStackLayout>
+        </Grid>
+    </ScrollView>
+
+</ContentPage>

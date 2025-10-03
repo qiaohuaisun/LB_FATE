@@ -1,4 +1,5 @@
 using ETBBS;
+using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -105,6 +106,8 @@ internal static class BossAiLoader
         return null;
     }
 
+    [UnconditionalSuppressMessage("Trimming", "IL2026:RequiresUnreferencedCode",
+        Justification = "BossAiConfig types are annotated with JsonPropertyName and preserved during trimming.")]
     private static BossAiConfig? LoadFromFile(string path)
     {
         try

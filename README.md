@@ -76,11 +76,11 @@ dotnet run --project LB_FATE -- --client 127.0.0.1:35500
 ```
 ┌──────────────────────────────────────────────────────┐
 │                   LB_FATE (Game)                     │
-│  ┌────────────┐  ┌────────────┐                     │
-│  │ Console UI │  │  TCP Net   │                     │
-│  │            │  │ Host/Client│                     │
-│  └──────┬─────┘  └──────┬─────┘                     │
-│         └────────────────┘                           │
+│  ┌────────────┐  ┌────────────┐  ┌────────────┐    │
+│  │ Console UI │  │  MAUI UI   │  │  TCP Net   │    │
+│  │            │  │  (Mobile)  │  │ Host/Client│    │
+│  └──────┬─────┘  └──────┬─────┘  └──────┬─────┘    │
+│         └────────────────┴────────────────┘          │
 └───────────────────┬──────────────────────────────────┘
                     │
 ┌───────────────────▼──────────────────────────────────┐
@@ -120,6 +120,13 @@ ETBBS/
 │   ├── Game/                   # Game loop, initialization, turn logic
 │   ├── Program.Main.cs         # Entry point
 │   └── Net.cs                  # TCP networking
+│
+├── LB_FATE.Mobile/             # .NET MAUI mobile client
+│   ├── Views/                  # XAML pages and custom controls
+│   ├── ViewModels/             # MVVM view models
+│   ├── Services/               # Dialog, notification, protocol services
+│   ├── Platforms/              # Platform-specific code (Android/iOS/Windows)
+│   └── Resources/              # Images, fonts, styles
 │
 ├── ETBBS.LbrValidator/         # CLI validation tool
 │   ├── Program.cs              # Validator logic
@@ -236,6 +243,47 @@ dotnet run --project LB_FATE -- --host --mode boss --players 7
 - `pass` - End turn
 - `info` - Show unit details
 - `help` - List available commands
+
+---
+
+## 📱 Mobile Client
+
+**.NET MAUI cross-platform client** for Android, iOS, Windows, and macOS.
+
+**Features**:
+- ✅ **Touch-optimized UI** - Grid-based game board with gesture controls
+- ✅ **Tap Controls** - Single tap to select, double tap to confirm actions
+- ✅ **Swipe Gestures** - Pan to scroll the board, pinch to zoom (planned)
+- ✅ **Mobile Notifications** - Turn alerts and game state updates
+- ✅ **Error Dialogs** - Global exception handling with copy-to-clipboard
+- ✅ **Performance Optimized** - Platform-specific rendering (30fps on Android)
+- ✅ **Responsive Layout** - Adapts to different screen sizes and orientations
+- ✅ **Popup Dialogs** - Help, info, and skill details in scrollable popups
+
+**Platform Support**:
+- 🤖 **Android** - Optimized for mobile with fullscreen mode and gesture navigation
+- 🍎 **iOS** - Native iOS experience (requires Mac for building)
+- 🪟 **Windows** - Desktop app with touch and mouse support
+- 🍎 **macOS** - Native macOS application
+
+**Running the Mobile Client**:
+```bash
+# Build and run on Android
+dotnet build LB_FATE.Mobile -f net8.0-android -c Release
+dotnet build LB_FATE.Mobile -t:Run -f net8.0-android
+
+# Build for iOS (requires Mac)
+dotnet build LB_FATE.Mobile -f net8.0-ios -c Release
+
+# Build for Windows
+dotnet build LB_FATE.Mobile -f net8.0-windows10.0.19041.0 -c Release
+```
+
+📖 **Mobile Documentation**:
+- [Mobile User Guide](docs/MOBILE_USER_GUIDE.md) - Complete gameplay guide for mobile
+- [Mobile UX Optimizations](docs/MOBILE_UX_OPTIMIZATIONS.md) - Performance and UX improvements
+- [Gesture Controls](docs/GESTURE_CONTROLS.md) - Touch gesture reference
+- [Mobile Notifications](docs/MOBILE_NOTIFICATIONS.md) - Notification system details
 
 ---
 
@@ -517,12 +565,24 @@ export LB_FATE_LOG_LEVEL=Debug
 | [Extension Build Guide](vscode-lbr-extension/docs/BUILD.md) | Building and publishing the extension |
 | [Extension Troubleshooting](vscode-lbr-extension/DEBUG.md) | Debugging extension issues |
 
+### Mobile Documentation
+
+| Document | Description |
+|----------|-------------|
+| [Mobile User Guide](docs/MOBILE_USER_GUIDE.md) | Complete gameplay guide for mobile |
+| [Mobile UX Optimizations](docs/MOBILE_UX_OPTIMIZATIONS.md) | Performance and UX improvements |
+| [Gesture Controls](docs/GESTURE_CONTROLS.md) | Touch gesture reference |
+| [Mobile Notifications](docs/MOBILE_NOTIFICATIONS.md) | Notification system details |
+| [MAUI Grid Rendering](docs/MAUI_GRID_RENDERING.md) | Custom grid rendering implementation |
+| [Feature Implementation](docs/FEATURE_IMPLEMENTATION_SUMMARY.md) | Mobile feature development summary |
+
 ### Additional Resources
 
 | Document | Description |
 |----------|-------------|
 | [Replay JSON Format](docs/Replay_JSON.md) | Replay file structure and usage |
 | [Benchmarks](docs/Benchmarks.md) | Performance benchmarks and analysis |
+| [PC/Desktop Optimizations](docs/PC_DESKTOP_OPTIMIZATIONS.md) | Desktop-specific optimizations |
 
 ---
 
@@ -568,7 +628,7 @@ Looking forward to hearing from you!
 ## 🙏 Acknowledgments
 
 Special thanks to:
-- **Dawen** and **Xiaomao** - My dear friends who provided tremendous support and advice
+- **Dawen**, **Xiaomao**, and **Mouzi** - My dear friends who provided tremendous support and advice
 - **Claude Code** - The powerful AI coding assistant that made this project possible
 - **.NET Team** - For the amazing runtime and SDK
 

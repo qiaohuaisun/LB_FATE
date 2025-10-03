@@ -1,7 +1,7 @@
-using System;
-using System.IO;
 using Serilog;
 using Serilog.Events;
+using System;
+using System.IO;
 using Xunit;
 
 [Collection("LoggerSeq")]

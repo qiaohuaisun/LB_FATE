@@ -1,5 +1,4 @@
 using ETBBS;
-using System.Threading;
 using Xunit;
 
 public class ActionMetricsTests

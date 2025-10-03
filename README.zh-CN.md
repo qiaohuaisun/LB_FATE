@@ -76,11 +76,11 @@ dotnet run --project LB_FATE -- --client 127.0.0.1:35500
 ```
 ┌──────────────────────────────────────────────────────┐
 │                   LB_FATE (游戏)                     │
-│  ┌────────────┐  ┌────────────┐                     │
-│  │  控制台UI  │  │  TCP 网络  │                     │
-│  │            │  │ 主机/客户端│                     │
-│  └──────┬─────┘  └──────┬─────┘                     │
-│         └────────────────┘                           │
+│  ┌────────────┐  ┌────────────┐  ┌────────────┐    │
+│  │  控制台UI  │  │  MAUI UI   │  │  TCP 网络  │    │
+│  │            │  │   (移动)   │  │ 主机/客户端│    │
+│  └──────┬─────┘  └──────┬─────┘  └──────┬─────┘    │
+│         └────────────────┴────────────────┘          │
 └───────────────────┬──────────────────────────────────┘
                     │
 ┌───────────────────▼──────────────────────────────────┐
@@ -120,6 +120,13 @@ ETBBS/
 │   ├── Game/                   # 游戏循环、初始化、回合逻辑
 │   ├── Program.Main.cs         # 入口点
 │   └── Net.cs                  # TCP 网络
+│
+├── LB_FATE.Mobile/             # .NET MAUI 移动客户端
+│   ├── Views/                  # XAML 页面和自定义控件
+│   ├── ViewModels/             # MVVM 视图模型
+│   ├── Services/               # 对话框、通知、协议服务
+│   ├── Platforms/              # 平台特定代码（Android/iOS/Windows）
+│   └── Resources/              # 图像、字体、样式
 │
 ├── ETBBS.LbrValidator/         # CLI 验证工具
 │   ├── Program.cs              # 验证器逻辑
@@ -236,6 +243,47 @@ dotnet run --project LB_FATE -- --host --mode boss --players 7
 - `pass` - 结束回合
 - `info` - 显示单位详情
 - `help` - 列出可用命令
+
+---
+
+## 📱 移动客户端
+
+**.NET MAUI 跨平台客户端** 支持 Android、iOS、Windows 和 macOS。
+
+**功能特性**：
+- ✅ **触控优化 UI** - 基于网格的游戏棋盘与手势控制
+- ✅ **点击控制** - 单击选择，双击确认操作
+- ✅ **滑动手势** - 平移滚动棋盘，捏合缩放（计划中）
+- ✅ **移动通知** - 回合提醒和游戏状态更新
+- ✅ **错误对话框** - 全局异常处理，支持复制到剪贴板
+- ✅ **性能优化** - 平台特定渲染（Android 上 30fps）
+- ✅ **响应式布局** - 适配不同屏幕尺寸和方向
+- ✅ **弹窗对话框** - 帮助、信息和技能详情的可滚动弹窗
+
+**平台支持**：
+- 🤖 **Android** - 针对移动端优化，支持全屏模式和手势导航
+- 🍎 **iOS** - 原生 iOS 体验（需要 Mac 构建）
+- 🪟 **Windows** - 桌面应用，支持触控和鼠标
+- 🍎 **macOS** - 原生 macOS 应用程序
+
+**运行移动客户端**：
+```bash
+# 在 Android 上构建和运行
+dotnet build LB_FATE.Mobile -f net8.0-android -c Release
+dotnet build LB_FATE.Mobile -t:Run -f net8.0-android
+
+# 为 iOS 构建（需要 Mac）
+dotnet build LB_FATE.Mobile -f net8.0-ios -c Release
+
+# 为 Windows 构建
+dotnet build LB_FATE.Mobile -f net8.0-windows10.0.19041.0 -c Release
+```
+
+📖 **移动端文档**：
+- [移动端用户指南](docs/MOBILE_USER_GUIDE.md) - 移动端完整游戏指南
+- [移动端 UX 优化](docs/MOBILE_UX_OPTIMIZATIONS.md) - 性能和用户体验改进
+- [手势控制](docs/GESTURE_CONTROLS.md) - 触控手势参考
+- [移动端通知](docs/MOBILE_NOTIFICATIONS.md) - 通知系统详情
 
 ---
 
@@ -517,12 +565,24 @@ export LB_FATE_LOG_LEVEL=Debug
 | [扩展构建指南](vscode-lbr-extension/docs/BUILD.md) | 构建和发布扩展 |
 | [扩展故障排除](vscode-lbr-extension/DEBUG.md) | 调试扩展问题 |
 
+### 移动端文档
+
+| 文档 | 说明 |
+|------|------|
+| [移动端用户指南](docs/MOBILE_USER_GUIDE.md) | 移动端完整游戏指南 |
+| [移动端 UX 优化](docs/MOBILE_UX_OPTIMIZATIONS.md) | 性能和用户体验改进 |
+| [手势控制](docs/GESTURE_CONTROLS.md) | 触控手势参考 |
+| [移动端通知](docs/MOBILE_NOTIFICATIONS.md) | 通知系统详情 |
+| [MAUI 网格渲染](docs/MAUI_GRID_RENDERING.md) | 自定义网格渲染实现 |
+| [功能实现总结](docs/FEATURE_IMPLEMENTATION_SUMMARY.md) | 移动端功能开发总结 |
+
 ### 其他资源
 
 | 文档 | 说明 |
 |------|------|
 | [回放 JSON 格式](docs/Replay_JSON.md) | 回放文件结构和用法 |
 | [基准测试](docs/Benchmarks.md) | 性能基准和分析 |
+| [PC/桌面端优化](docs/PC_DESKTOP_OPTIMIZATIONS.md) | 桌面端特定优化 |
 
 ---
 
@@ -568,7 +628,7 @@ export LB_FATE_LOG_LEVEL=Debug
 ## 🙏 致谢
 
 特别感谢：
-- **大文** 和 **小猫** - 我的好朋友，给予我很多支持和建议
+- **大文**、**小猫** 和 **牟子** - 我的好朋友，给予我很多支持和建议
 - **Claude Code** - 强大的 AI 编程助手，让这个项目得以实现
 - **.NET 团队** - 卓越的运行时和 SDK
 

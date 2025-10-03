@@ -1,0 +1,487 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:viewmodels="clr-namespace:LB_FATE.Mobile.ViewModels"
+             xmlns:controls="clr-namespace:LB_FATE.Mobile.Views.Controls"
+             xmlns:services="clr-namespace:LB_FATE.Mobile.Services"
+             xmlns:models="clr-namespace:LB_FATE.Mobile.Models"
+             x:Class="LB_FATE.Mobile.Views.GamePage"
+             x:DataType="viewmodels:GameViewModel"
+             Shell.NavBarIsVisible="False"
+             Shell.TabBarIsVisible="False"
+             NavigationPage.HasNavigationBar="False"
+             NavigationPage.HasBackButton="False"
+             BackgroundColor="#F6F8FA">
+
+    <Grid x:Name="MainGrid" Padding="{OnIdiom Phone=10, Tablet=15, Desktop=30}"
+          RowSpacing="{OnIdiom Phone=8, Desktop=12}"
+          ColumnSpacing="{OnIdiom Phone=8, Desktop=12}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="{OnIdiom Phone='2*', Tablet='2.5*', Desktop='3*'}"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="{OnIdiom Phone='1*', Tablet='1*', Desktop='1.5*'}"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+
+        <!-- Day/Phase 显示 - 增强版 -->
+        <Border x:Name="DayPhaseBorder"
+                Grid.Row="0"
+                Stroke="#0969DA"
+                StrokeThickness="3"
+                Margin="0,0,0,8">
+            <Border.StrokeShape>
+                <RoundRectangle CornerRadius="12"/>
+            </Border.StrokeShape>
+            <Border.Background>
+                <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                    <GradientStop Color="#DFF6FF" Offset="0.0"/>
+                    <GradientStop Color="#B6E3FF" Offset="1.0"/>
+                </LinearGradientBrush>
+            </Border.Background>
+            <Border.Shadow>
+                <Shadow Brush="#0969DA" Opacity="0.3" Radius="10" Offset="0,3"/>
+            </Border.Shadow>
+            <Label Text="{Binding DayPhaseDisplay}"
+                   TextColor="#0969DA"
+                   FontFamily="monospace"
+                   FontSize="{OnIdiom Phone=18, Tablet=17, Desktop=16}"
+                   FontAttributes="Bold"
+                   HorizontalTextAlignment="Center"
+                   VerticalTextAlignment="Center"
+                   Padding="{OnIdiom Phone=14, Default=12}">
+                <Label.Shadow>
+                    <Shadow Brush="#0969DA" Opacity="0.2" Radius="2" Offset="0,1"/>
+                </Label.Shadow>
+            </Label>
+        </Border>
+
+        <!-- 状态栏 - 简化版 -->
+        <Border x:Name="StatusBorder"
+                Grid.Row="1"
+                Stroke="#D0D7DE"
+                StrokeThickness="2"
+                Background="White"
+                Margin="0,0,0,8">
+            <Border.StrokeShape>
+                <RoundRectangle CornerRadius="12"/>
+            </Border.StrokeShape>
+            <Border.Shadow>
+                <Shadow Brush="Black" Opacity="0.08" Radius="8" Offset="0,2"/>
+            </Border.Shadow>
+            <VerticalStackLayout Padding="{OnIdiom Phone=12, Default=14}" Spacing="{OnIdiom Phone=10, Default=10}">
+                <!-- 玩家状态 -->
+                <VerticalStackLayout Spacing="4" IsVisible="{Binding PlayerStatus, Converter={StaticResource StringToBoolConverter}}">
+                    <Label Text="{Binding PlayerStatus}"
+                           TextColor="#1F2328"
+                           FontFamily="monospace"
+                           FontSize="{OnIdiom Phone=12, Tablet=13, Desktop=12}"
+                           FontAttributes="Bold"
+                           LineBreakMode="WordWrap"
+                           MaxLines="2"/>
+
+                    <Grid ColumnDefinitions="Auto,*,Auto,*" ColumnSpacing="8">
+                        <Label Grid.Column="0" Text="❤️" FontSize="14" VerticalTextAlignment="Center"/>
+                        <Border Grid.Column="1"
+                                StrokeThickness="1"
+                                Stroke="#E5E5E5"
+                                BackgroundColor="#F5F5F5"
+                                VerticalOptions="Center">
+                            <Border.StrokeShape>
+                                <RoundRectangle CornerRadius="4"/>
+                            </Border.StrokeShape>
+                            <ProgressBar Progress="{Binding PlayerHpPercent}"
+                                         ProgressColor="{Binding PlayerHpColor}"
+                                         HeightRequest="8"
+                                         VerticalOptions="Center"
+                                         BackgroundColor="Transparent"/>
+                        </Border>
+
+                        <Label Grid.Column="2" Text="⚡" FontSize="14" VerticalTextAlignment="Center"/>
+                        <Border Grid.Column="3"
+                                StrokeThickness="1"
+                                Stroke="#E5E5E5"
+                                BackgroundColor="#F5F5F5"
+                                VerticalOptions="Center">
+                            <Border.StrokeShape>
+                                <RoundRectangle CornerRadius="4"/>
+                            </Border.StrokeShape>
+                            <ProgressBar Progress="{Binding PlayerMpPercent}"
+                                         ProgressColor="#0969DA"
+                                         HeightRequest="8"
+                                         VerticalOptions="Center"
+                                         BackgroundColor="Transparent"/>
+                        </Border>
+                    </Grid>
+                </VerticalStackLayout>
+
+                <!-- Boss状态 -->
+                <VerticalStackLayout Spacing="6" IsVisible="{Binding IsBossMode}">
+                    <Label Text="{Binding BossStatus}"
+                           TextColor="#CF222E"
+                           FontFamily="monospace"
+                           FontSize="{OnIdiom Phone=12, Tablet=14, Desktop=13}"
+                           FontAttributes="Bold"
+                           LineBreakMode="WordWrap"
+                           MaxLines="2">
+                        <Label.Shadow>
+                            <Shadow Brush="#CF222E" Opacity="0.3" Radius="2" Offset="0,1"/>
+                        </Label.Shadow>
+                    </Label>
+
+                    <Border StrokeThickness="2"
+                            Stroke="#CF222E"
+                            BackgroundColor="#FFE8E8"
+                            VerticalOptions="Center">
+                        <Border.StrokeShape>
+                            <RoundRectangle CornerRadius="6"/>
+                        </Border.StrokeShape>
+                        <ProgressBar Progress="{Binding BossHpPercent}"
+                                     ProgressColor="{Binding BossHpColor}"
+                                     HeightRequest="12"
+                                     VerticalOptions="Center"
+                                     BackgroundColor="Transparent"/>
+                    </Border>
+                </VerticalStackLayout>
+            </VerticalStackLayout>
+        </Border>
+
+        <!-- 游戏网格视图 - 浅色主题 -->
+        <Border x:Name="GridViewBorder"
+                Grid.Row="2"
+                Stroke="#D0D7DE"
+                StrokeThickness="2"
+                Background="White"
+               >
+            <Border.StrokeShape>
+                <RoundRectangle CornerRadius="12"/>
+            </Border.StrokeShape>
+            <Border.Shadow>
+                <Shadow Brush="Black" Opacity="0.15" Radius="12" Offset="0,4"/>
+            </Border.Shadow>
+            <Grid>
+                <controls:GridBoardView x:Name="GridBoard"
+                                       GridData="{Binding GridData}"
+                                       InteractionState="{Binding InteractionState}"
+                                       CellSize="30"
+                                       Margin="8"/>
+
+                <!-- 状态提示栏 -->
+                <Border VerticalOptions="Start"
+                        HorizontalOptions="Fill"
+                        BackgroundColor="#0969DA"
+                        Padding="12,8"
+                        Margin="8,8,8,0"
+                        IsVisible="{Binding StatusTip, Converter={StaticResource StringToBoolConverter}}">
+                    <Border.StrokeShape>
+                        <RoundRectangle CornerRadius="8"/>
+                    </Border.StrokeShape>
+                    <Border.Shadow>
+                        <Shadow Brush="#0969DA" Opacity="0.4" Radius="8" Offset="0,2"/>
+                    </Border.Shadow>
+                    <Label Text="{Binding StatusTip}"
+                           TextColor="White"
+                           FontSize="13"
+                           FontAttributes="Bold"
+                           HorizontalTextAlignment="Center"/>
+                </Border>
+
+                <!-- 操作提示 (Android优化: 更大字体和间距) -->
+                <Border VerticalOptions="End"
+                        HorizontalOptions="End"
+                        BackgroundColor="#24292F"
+                        Opacity="0.85"
+                        Padding="{OnIdiom Phone=14, Default=12}"
+                        Margin="{OnIdiom Phone=14, Default=12}">
+                    <Border.StrokeShape>
+                        <RoundRectangle CornerRadius="8"/>
+                    </Border.StrokeShape>
+                    <VerticalStackLayout Spacing="{OnIdiom Phone=6, Default=4}">
+                        <Label TextColor="White"
+                               FontSize="{OnIdiom Phone=12, Default=10}"
+                               HorizontalTextAlignment="Center">
+                            <Label.FormattedText>
+                                <FormattedString>
+                                    <Span Text="👆 双指缩放" FontAttributes="Bold"/>
+                                </FormattedString>
+                            </Label.FormattedText>
+                        </Label>
+                        <Label TextColor="White"
+                               FontSize="{OnIdiom Phone=12, Default=10}"
+                               HorizontalTextAlignment="Center">
+                            <Label.FormattedText>
+                                <FormattedString>
+                                    <Span Text="✋ 单指拖动"/>
+                                </FormattedString>
+                            </Label.FormattedText>
+                        </Label>
+                    </VerticalStackLayout>
+                </Border>
+            </Grid>
+        </Border>
+
+        <!-- 技能面板 - 增强版 -->
+        <Border x:Name="SkillPanel"
+                Grid.Row="3"
+                Stroke="#8250DF"
+                StrokeThickness="2"
+                Margin="0,0,0,8"
+                IsVisible="{Binding Skills.Count}">
+            <Border.StrokeShape>
+                <RoundRectangle CornerRadius="12"/>
+            </Border.StrokeShape>
+            <Border.Background>
+                <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                    <GradientStop Color="#F6F8FA" Offset="0.0"/>
+                    <GradientStop Color="#FFFFFF" Offset="1.0"/>
+                </LinearGradientBrush>
+            </Border.Background>
+            <Border.Shadow>
+                <Shadow Brush="#8250DF" Opacity="0.2" Radius="8" Offset="0,2"/>
+            </Border.Shadow>
+            <VerticalStackLayout Padding="{OnIdiom Phone=14, Default=12}" Spacing="8">
+                <Label Text="⚔️ 可用技能"
+                       TextColor="#8250DF"
+                       FontSize="{OnIdiom Phone=16, Default=14}"
+                       FontAttributes="Bold"
+                       Margin="0,0,0,6">
+                    <Label.Shadow>
+                        <Shadow Brush="#8250DF" Opacity="0.2" Radius="2" Offset="0,1"/>
+                    </Label.Shadow>
+                </Label>
+
+                <CollectionView ItemsSource="{Binding Skills}"
+                                SelectionMode="None"
+                                HeightRequest="100">
+                    <CollectionView.ItemsLayout>
+                        <LinearItemsLayout Orientation="Vertical" ItemSpacing="6"/>
+                    </CollectionView.ItemsLayout>
+                    <CollectionView.ItemTemplate>
+                        <DataTemplate x:DataType="services:SkillInfo">
+                            <Border Stroke="{Binding IsAvailable, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#1A7F37:#CCCCCC'}"
+                                    StrokeThickness="2"
+                                    Background="{Binding IsAvailable, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#E6F4EA:#F8F8F8'}"
+                                    Padding="{OnIdiom Phone=12, Default=10}">
+                                <Border.StrokeShape>
+                                    <RoundRectangle CornerRadius="8"/>
+                                </Border.StrokeShape>
+                                <Border.Shadow>
+                                    <Shadow Brush="Black" Opacity="0.05" Radius="4" Offset="0,2"/>
+                                </Border.Shadow>
+                                <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto" ColumnSpacing="8">
+                                    <Label Grid.Column="0"
+                                           Text="{Binding Index, StringFormat='[{0}]'}"
+                                           TextColor="#656D76"
+                                           FontFamily="monospace"
+                                           FontSize="{OnIdiom Phone=13, Default=11}"
+                                           FontAttributes="Bold"
+                                           VerticalTextAlignment="Center"/>
+
+                                    <Label Grid.Column="1"
+                                           Text="{Binding Name}"
+                                           TextColor="#1F2328"
+                                           FontSize="{OnIdiom Phone=13, Default=11}"
+                                           FontAttributes="Bold"
+                                           VerticalTextAlignment="Center"/>
+
+                                    <Label Grid.Column="2"
+                                           Text="{Binding MpCost, StringFormat='⚡{0}'}"
+                                           TextColor="#0969DA"
+                                           FontSize="{OnIdiom Phone=12, Default=10}"
+                                           VerticalTextAlignment="Center"/>
+
+                                    <Label Grid.Column="3"
+                                           Text="{Binding Range, StringFormat='📏{0}'}"
+                                           TextColor="#656D76"
+                                           FontSize="{OnIdiom Phone=12, Default=10}"
+                                           VerticalTextAlignment="Center"/>
+
+                                    <Label Grid.Column="4"
+                                           Text="{Binding CooldownLeft, StringFormat='⏱️{0}'}"
+                                           TextColor="{Binding IsAvailable, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#1A7F37:#CF222E'}"
+                                           FontSize="{OnIdiom Phone=12, Default=10}"
+                                           FontAttributes="Bold"
+                                           VerticalTextAlignment="Center"/>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </CollectionView.ItemTemplate>
+                </CollectionView>
+            </VerticalStackLayout>
+        </Border>
+
+        <!-- 消息日志区域 (Android优化: 更大字体和间距 + 彩色消息) -->
+        <Border x:Name="LogPanel"
+                Grid.Row="4"
+                Stroke="#D0D7DE"
+                StrokeThickness="2"
+                Background="White"
+                Margin="0,0,0,8">
+            <Border.StrokeShape>
+                <RoundRectangle CornerRadius="12"/>
+            </Border.StrokeShape>
+            <Border.Shadow>
+                <Shadow Brush="Black" Opacity="0.15" Radius="12" Offset="0,4"/>
+            </Border.Shadow>
+            <CollectionView ItemsSource="{Binding LogMessages}"
+                            SelectionMode="None"
+                            Margin="{OnIdiom Phone=14, Default=12}">
+                <CollectionView.ItemsLayout>
+                    <LinearItemsLayout Orientation="Vertical" ItemSpacing="4"/>
+                </CollectionView.ItemsLayout>
+                <CollectionView.ItemTemplate>
+                    <DataTemplate x:DataType="models:LogMessage">
+                        <!-- 使用Grid替代HorizontalStackLayout以支持换行 -->
+                        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="6">
+                            <Label Grid.Column="0"
+                                   Text="{Binding Time, StringFormat='[{0}]'}"
+                                   TextColor="#656D76"
+                                   FontFamily="monospace"
+                                   FontSize="{OnIdiom Phone=12, Tablet=11, Desktop=10}"
+                                   VerticalOptions="Start"/>
+                            <Label Grid.Column="1"
+                                   Text="{Binding Text}"
+                                   TextColor="{Binding TextColor}"
+                                   FontFamily="monospace"
+                                   FontSize="{OnIdiom Phone=14, Tablet=13, Desktop=12}"
+                                   FontAttributes="{Binding IsBold, Converter={StaticResource BoolToFontAttributesConverter}}"
+                                   LineBreakMode="WordWrap"
+                                   MaxLines="10"
+                                   VerticalOptions="Start"/>
+                        </Grid>
+                    </DataTemplate>
+                </CollectionView.ItemTemplate>
+            </CollectionView>
+        </Border>
+
+        <!-- 命令输入区域 - 浅色主题 (Android优化) -->
+        <Grid x:Name="InputPanel"
+              Grid.Row="5"
+              ColumnDefinitions="*,Auto"
+              ColumnSpacing="{OnIdiom Phone=12, Default=8}">
+            <!-- 输入框 -->
+            <Border Grid.Column="0"
+                    Stroke="#D0D7DE"
+                    StrokeThickness="1"
+                    BackgroundColor="White">
+                <Border.StrokeShape>
+                    <RoundRectangle CornerRadius="12"/>
+                </Border.StrokeShape>
+                <Entry x:Name="CommandEntry" Text="{Binding CommandInput}"
+                       Placeholder="💬 输入命令..."
+                       PlaceholderColor="#8C959F"
+                       TextColor="#1F2328"
+                       ReturnCommand="{Binding SendCommandCommand}"
+                       FontFamily="monospace"
+                       FontSize="{OnIdiom Phone=16, Tablet=15, Desktop=14}"
+                       MinimumHeightRequest="{OnPlatform Android=56, Default=52}"
+                       ClearButtonVisibility="WhileEditing"
+                       BackgroundColor="Transparent"
+                       Keyboard="Default"
+                       ReturnType="Send"
+                       IsEnabled="True"/>
+            </Border>
+
+            <!-- 指令补全下拉（智能建议） -->
+            <Border Grid.Column="0"
+                    BackgroundColor="#FFFFFF"
+                    Stroke="#D0D7DE"
+                    StrokeThickness="1"
+                    IsVisible="{Binding ShowCommandSuggestions}"
+                    Margin="0,4,0,0">
+                <Border.StrokeShape>
+                    <RoundRectangle CornerRadius="8"/>
+                </Border.StrokeShape>
+                <CollectionView ItemsSource="{Binding CommandSuggestions}"
+                                SelectionMode="None"
+                                HeightRequest="120">
+                    <CollectionView.ItemsLayout>
+                        <LinearItemsLayout Orientation="Vertical" ItemSpacing="2"/>
+                    </CollectionView.ItemsLayout>
+                    <CollectionView.ItemTemplate>
+                        <DataTemplate x:DataType="x:String">
+                            <Border StrokeThickness="0" BackgroundColor="#F9FAFB" Padding="10">
+                                <Label Text="{Binding .}" TextColor="#1F2328"/>
+                                <Border.GestureRecognizers>
+                                    <TapGestureRecognizer Command="{Binding Source={RelativeSource AncestorType={x:Type viewmodels:GameViewModel}}, Path=AcceptSuggestionCommand}"
+                                                          CommandParameter="{Binding .}"/>
+                                </Border.GestureRecognizers>
+                            </Border>
+                        </DataTemplate>
+                    </CollectionView.ItemTemplate>
+                </CollectionView>
+            </Border>
+
+            <!-- 发送按钮 (Android优化: 更大的触摸目标) -->
+            <Button Grid.Column="1"
+                    Text="📤"
+                    Command="{Binding SendCommandCommand}"
+                    IsEnabled="{Binding CanSendCommand}"
+                    WidthRequest="{OnIdiom Phone=72, Tablet=80, Desktop=80}"
+                    Padding="{OnIdiom Phone=16, Default=12}"
+                    TextColor="White"
+                    FontSize="{OnIdiom Phone=20, Default=18}"
+                    MinimumHeightRequest="{OnPlatform Android=56, Default=52}"
+                    MinimumWidthRequest="{OnPlatform Android=56, Default=52}"
+                    CornerRadius="12"
+                   >
+                <Button.Background>
+                    <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                        <GradientStop Color="#1A7F37" Offset="0.0"/>
+                        <GradientStop Color="#2DA44E" Offset="1.0"/>
+                    </LinearGradientBrush>
+                </Button.Background>
+                <Button.Shadow>
+                    <Shadow Brush="#1A7F37" Opacity="0.3" Radius="8" Offset="0,2"/>
+                </Button.Shadow>
+            </Button>
+        </Grid>
+
+        <!-- Boss 预警横幅 (覆盖层) -->
+        <Border Grid.Row="0" Grid.RowSpan="6"
+                VerticalOptions="Start"
+                HorizontalOptions="Fill"
+                BackgroundColor="#CF222E"
+                Padding="{OnIdiom Phone=16, Default=14}"
+                Margin="0,80,0,0"
+                IsVisible="{Binding ShowTelegraphWarning}">
+            <Border.StrokeShape>
+                <RoundRectangle CornerRadius="12"/>
+            </Border.StrokeShape>
+            <Border.Shadow>
+                <Shadow Brush="#CF222E" Opacity="0.5" Radius="16" Offset="0,4"/>
+            </Border.Shadow>
+            <HorizontalStackLayout Spacing="12">
+                <Label Text="⚠️"
+                       FontSize="{OnIdiom Phone=28, Default=24}"
+                       VerticalTextAlignment="Center"/>
+                <VerticalStackLayout Spacing="4" VerticalOptions="Center" HorizontalOptions="FillAndExpand">
+                    <Label Text="BOSS 预警"
+                           TextColor="White"
+                           FontSize="{OnIdiom Phone=16, Default=14}"
+                           FontAttributes="Bold"/>
+                    <Label Text="{Binding TelegraphWarningText}"
+                           TextColor="White"
+                           FontSize="{OnIdiom Phone=14, Default=12}"
+                           LineBreakMode="WordWrap"/>
+                </VerticalStackLayout>
+            </HorizontalStackLayout>
+        </Border>
+
+        <!-- Boss 台词动画层 (最上层覆盖) -->
+        <AbsoluteLayout x:Name="BossQuoteLayer"
+                        Grid.Row="0" Grid.RowSpan="6"
+                        ZIndex="1000"
+                        InputTransparent="True"
+                        BackgroundColor="Transparent">
+            <!-- 动态添加的台词Label将在这里显示 -->
+        </AbsoluteLayout>
+
+    </Grid>
+
+</ContentPage>
+

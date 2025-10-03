@@ -456,13 +456,13 @@ partial class Game
                 {
                     // Broadcast turn start banner (not added to log to avoid duplication)
                     BroadcastBanner("", "╔═══════════════════════════════════════════════════════════════╗", $"║  ⚔️  【{bossName}】的回合开始  ⚔️  ", "╚═══════════════════════════════════════════════════════════════╝", "");
-                    // Play turn start quote
+                    // Play turn start quote with special effects
                     if (roleOf.TryGetValue(pid, out var bossRole))
                     {
                         var quote = ETBBS.RoleQuotes.GetRandom(bossRole.Quotes.OnTurnStart, rng);
                         if (!string.IsNullOrEmpty(quote))
                         {
-                            AppendPublic(new[] { $"💬 【{bossName}】：\"{quote}\"" });
+                            BroadcastBossQuote(quote, "turn_start");
                         }
                     }
                     BroadcastBoard(day, phase);
@@ -470,13 +470,13 @@ partial class Game
                     if (!done) RunBossAiTurn(pid, phase, day);
                     // Check HP threshold quotes after actions
                     CheckHpThresholdQuotes(pid);
-                    // Play turn end quote
+                    // Play turn end quote with special effects
                     if (roleOf.TryGetValue(pid, out bossRole))
                     {
                         var quote = ETBBS.RoleQuotes.GetRandom(bossRole.Quotes.OnTurnEnd, rng);
                         if (!string.IsNullOrEmpty(quote))
                         {
-                            AppendPublic(new[] { $"💬 【{bossName}】：\"{quote}\"" });
+                            BroadcastBossQuote(quote, "turn_end");
                         }
                     }
                     // Broadcast turn end banner
@@ -934,13 +934,13 @@ partial class Game
 
         string targetDesc = tid is not null ? tid : (usePoint ? $"{point}" : "无目标");
 
-        // Play skill quote if available
+        // Play skill quote with special effects if available
         if (role != null && role.Quotes.OnSkill.TryGetValue(s.Name, out var skillQuotes))
         {
             var quote = ETBBS.RoleQuotes.GetRandom(skillQuotes, rng);
             if (!string.IsNullOrEmpty(quote))
             {
-                AppendPublic(new[] { $"💬 【{bossName}】：\"{quote}\"" });
+                BroadcastBossQuote(quote, "skill", s.Name);
             }
         }
 
@@ -1115,13 +1115,13 @@ partial class Game
                         {
                             var se = new SkillExecutor();
 
-                            // Play skill quote if available
+                            // Play skill quote with special effects if available
                             if (role.Quotes.OnSkill.TryGetValue(s.Name, out var skillQuotes))
                             {
                                 var quote = ETBBS.RoleQuotes.GetRandom(skillQuotes, rng);
                                 if (!string.IsNullOrEmpty(quote))
                                 {
-                                    AppendPublic(new[] { $"💬 【{bossName}】：\"{quote}\"" });
+                                    BroadcastBossQuote(quote, "skill", s.Name);
                                 }
                             }
 
@@ -1317,8 +1317,16 @@ partial class Game
                 var quote = ETBBS.RoleQuotes.GetRandom(quotes, rng);
                 if (!string.IsNullOrEmpty(quote))
                 {
-                    var unitName = unitId == bossId ? bossName : unitId;
-                    AppendPublic(new[] { $"💬 【{unitName}】：\"{quote}\"" });
+                    if (unitId == bossId)
+                    {
+                        // Boss uses special quote broadcast
+                        BroadcastBossQuote(quote, "hp_threshold", $"{(int)(threshold * 100)}%");
+                    }
+                    else
+                    {
+                        // Regular units use simple message
+                        AppendPublic(new[] { $"💬 【{unitId}】：\"{quote}\"" });
+                    }
                 }
                 // Mark this threshold as triggered
                 triggered.Add(threshold);
