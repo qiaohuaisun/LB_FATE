@@ -164,9 +164,6 @@ public class GridBoardDrawable : IDrawable
         // 绘制单位 ID/名称
         DrawUnitLabel(canvas, unit, centerX, centerY);
 
-        // 绘制状态效果图标
-        DrawStatusIcons(canvas, unit, x, y);
-
         // 绘制离线标记
         if (unit.IsOffline)
         {
@@ -239,28 +236,6 @@ public class GridBoardDrawable : IDrawable
     }
 
     /// <summary>
-    /// 绘制状态效果图标
-    /// </summary>
-    private void DrawStatusIcons(ICanvas canvas, GridUnit unit, float x, float y)
-    {
-        if (unit.Tags == null || unit.Tags.Count == 0)
-            return;
-
-        float iconSize = Math.Max(6f, _cellSize * 0.15f);
-        float iconSpacing = iconSize + 2f;
-        float startX = x + (_cellSize - (unit.Tags.Count * iconSpacing - 2f)) / 2;
-        float iconY = y + 2f;
-
-        int iconIndex = 0;
-        foreach (var tag in unit.Tags.Take(4))
-        {
-            float iconX = startX + iconIndex * iconSpacing;
-            DrawStatusIcon(canvas, tag, iconX, iconY, iconSize);
-            iconIndex++;
-        }
-    }
-
-    /// <summary>
     /// 绘制离线标记
     /// </summary>
     private void DrawOfflineMarker(ICanvas canvas, float centerX, float centerY, float radius)
@@ -280,70 +255,6 @@ public class GridBoardDrawable : IDrawable
         canvas.StrokeColor = Color.FromArgb("#CF222E").WithAlpha(0.7f);
         canvas.StrokeSize = 3f;
         canvas.DrawCircle(centerX, centerY, radius * 1.1f);
-    }
-
-    /// <summary>
-    /// 绘制单个状态图标
-    /// </summary>
-    private void DrawStatusIcon(ICanvas canvas, string tag, float x, float y, float size)
-    {
-        Color bgColor;
-        Color fgColor = Colors.White;
-        string symbol = "";
-
-        switch (tag.ToLowerInvariant())
-        {
-            case "stunned":
-                bgColor = Color.FromArgb("#BF8700");
-                symbol = "Z";
-                break;
-            case "rooted":
-            case "frozen":
-                bgColor = Color.FromArgb("#0969DA");
-                symbol = "R";
-                break;
-            case "silenced":
-                bgColor = Color.FromArgb("#8250DF");
-                symbol = "S";
-                break;
-            case "bleeding":
-                bgColor = Color.FromArgb("#CF222E");
-                symbol = "B";
-                break;
-            case "burning":
-                bgColor = Color.FromArgb("#FB8500");
-                symbol = "F";
-                break;
-            case "shielded":
-                bgColor = Color.FromArgb("#1A7F37");
-                symbol = "▲";
-                break;
-            case "undying":
-                bgColor = Color.FromArgb("#8250DF");
-                symbol = "∞";
-                break;
-            default:
-                bgColor = Color.FromArgb("#656D76");
-                symbol = "?";
-                break;
-        }
-
-        canvas.FillColor = bgColor;
-        canvas.FillCircle(x + size / 2, y + size / 2, size / 2);
-
-        canvas.StrokeColor = Colors.White;
-        canvas.StrokeSize = 1f;
-        canvas.DrawCircle(x + size / 2, y + size / 2, size / 2);
-
-        var font = Microsoft.Maui.Graphics.Font.DefaultBold;
-        float fontSize = size * 0.6f;
-
-        canvas.FontColor = fgColor;
-        canvas.FontSize = fontSize;
-        canvas.Font = font;
-
-        var textSize = canvas.GetStringSize(symbol, font, fontSize);
-        canvas.DrawString(symbol, x + (size - textSize.Width) / 2, y + (size - textSize.Height) / 2, HorizontalAlignment.Left);
     }
 
     /// <summary>
