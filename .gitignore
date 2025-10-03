@@ -366,3 +366,21 @@ FodyWeavers.xsd
 TestResults/
 .claude/
 tools/
+
+# Certificates and keys (security)
+*.cer
+*.keystore
+cert_thumbprint.txt
+create_cert.ps1
+
+# Environment variables and secrets
+.env
+.env.local
+.env.*.local
+secrets.json
+
+# MAUI specific
+**/AppPackages/
+*.msix
+*.apk
+*.aab

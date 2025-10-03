@@ -13,7 +13,9 @@
       "Bash(dotnet run:*)",
       "Bash(Select-String -Pattern \"error|warning\")",
       "Bash(Select-Object -First 20)",
-      "Bash(dotnet restore:*)"
+      "Bash(dotnet restore:*)",
+      "Bash(dotnet publish:*)",
+      "Bash(test:*)"
     ],
     "deny": [],
     "ask": []
